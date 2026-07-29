@@ -1,0 +1,54 @@
+# Binaries
+/bin/
+/dist/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+print-kiosk
+
+# Test / coverage
+*.test
+*.out
+coverage.html
+coverage.out
+
+# Go workspace
+go.work
+go.work.sum
+
+# Dependency vendor (uncomment if you prefer not to commit vendor/)
+# /vendor/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+*.swp
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# App runtime / local data
+*.db
+*.sqlite
+*.sqlite3
+/data/
+/logs/
+*.log
+/tmp/
+/uploads/
+/print-jobs/
+
+# Secrets / local config overrides
+.env
+.env.*
+!.env.example
+config.local.*
+*.pem
+*.key
+secrets.*
