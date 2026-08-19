@@ -1,12 +1,12 @@
 /**
  * Kiosk idle watchdog:
  * after session_timeout_sec without interaction → home,
- * with a 10s countdown near the end.
- * Paused while dialogs/loading overlays are open.
+ * with a 15s countdown warning on top of any screen (including dialogs).
+ * Paused only while a loading overlay is visible.
  * Wait screens (email/MAX) skip the timer so the visitor can receive a file.
  */
 (function () {
-  const WARN_BEFORE_MS = 10 * 1000;
+  const WARN_BEFORE_MS = 15 * 1000;
   const TICK_MS = 250;
   const DEFAULT_LIMIT_MS = 120 * 1000;
 
@@ -37,52 +37,72 @@
     })
     .catch(() => {});
 
+  function warnWindowMs() {
+    // Always warn for 15s when the session is long enough.
+    // Never shorter than 10s unless the whole timeout is under 10s.
+    const minWarn = Math.min(10000, idleLimitMs);
+    return Math.min(WARN_BEFORE_MS, Math.max(minWarn, idleLimitMs - 5000));
+  }
+
   function ensureUI() {
     if (overlay) return;
-    overlay = document.createElement("div");
+    overlay = document.createElement("dialog");
     overlay.className = "idle-overlay";
-    overlay.hidden = true;
-    overlay.innerHTML = `
-      <div class="idle-card" role="dialog" aria-live="assertive" aria-modal="true">
-        <h2>Сессия скоро завершится</h2>
-        <p class="idle-count"><span id="idle-seconds">10</span></p>
-        <p class="muted">Нет действий. Возврат на главную через несколько секунд.</p>
-        <button type="button" class="primary-btn" id="idle-stay-btn">Остаться</button>
-      </div>
-    `;
+    overlay.setAttribute("aria-modal", "true");
+    overlay.setAttribute("aria-live", "assertive");
+    overlay.innerHTML =
+      '<div class="idle-card" role="document">' +
+      "<h2>Сессия скоро завершится</h2>" +
+      '<p class="idle-count"><span id="idle-seconds">15</span></p>' +
+      '<p class="muted">Нет действий. Возврат на главную через несколько секунд.</p>' +
+      '<button type="button" class="primary-btn" id="idle-stay-btn">Остаться</button>' +
+      "</div>";
     document.body.appendChild(overlay);
     secondsEl = overlay.querySelector("#idle-seconds");
     overlay.querySelector("#idle-stay-btn").addEventListener("click", (e) => {
       e.stopPropagation();
-      bump();
-      hideWarn();
+      stay();
     });
-    overlay.addEventListener("click", bump);
+    overlay.addEventListener("click", (e) => {
+      if (e.target === overlay) stay();
+    });
+    overlay.addEventListener("cancel", (e) => {
+      e.preventDefault();
+      stay();
+    });
   }
 
   function bump() {
     lastActive = Date.now();
   }
 
+  function stay() {
+    bump();
+    hideWarn();
+  }
+
   function isPaused() {
-    if (document.querySelector("dialog[open]")) return true;
-    const loading = document.querySelector(".loading-overlay:not([hidden])");
-    if (loading) return true;
+    if (document.querySelector(".loading-overlay:not([hidden])")) return true;
     return false;
   }
 
   function showWarn(secondsLeft) {
     ensureUI();
     warnVisible = true;
-    overlay.hidden = false;
     document.body.classList.add("idle-warn");
     if (secondsEl) secondsEl.textContent = String(Math.max(1, secondsLeft));
+    overlay.hidden = false;
+    if (typeof overlay.showModal === "function") {
+      if (!overlay.open) overlay.showModal();
+    }
   }
 
   function hideWarn() {
     warnVisible = false;
-    if (overlay) overlay.hidden = true;
     document.body.classList.remove("idle-warn");
+    if (!overlay) return;
+    if (overlay.open) overlay.close();
+    overlay.hidden = true;
   }
 
   function sessionPayload() {
@@ -102,6 +122,7 @@
   function goHome() {
     if (leaving) return;
     leaving = true;
+    hideWarn();
     const body = sessionPayload();
     const hasIds = Object.keys(body).length > 0;
     const finish = () => {
@@ -135,7 +156,7 @@
     }
 
     const remaining = idleLimitMs - idle;
-    const warnMs = Math.min(WARN_BEFORE_MS, Math.max(3000, idleLimitMs / 6));
+    const warnMs = warnWindowMs();
     if (remaining <= warnMs) {
       showWarn(Math.ceil(remaining / 1000));
     } else if (warnVisible) {
@@ -143,23 +164,13 @@
     }
   }
 
-  const activityEvents = [
-    "pointerdown",
-    "pointermove",
-    "keydown",
-    "touchstart",
-    "touchmove",
-    "wheel",
-    "scroll",
-  ];
-  activityEvents.forEach((evt) => {
+  ["pointerdown", "keydown", "touchstart"].forEach((evt) => {
     document.addEventListener(
       evt,
-      () => {
+      (e) => {
+        if (overlay && overlay.contains(e.target)) return;
         bump();
-        if (warnVisible && evt !== "pointermove" && evt !== "touchmove" && evt !== "scroll") {
-          hideWarn();
-        }
+        if (warnVisible) hideWarn();
       },
       { passive: true, capture: true }
     );

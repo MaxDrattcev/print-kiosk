@@ -805,14 +805,19 @@ a {
 }
 
 .secondary-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 100%;
+  max-width: 100%;
   min-height: var(--touch);
   border-radius: 18px;
   padding: 14px 18px;
   background: #edf4ff;
   color: var(--text);
-  margin-top: 12px;
+  margin: 12px 0 0;
   font-size: 18px;
+  box-sizing: border-box;
 }
 
 /* Browse */
@@ -1156,7 +1161,7 @@ a {
 
 .modal {
   border: 0;
-  padding: 0;
+  padding: 32px 24px;
   background: var(--bg);
   max-width: 100%;
   margin: 0;
@@ -1171,13 +1176,20 @@ a {
   animation: screen-in 180ms ease;
 }
 
+.modal[open] {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
 .modal::backdrop {
   background: rgba(16, 28, 58, 0.45);
 }
 
 .modal-card {
   width: min(720px, calc(100% - 48px));
-  margin: 8vh auto 40px;
+  margin: 0;
   border-radius: var(--radius);
   padding: 40px 36px;
   background: var(--card);
@@ -1285,7 +1297,7 @@ a {
 
 .payment-card {
   width: min(640px, calc(100% - 48px));
-  margin: 7vh auto 40px;
+  margin: 0;
   padding: 48px 40px 32px;
   background: #fff;
   border-radius: 36px;
@@ -1479,6 +1491,14 @@ a {
 .error-state {
   text-align: center;
   padding: 12px 8px 28px;
+}
+
+.modal-card.success-state,
+.modal-card.error-state {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  overflow: visible;
 }
 
 .status-illustration,
@@ -1895,7 +1915,7 @@ body.kiosk-mode {
 
   .modal-card {
     width: min(720px, calc(100% - 32px));
-    margin-top: 6vh;
+    margin: 0;
     padding: 32px 24px;
   }
 }
@@ -1921,231 +1941,189 @@ body.kiosk-mode {
   }
 }
 
-/* Home screen: vertical kiosk — large operations + square bottom tiles */
+/* Home: grow Print / Copy / Scan. Keep price & support compact. */
 
 body.kiosk-home {
   min-height: 100vh;
   min-height: 100dvh;
 }
 
-.kiosk-home a,
-.kiosk-home button {
+body.kiosk-home a,
+body.kiosk-home button {
   -webkit-user-drag: none;
 }
 
-.kiosk-home .app {
+body.kiosk-home .app {
   min-height: 100vh;
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
-  justify-content: flex-start;
   padding:
-    clamp(20px, 2.6vh, 40px)
+    clamp(20px, 2.4vh, 36px)
     clamp(20px, 4vw, 48px)
-    clamp(32px, 3.2vh, 48px);
+    clamp(24px, 3vh, 40px);
 }
 
-.kiosk-home .app-header {
-  flex-shrink: 0;
+body.kiosk-home .app-header {
+  flex: 0 0 auto;
   width: 100%;
 }
 
-.kiosk-home .specialist-button {
+body.kiosk-home .specialist-button {
   min-height: 44px;
   padding: 0 16px;
   font-size: 14px;
   border-radius: 16px;
 }
 
-.kiosk-home .specialist-button svg {
+body.kiosk-home .specialist-button svg {
   width: 18px;
   height: 18px;
 }
 
-.kiosk-home .brand-icon {
-  width: clamp(64px, 6.2vh, 80px);
-  height: clamp(64px, 6.2vh, 80px);
-  border-radius: clamp(18px, 1.8vh, 22px);
+body.kiosk-home .brand-icon {
+  width: clamp(64px, 6vh, 80px);
+  height: clamp(64px, 6vh, 80px);
 }
 
-.kiosk-home .brand-icon svg {
-  width: clamp(34px, 3.2vh, 42px);
-  height: clamp(34px, 3.2vh, 42px);
-}
-
-.kiosk-home .brand-title {
-  font-size: clamp(24px, 1.1vh + 1.6vw, 32px);
-}
-
-.kiosk-home .brand-subtitle {
-  font-size: clamp(14px, 0.7vh + 0.6vw, 16px);
-}
-
-.kiosk-home .hero {
-  flex-shrink: 0;
-  width: 100%;
-  margin: clamp(16px, 3.4vh, 40px) auto clamp(16px, 2.6vh, 32px);
-}
-
-.kiosk-home .hero h1 {
-  font-size: clamp(40px, 3vh + 2.4vw, 64px);
-}
-
-.kiosk-home .hero p {
-  margin-top: clamp(8px, 1vh, 16px);
-  font-size: clamp(18px, 1vh + 0.7vw, 26px);
-}
-
-.kiosk-home .actions {
+body.kiosk-home .hero {
   flex: 0 0 auto;
   width: 100%;
-  gap: clamp(24px, 2.4vh, 32px);
+  margin: clamp(12px, 2.4vh, 28px) auto clamp(12px, 2vh, 24px);
 }
 
-.kiosk-home .action-card {
-  min-height: clamp(180px, 18vh, 220px);
-  grid-template-columns:
-    clamp(120px, 15vw, 176px)
-    1fr
-    clamp(72px, 8vw, 88px);
+body.kiosk-home .hero h1 {
+  font-size: clamp(36px, 3.2vh + 2vw, 56px);
 }
 
-.kiosk-home .action-icon {
-  width: clamp(64px, 6.6vh, 72px);
-  height: clamp(64px, 6.6vh, 72px);
-  border-radius: 22px;
+body.kiosk-home .hero p {
+  margin-top: 8px;
+  font-size: clamp(18px, 1.2vh + 0.5vw, 24px);
 }
 
-.kiosk-home .action-icon svg {
-  width: clamp(36px, 3.8vh, 44px);
-  height: clamp(36px, 3.8vh, 44px);
-}
-
-.kiosk-home .action-text {
-  padding: clamp(24px, 2.6vh, 40px) clamp(24px, 3vw, 40px);
-}
-
-.kiosk-home .action-title {
-  font-size: clamp(24px, 1.5vh + 1.5vw, 34px);
-}
-
-.kiosk-home .action-description {
-  margin-top: clamp(6px, 0.8vh, 10px);
-  font-size: clamp(16px, 0.9vh + 0.4vw, 20px);
-}
-
-.kiosk-home .arrow {
-  width: clamp(52px, 5.6vh, 64px);
-  height: clamp(52px, 5.6vh, 64px);
-}
-
-.kiosk-home .arrow svg {
-  width: clamp(22px, 2.2vh, 28px);
-  height: clamp(22px, 2.2vh, 28px);
-}
-
-.kiosk-home .secondary-actions {
+body.kiosk-home .actions {
   flex: 1 1 auto;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  align-items: stretch;
-  width: 100%;
-  margin-top: auto;
-  padding-top: clamp(20px, 2.4vh, 32px);
-  gap: clamp(16px, 2vw, 24px);
-}
-
-.kiosk-home .secondary-card {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: clamp(12px, 1.6vh, 20px);
-  min-height: clamp(160px, 20vh, 200px);
-  height: 100%;
-  max-height: min(42vh, 480px);
-  padding: clamp(20px, 2.4vh, 32px);
-  grid-template-columns: none;
-  background: var(--card);
-  box-shadow: var(--shadow-soft);
+  width: 100%;
+  min-height: 0;
+  gap: clamp(14px, 1.8vh, 24px);
+}
+
+body.kiosk-home .action-card {
+  flex: 1 1 0;
+  min-height: 168px;
+  grid-template-columns:
+    clamp(140px, 18vw, 220px)
+    1fr
+    clamp(76px, 8vw, 96px);
+}
+
+body.kiosk-home .action-icon {
+  width: clamp(88px, 9vh, 120px);
+  height: clamp(88px, 9vh, 120px);
   border-radius: 28px;
 }
 
-.kiosk-home .secondary-arrow {
-  display: none;
+body.kiosk-home .action-icon svg {
+  width: clamp(52px, 5.4vh, 72px);
+  height: clamp(52px, 5.4vh, 72px);
 }
 
-.kiosk-home .secondary-icon {
-  width: clamp(56px, 6vh, 72px);
-  height: clamp(56px, 6vh, 72px);
-  border-radius: 18px;
+body.kiosk-home .action-text {
+  padding: clamp(20px, 2.4vh, 36px) clamp(20px, 2.8vw, 36px);
 }
 
-.kiosk-home .secondary-icon svg {
-  width: clamp(28px, 3vh, 36px);
-  height: clamp(28px, 3vh, 36px);
+body.kiosk-home .action-title {
+  font-size: clamp(26px, 2vh + 1.2vw, 38px);
 }
 
-.kiosk-home .secondary-title {
-  text-align: center;
-  font-size: clamp(16px, 1.3vh + 0.4vw, 22px);
-  line-height: 1.25;
+body.kiosk-home .action-description {
+  margin-top: 8px;
+  font-size: clamp(16px, 1.1vh + 0.3vw, 22px);
 }
 
-@media (orientation: portrait) and (min-height: 1400px) {
-  .kiosk-home .action-card {
-    min-height: clamp(180px, 18vh, 220px);
-  }
+body.kiosk-home .arrow {
+  width: clamp(56px, 6.2vh, 72px);
+  height: clamp(56px, 6.2vh, 72px);
+}
+
+body.kiosk-home .arrow svg {
+  width: 28px;
+  height: 28px;
+}
+
+body.kiosk-home .secondary-actions {
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  width: 100%;
+  margin-top: clamp(14px, 2vh, 24px);
+  padding-top: 0;
+  gap: 14px;
+}
+
+body.kiosk-home .secondary-card {
+  display: grid;
+  grid-template-columns: 52px 1fr 22px;
+  align-items: center;
+  gap: 12px;
+  min-height: 88px;
+  max-height: none;
+  height: auto;
+  padding: 14px 18px;
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: none;
+  border-radius: 22px;
+}
+
+body.kiosk-home .secondary-arrow {
+  display: grid;
+}
+
+body.kiosk-home .secondary-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+}
+
+body.kiosk-home .secondary-icon svg {
+  width: 24px;
+  height: 24px;
+}
+
+body.kiosk-home .secondary-title {
+  text-align: left;
+  font-size: 17px;
+  font-weight: 700;
 }
 
 @media (max-height: 900px) {
-  .kiosk-home .app {
+  body.kiosk-home .app {
     padding-top: 16px;
-    padding-bottom: 24px;
+    padding-bottom: 20px;
   }
 
-  .kiosk-home .hero {
-    margin: 10px auto 12px;
-  }
-
-  .kiosk-home .hero h1 {
-    font-size: clamp(32px, 6vh, 44px);
-  }
-
-  .kiosk-home .actions {
-    gap: 16px;
-  }
-
-  .kiosk-home .action-card {
-    min-height: clamp(120px, 18vh, 156px);
-  }
-
-  .kiosk-home .action-text {
-    padding: 16px 20px;
-  }
-
-  .kiosk-home .secondary-actions {
-    flex: 0 0 auto;
-    padding-top: 16px;
-  }
-
-  .kiosk-home .secondary-card {
-    min-height: 120px;
-    max-height: none;
-  }
-}
-
-@media (max-height: 760px) {
-  .kiosk-home .brand-subtitle {
-    display: none;
-  }
-
-  .kiosk-home .hero {
+  body.kiosk-home .hero {
     margin: 8px auto 10px;
   }
 
-  .kiosk-home .actions {
-    gap: 12px;
+  body.kiosk-home .action-card {
+    min-height: 120px;
+  }
+
+  body.kiosk-home .action-icon {
+    width: 64px;
+    height: 64px;
+  }
+
+  body.kiosk-home .action-icon svg {
+    width: 40px;
+    height: 40px;
+  }
+
+  body.kiosk-home .secondary-card {
+    min-height: 72px;
   }
 }
 
@@ -2155,6 +2133,7 @@ body.kiosk-user .screen {
   min-height: 100vh;
   min-height: 100dvh;
   padding: clamp(24px, 2.6vh, 32px);
+  --content: 100%;
 }
 
 body.kiosk-user .screen .page-title {
@@ -2265,24 +2244,41 @@ body.kiosk-user .payment-waiting-icon {
 .source-pick {
   display: flex;
   flex-direction: column;
+  align-items: stretch;
+  min-height: 100vh;
+  min-height: 100dvh;
 }
 
-.source-pick .actions {
+.source-pick > .app-header,
+.source-pick > .top-nav,
+.source-pick > .page-head,
+.source-pick > .actions {
+  flex: 0 0 auto;
   width: 100%;
-  flex: 1 0 auto;
+  max-width: none;
+  margin-left: 0;
+  margin-right: 0;
 }
 
-.back-btn--floor {
+.source-pick > .top-nav {
+  justify-content: flex-start;
+}
+
+.source-pick > .page-head {
+  margin-top: auto;
+  margin-bottom: clamp(16px, 2vh, 24px);
+}
+
+.source-pick > .actions {
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  gap: clamp(16px, 2vh, 24px);
+  margin-bottom: auto;
+}
+
+.source-pick .source-card {
   width: 100%;
-  max-width: var(--content);
-  margin: auto auto 0;
-  min-height: clamp(72px, 8vh, 88px);
-  padding: 16px 24px;
-  border-radius: 24px;
-  background: #edf4ff;
-  font-size: 22px;
+  min-height: clamp(168px, 18vh, 220px);
 }
 
 @media (max-height: 900px) {
@@ -2301,15 +2297,26 @@ body.kiosk-user .payment-waiting-icon {
 .idle-overlay {
   position: fixed;
   inset: 0;
-  z-index: 3000;
+  z-index: 4000;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  border: 0;
   display: grid;
   place-items: center;
   padding: 24px;
   background: rgba(16, 28, 58, 0.55);
 }
 
-.idle-overlay[hidden] {
+.idle-overlay[hidden],
+.idle-overlay:not([open]) {
   display: none;
+}
+
+.idle-overlay::backdrop {
+  background: rgba(16, 28, 58, 0.55);
 }
 
 .idle-card {
@@ -2503,4 +2510,409 @@ textarea.osk-target {
     min-width: 0;
     max-width: none;
   }
+}
+
+/* Terminal: every kiosk screen — large, centered, vertical */
+
+body.kiosk-user {
+  --touch: 72px;
+  --touch-lg: 104px;
+  --content: 100%;
+  font-size: 20px;
+}
+
+body.kiosk-user .app,
+body.kiosk-user .screen {
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: clamp(20px, 2.2vh, 36px);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+body.kiosk-user .app > *,
+body.kiosk-user .screen > * {
+  width: 100%;
+  max-width: none;
+  margin-left: 0;
+  margin-right: 0;
+}
+
+body.kiosk-user .app-header,
+body.kiosk-user .top,
+body.kiosk-user .top-nav {
+  flex: 0 0 auto;
+}
+
+body.kiosk-user .top-nav {
+  justify-content: flex-start;
+}
+
+body.kiosk-user .brand-title {
+  font-size: clamp(26px, 2.4vh, 34px);
+}
+
+body.kiosk-user .brand-subtitle {
+  font-size: 18px;
+}
+
+body.kiosk-user .brand-icon {
+  width: clamp(64px, 6.4vh, 84px);
+  height: clamp(64px, 6.4vh, 84px);
+}
+
+body.kiosk-user .page-title,
+body.kiosk-user .hero h1,
+body.kiosk-user .prompt-card h1,
+body.kiosk-user .browse-header h1,
+body.kiosk-user .settings-panel h1 {
+  font-size: clamp(32px, 3.4vh, 44px);
+}
+
+body.kiosk-user .page-subtitle,
+body.kiosk-user .hero p,
+body.kiosk-user .prompt-card p,
+body.kiosk-user .browse-header p {
+  font-size: clamp(18px, 1.8vh, 24px);
+}
+
+body.kiosk-user .action-title {
+  font-size: clamp(26px, 2.4vh, 36px);
+}
+
+body.kiosk-user .action-description,
+body.kiosk-user .source-email {
+  font-size: clamp(18px, 1.6vh, 22px);
+}
+
+body.kiosk-user:not(.kiosk-home) .source-card,
+body.kiosk-user:not(.kiosk-home) .action-card {
+  min-height: clamp(168px, 18vh, 240px);
+}
+
+body.kiosk-user .action-icon {
+  width: clamp(80px, 8.5vh, 112px);
+  height: clamp(80px, 8.5vh, 112px);
+}
+
+body.kiosk-user .action-icon svg {
+  width: clamp(48px, 5.2vh, 68px);
+  height: clamp(48px, 5.2vh, 68px);
+}
+
+body.kiosk-user .arrow {
+  width: clamp(56px, 6vh, 72px);
+  height: clamp(56px, 6vh, 72px);
+}
+
+body.kiosk-user .back-btn {
+  font-size: 24px;
+  min-height: 64px;
+}
+
+body.kiosk-user .back-btn span {
+  font-size: 36px;
+}
+
+body.kiosk-user .primary-btn,
+body.kiosk-user .cta-btn {
+  min-height: clamp(80px, 9vh, 108px);
+  font-size: clamp(22px, 2vh, 28px);
+  border-radius: 24px;
+}
+
+body.kiosk-user .pay-btn {
+  min-height: clamp(112px, 12vh, 140px);
+  font-size: clamp(24px, 2.2vh, 30px);
+}
+
+body.kiosk-user .secondary-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  max-width: 100%;
+  min-height: 72px;
+  margin: 16px 0 0;
+  font-size: 22px;
+}
+
+body.kiosk-user .modal-card.success-state,
+body.kiosk-user .modal-card.error-state {
+  padding: 48px 36px 40px;
+}
+
+body.kiosk-user .segmented span {
+  min-height: 80px;
+  font-size: 22px;
+  border-radius: 20px;
+}
+
+body.kiosk-user .round-btn {
+  width: 80px;
+  height: 80px;
+  font-size: 36px;
+}
+
+body.kiosk-user .copies-row input {
+  min-height: 80px;
+  font-size: 32px;
+}
+
+body.kiosk-user .option-label {
+  font-size: 20px;
+}
+
+body.kiosk-user .file-item,
+body.kiosk-user .drive-item,
+body.kiosk-user .step {
+  min-height: 88px;
+}
+
+body.kiosk-user .step-title,
+body.kiosk-user .file-name {
+  font-size: 22px;
+}
+
+body.kiosk-user .prompt-card,
+body.kiosk-user .prepare-screen {
+  margin-top: auto;
+  margin-bottom: auto;
+}
+
+body.kiosk-user .prompt-icon {
+  width: 120px;
+  height: 120px;
+}
+
+body.kiosk-user .modal[open] {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 24px;
+}
+
+body.kiosk-user .modal-card {
+  width: min(920px, calc(100% - 40px));
+  margin: 0;
+  padding: 44px 36px;
+}
+
+body.kiosk-user .modal-card h2 {
+  font-size: clamp(32px, 3.4vh, 44px);
+}
+
+body.kiosk-user .modal-card p,
+body.kiosk-user .modal-card button,
+body.kiosk-user .price-rows div {
+  font-size: 22px;
+}
+
+body.kiosk-user .price-rows strong {
+  font-size: 28px;
+}
+
+body.kiosk-user .support-phone {
+  font-size: 48px;
+}
+
+body.kiosk-user .payment-card {
+  width: min(840px, calc(100% - 40px));
+  margin: 0;
+  padding: 56px 44px 48px;
+}
+
+body.kiosk-user .payment-card--waiting {
+  padding: 64px 48px 56px;
+}
+
+body.kiosk-user .payment-title {
+  font-size: clamp(32px, 3.4vh, 42px);
+}
+
+body.kiosk-user .payment-amount,
+body.kiosk-user #pay-sum.payment-amount {
+  font-size: clamp(48px, 5.4vh, 64px);
+}
+
+body.kiosk-user .payment-method {
+  min-height: 140px;
+  padding: 28px 24px;
+}
+
+body.kiosk-user .payment-method__title {
+  font-size: 30px;
+}
+
+body.kiosk-user .payment-method__subtitle,
+body.kiosk-user .payment-method__hint {
+  font-size: 20px;
+}
+
+body.kiosk-user .payment-cancel {
+  min-height: 80px;
+  font-size: 24px;
+}
+
+body.kiosk-user .flow-icon,
+body.kiosk-user .payment-waiting-icon,
+body.kiosk-user .error-icon {
+  width: 128px;
+  height: 128px;
+}
+
+body.kiosk-user .idle-count {
+  font-size: 84px;
+}
+
+body.kiosk-user .idle-card h2 {
+  font-size: 32px;
+}
+
+body.kiosk-home .actions {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+}
+
+body.kiosk-home .action-card {
+  flex: 1 1 0;
+  min-height: 168px;
+}
+
+body.kiosk-home .secondary-actions {
+  flex: 0 0 auto;
+  grid-template-columns: 1fr 1fr;
+}
+
+body.kiosk-home .secondary-card {
+  min-height: 88px;
+}
+
+body.kiosk-home .secondary-card {
+  min-height: 112px;
+  grid-template-columns: 72px 1fr 28px;
+  gap: 14px;
+  padding: 18px 22px;
+}
+
+body.kiosk-home .secondary-icon {
+  width: 64px;
+  height: 64px;
+}
+
+body.kiosk-home .secondary-icon svg {
+  width: 32px;
+  height: 32px;
+}
+
+body.kiosk-home .secondary-title {
+  font-size: 22px;
+}
+
+body.kiosk-user .specialist-button,
+body.kiosk-home .specialist-button {
+  min-height: 64px;
+  padding: 0 22px;
+  font-size: 20px;
+  border-radius: 18px;
+}
+
+body.kiosk-user .specialist-button svg,
+body.kiosk-home .specialist-button svg {
+  width: 28px;
+  height: 28px;
+}
+
+body.kiosk-user .specialist-link {
+  min-height: 56px;
+  font-size: 18px;
+}
+
+body.kiosk-user .setup-screen,
+body.kiosk-user .setup-layout {
+  max-width: none;
+  width: 100%;
+}
+
+body.kiosk-user .setup-layout {
+  grid-template-columns: 1fr;
+}
+
+body.kiosk-user .copies-row {
+  grid-template-columns: 80px 1fr 80px;
+}
+
+body.kiosk-user .price-line {
+  font-size: 22px;
+}
+
+body.kiosk-user .price-line.total {
+  font-size: 28px;
+}
+
+body.kiosk-user .price-card {
+  padding: 28px 32px;
+}
+
+body.kiosk-user .price-card-label {
+  font-size: 22px;
+}
+
+body.kiosk-user .price-card-value {
+  font-size: 48px;
+}
+
+body.kiosk-user .file-icon {
+  width: 64px;
+  height: 64px;
+}
+
+body.kiosk-user .file-sub {
+  font-size: 18px;
+}
+
+body.kiosk-user .scan-steps {
+  max-width: none;
+  font-size: 22px;
+}
+
+body.kiosk-user .code-block {
+  font-size: 56px;
+}
+
+body.kiosk-user .prompt-card {
+  max-width: none;
+  width: 100%;
+  padding: 48px 36px 40px;
+}
+
+body.kiosk-user .settings-panel {
+  max-width: none;
+  width: 100%;
+  margin-left: 0;
+  margin-right: 0;
+}
+
+body.kiosk-user .modal-card > button,
+body.kiosk-user .modal-card form > button[value="close"] {
+  min-height: 80px;
+  font-size: 24px;
+}
+
+body.kiosk-user .osk-bar {
+  font-size: 1.1rem;
+}
+
+body.kiosk-user .osk-hide {
+  min-height: 56px;
+  font-size: 1.15rem;
+}
+
+body.kiosk-user .osk-key {
+  min-width: 56px;
+  min-height: 64px;
+  font-size: 1.35rem;
 }
