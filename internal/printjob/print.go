@@ -1,0 +1,200 @@
+package printjob
+
+import (
+	"fmt"
+	"log/slog"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"runtime"
+	"strconv"
+	"strings"
+)
+
+type PrintOptions struct {
+	Color  bool
+	Duplex bool
+	Copies int
+}
+
+func (s *Service) Print(job *Job, opt PrintOptions) error {
+	if job == nil {
+		return fmt.Errorf("job is nil")
+	}
+	if opt.Copies < 1 {
+		opt.Copies = 1
+	}
+
+	filePath := job.PreviewPath
+	if filePath == "" {
+		return fmt.Errorf("нет файла для печати")
+	}
+
+	if s.dryRun {
+		slog.Info("print dry-run", "file", filePath, "copies", opt.Copies, "color", opt.Color, "duplex", opt.Duplex, "printer", s.printerName)
+		return nil
+	}
+
+	switch runtime.GOOS {
+	case "windows":
+		return s.printWindows(filePath, opt)
+	default:
+		return printUnix(filePath, opt)
+	}
+}
+
+func printUnix(filePath string, opt PrintOptions) error {
+	if bin, err := exec.LookPath("lp"); err == nil {
+		return printLP(bin, filePath, opt)
+	}
+	if bin, err := exec.LookPath("lpr"); err == nil {
+		return printLPR(bin, filePath, opt)
+	}
+	return fmt.Errorf("команда печати не найдена (lp/lpr)")
+}
+
+func printLP(bin, filePath string, opt PrintOptions) error {
+	args := []string{
+		"-n", strconv.Itoa(opt.Copies),
+		"-o", "media=A4",
+		"-o", "PageSize=A4",
+		"-o", "CNPdeUseJobAccount=False",
+		"-o", "CNAuthenticate=False",
+		"-o", "CNUseSecuredPrint=False",
+		"-o", "CNJobExecMode=print",
+	}
+	if opt.Duplex {
+		args = append(args, "-o", "sides=two-sided-long-edge", "-o", "CNDuplex=DuplexFront")
+	} else {
+		args = append(args, "-o", "sides=one-sided", "-o", "CNDuplex=None")
+	}
+	args = append(args, filePath)
+
+	cmd := exec.Command(bin, args...)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("печать lp: %w (%s)", err, strings.TrimSpace(string(out)))
+	}
+	return nil
+}
+
+func printLPR(bin, filePath string, opt PrintOptions) error {
+	args := []string{"-#", strconv.Itoa(opt.Copies), "-o", "media=A4"}
+	if opt.Duplex {
+		args = append(args, "-o", "sides=two-sided-long-edge")
+	} else {
+		args = append(args, "-o", "sides=one-sided")
+	}
+	args = append(args, filePath)
+
+	cmd := exec.Command(bin, args...)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("печать lpr: %w (%s)", err, strings.TrimSpace(string(out)))
+	}
+	return nil
+}
+
+func (s *Service) printWindows(filePath string, opt PrintOptions) error {
+	abs, err := filepath.Abs(filePath)
+	if err != nil {
+		return fmt.Errorf("путь файла: %w", err)
+	}
+
+	if sumatra := resolveSumatra(s.sumatraPath); sumatra != "" {
+		return printSumatra(sumatra, abs, s.printerName, opt)
+	}
+
+	slog.Warn("SumatraPDF не найден, печать через ассоциацию Windows (менее надёжно)")
+	return printWindowsShell(abs, s.printerName, opt)
+}
+
+func printSumatra(bin, filePath, printer string, opt PrintOptions) error {
+	settings := []string{"noscale", "paper=A4"}
+	if opt.Duplex {
+		settings = append(settings, "duplex")
+	} else {
+		settings = append(settings, "simplex")
+	}
+	if opt.Color {
+		settings = append(settings, "color")
+	} else {
+		settings = append(settings, "monochrome")
+	}
+	if opt.Copies > 1 {
+		settings = append(settings, fmt.Sprintf("%dx", opt.Copies))
+	}
+
+	args := []string{"-silent", "-exit-when-done"}
+	if strings.TrimSpace(printer) != "" {
+		args = append(args, "-print-to", printer)
+	} else {
+		args = append(args, "-print-to-default")
+	}
+	args = append(args, "-print-settings", strings.Join(settings, ","), filePath)
+
+	cmd := exec.Command(bin, args...)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("печать SumatraPDF: %w (%s)", err, strings.TrimSpace(string(out)))
+	}
+	slog.Info("printed via SumatraPDF", "file", filePath, "printer", printer, "copies", opt.Copies)
+	return nil
+}
+
+func printWindowsShell(filePath, printer string, opt PrintOptions) error {
+	escaped := strings.ReplaceAll(filePath, "'", "''")
+	printerEsc := strings.ReplaceAll(printer, "'", "''")
+
+	var ps string
+	if strings.TrimSpace(printer) != "" {
+		ps = fmt.Sprintf(
+			`$file = '%s'; $printer = '%s'; for ($i = 0; $i -lt %d; $i++) { Start-Process -FilePath $file -Verb PrintTo -ArgumentList $printer -WindowStyle Hidden -Wait }`,
+			escaped, printerEsc, opt.Copies,
+		)
+	} else {
+		ps = fmt.Sprintf(
+			`$file = '%s'; for ($i = 0; $i -lt %d; $i++) { Start-Process -FilePath $file -Verb Print -WindowStyle Hidden -Wait }`,
+			escaped, opt.Copies,
+		)
+	}
+
+	cmd := exec.Command("powershell", "-NoProfile", "-NonInteractive", "-Command", ps)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("печать windows: %w (%s)", err, strings.TrimSpace(string(out)))
+	}
+	slog.Info("printed via Windows shell", "file", filePath, "printer", printer, "copies", opt.Copies)
+	return nil
+}
+
+func resolveSumatra(configured string) string {
+	candidates := []string{}
+	if configured != "" {
+		candidates = append(candidates, configured)
+	}
+	if exe, err := os.Executable(); err == nil {
+		dir := filepath.Dir(exe)
+		candidates = append(candidates,
+			filepath.Join(dir, "SumatraPDF.exe"),
+			filepath.Join(dir, "tools", "SumatraPDF.exe"),
+		)
+	}
+	candidates = append(candidates,
+		`C:\Program Files\SumatraPDF\SumatraPDF.exe`,
+		`C:\Program Files (x86)\SumatraPDF\SumatraPDF.exe`,
+	)
+	if p, err := exec.LookPath("SumatraPDF.exe"); err == nil {
+		candidates = append(candidates, p)
+	}
+	if p, err := exec.LookPath("SumatraPDF"); err == nil {
+		candidates = append(candidates, p)
+	}
+
+	for _, c := range candidates {
+		if st, err := os.Stat(c); err == nil && !st.IsDir() {
+			return c
+		}
+	}
+	return ""
+}

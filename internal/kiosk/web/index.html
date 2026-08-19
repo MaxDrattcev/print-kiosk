@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>PrintStart — терминал самообслуживания</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <div class="brand">
+        <div class="brand-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M6 9V3h12v6"/>
+            <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
+            <rect x="6" y="14" width="12" height="7" rx="1"/>
+            <path d="M18 12h.01"/>
+          </svg>
+        </div>
+        <div>
+          <div class="brand-title">PrintStart</div>
+          <div class="brand-subtitle">Сервис печати</div>
+        </div>
+      </div>
+
+      <a class="specialist-button" href="/admin/">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="8" r="4"/>
+          <path d="M4 21v-2a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v2"/>
+        </svg>
+        Вход для специалиста
+      </a>
+    </header>
+
+    <section class="hero">
+      <h1>Добро пожаловать!</h1>
+      <p>Выберите нужную операцию</p>
+    </section>
+
+    <main class="actions" aria-label="Основные операции">
+      <a class="action-card" href="/print/">
+        <div class="action-visual">
+          <div class="action-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M6 9V3h12v6"/>
+              <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
+              <rect x="6" y="14" width="12" height="7" rx="1"/>
+            </svg>
+          </div>
+        </div>
+        <div class="action-text">
+          <div class="action-title">Печать документов</div>
+          <div class="action-description">Загрузите файл и распечатайте его</div>
+        </div>
+        <div class="arrow" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 18l6-6-6-6"/>
+          </svg>
+        </div>
+      </a>
+
+      <a class="action-card green" href="/copy/">
+        <div class="action-visual">
+          <div class="action-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="8" y="8" width="12" height="12" rx="2"/>
+              <path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>
+            </svg>
+          </div>
+        </div>
+        <div class="action-text">
+          <div class="action-title">Копирование документов</div>
+          <div class="action-description">Сделайте копию документа</div>
+        </div>
+        <div class="arrow" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 18l6-6-6-6"/>
+          </svg>
+        </div>
+      </a>
+
+      <a class="action-card purple" href="/scan/">
+        <div class="action-visual">
+          <div class="action-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M5 7l14-4"/>
+              <path d="M5 7v5"/>
+              <path d="M19 3v5"/>
+              <rect x="4" y="12" width="16" height="7" rx="2"/>
+              <path d="M8 22h8"/>
+            </svg>
+          </div>
+        </div>
+        <div class="action-text">
+          <div class="action-title">Сканирование документов</div>
+          <div class="action-description">Получите электронную копию</div>
+        </div>
+        <div class="arrow" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 18l6-6-6-6"/>
+          </svg>
+        </div>
+      </a>
+    </main>
+
+    <section class="secondary-actions">
+      <button class="secondary-card" type="button" id="price-btn">
+        <div class="secondary-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M6 2h9l4 4v16H6z"/>
+            <path d="M14 2v5h5"/>
+            <path d="M9 12h6"/>
+            <path d="M9 16h6"/>
+          </svg>
+        </div>
+        <div class="secondary-title">Прайс<br>всех услуг</div>
+        <div class="secondary-arrow" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 18l6-6-6-6"/>
+          </svg>
+        </div>
+      </button>
+
+      <button class="secondary-card" type="button" id="support-btn">
+        <div class="secondary-icon green">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M4 14v-3a8 8 0 0 1 16 0v3"/>
+            <path d="M18 19h1a2 2 0 0 0 2-2v-3h-4v5z"/>
+            <path d="M6 19H5a2 2 0 0 1-2-2v-3h4v5z"/>
+            <path d="M18 19c0 2-2 3-5 3"/>
+          </svg>
+        </div>
+        <div class="secondary-title">Связаться<br>с менеджером</div>
+        <div class="secondary-arrow" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 18l6-6-6-6"/>
+          </svg>
+        </div>
+      </button>
+    </section>
+  </div>
+
+  <dialog class="modal" id="price-modal">
+    <form method="dialog" class="modal-card">
+      <h2>Прайс услуг</h2>
+      <div class="price-rows">
+        <div><span>Чёрно-белая печать</span><strong id="price-bw">—</strong></div>
+        <div><span>Цветная печать</span><strong id="price-color">—</strong></div>
+        <div><span>Копия документа</span><strong id="price-copy">—</strong></div>
+        <div><span>Скан документа</span><strong id="price-scan">—</strong></div>
+      </div>
+      <button value="close">Закрыть</button>
+    </form>
+  </dialog>
+
+  <dialog class="modal" id="support-modal">
+    <form method="dialog" class="modal-card">
+      <h2>Связаться с менеджером</h2>
+      <p id="support-text">—</p>
+      <button value="close">Закрыть</button>
+    </form>
+  </dialog>
+
+  <script>
+    async function loadInfo() {
+      const res = await fetch('/api/kiosk/info');
+      if (!res.ok) return null;
+      return res.json();
+    }
+
+    function formatPrice(value) {
+      const n = Number(value);
+      if (Number.isNaN(n)) return value + ' ₽';
+      return n.toLocaleString('ru-RU') + ' ₽ / лист';
+    }
+
+    (async () => {
+      const info = await loadInfo();
+      if (!info) return;
+      document.getElementById('price-bw').textContent = formatPrice(info.price_bw);
+      document.getElementById('price-color').textContent = formatPrice(info.price_color);
+      document.getElementById('price-copy').textContent = formatPrice(info.price_copy);
+      document.getElementById('price-scan').textContent = formatPrice(info.price_scan);
+      document.getElementById('support-text').textContent = info.support_text || 'Обратитесь к администратору';
+    })();
+
+    document.getElementById('price-btn').addEventListener('click', () => {
+      document.getElementById('price-modal').showModal();
+    });
+    document.getElementById('support-btn').addEventListener('click', () => {
+      document.getElementById('support-modal').showModal();
+    });
+  </script>
+  <script src="/static/idle.js"></script>
+</body>
+</html>

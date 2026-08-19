@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>Копирование — PrintStart</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="screen">
+    <header class="top top-nav">
+      <a class="back-btn" href="/">
+        <span aria-hidden="true">‹</span>
+        Назад
+      </a>
+    </header>
+
+    <section class="prompt-card">
+      <div class="prompt-icon" aria-hidden="true">
+        <svg viewBox="0 0 96 96" fill="none">
+          <rect x="22" y="18" width="36" height="46" rx="6" fill="#18c97a" opacity=".55"/>
+          <rect x="38" y="30" width="36" height="46" rx="6" fill="#18c97a"/>
+          <path d="M46 46h20M46 56h20M46 66h12" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <h1>Подготовьте документ</h1>
+      <ol class="scan-steps">
+        <li>Откройте крышку копира / МФУ</li>
+        <li>Положите документ на стекло текстом вниз</li>
+        <li>Закройте крышку</li>
+        <li>Нажмите кнопку ниже, чтобы перейти к настройкам</li>
+      </ol>
+      <p class="error" id="error" hidden></p>
+      <button type="button" class="primary-btn" id="ready-btn">Документ готов к копированию</button>
+    </section>
+  </div>
+
+  <script>
+    const errorEl = document.getElementById('error');
+    const readyBtn = document.getElementById('ready-btn');
+
+    function showError(msg) {
+      errorEl.textContent = msg || '';
+      errorEl.hidden = !msg;
+    }
+
+    readyBtn.addEventListener('click', async () => {
+      showError('');
+      readyBtn.disabled = true;
+      try {
+        const res = await fetch('/api/kiosk/copy/jobs', { method: 'POST' });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          showError(data.error || 'Не удалось начать копирование');
+          readyBtn.disabled = false;
+          return;
+        }
+        location.href = '/copy/setup/?job=' + encodeURIComponent(data.job.id);
+      } catch (e) {
+        showError('Ошибка связи с сервером');
+        readyBtn.disabled = false;
+      }
+    });
+  </script>
+  <script src="/static/idle.js"></script>
+</body>
+</html>

@@ -48,6 +48,7 @@ desktop.ini
 .env
 .env.*
 !.env.example
+configs/config.yaml
 config.local.*
 *.pem
 *.key

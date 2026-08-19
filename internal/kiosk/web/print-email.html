@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>Печать с Email — PrintStart</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="screen">
+    <header class="top top-nav">
+      <a class="back-btn" href="/print/">
+        <span aria-hidden="true">‹</span>
+        Назад
+      </a>
+    </header>
+
+    <section class="prompt-card">
+      <div class="prompt-icon" aria-hidden="true">
+        <svg viewBox="0 0 96 96" fill="none">
+          <rect x="14" y="24" width="68" height="48" rx="10" fill="#18c97a"/>
+          <path d="M18 30l30 22 30-22" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <h1>Отправьте документ на почту</h1>
+      <p>С телефона или компьютера отправьте письмо с вложением на адрес:</p>
+      <p class="scan-price" id="email-address">…</p>
+      <ol class="scan-steps">
+        <li>Прикрепите файл к письму (PDF, Word, Excel, фото)</li>
+        <li>Максимальный размер файла: <strong id="max-size">—</strong></li>
+        <li>Отправьте письмо и нажмите кнопку ниже</li>
+        <li>Ожидание письма на терминале — до 2 минут</li>
+      </ol>
+      <p class="error" id="error" hidden></p>
+      <button type="button" class="primary-btn" id="sent-btn" disabled>Я отправил письмо на email</button>
+    </section>
+  </div>
+
+  <script>
+    const errorEl = document.getElementById('error');
+    const sentBtn = document.getElementById('sent-btn');
+    const params = new URLSearchParams(location.search);
+
+    function showError(msg) {
+      errorEl.textContent = msg || '';
+      errorEl.hidden = !msg;
+    }
+
+    if (params.get('timeout') === '1') {
+      showError('Письмо не найдено за 2 минуты. Отправьте документ ещё раз и нажмите кнопку ниже.');
+    }
+
+    (async () => {
+      try {
+        const res = await fetch('/api/kiosk/email/info');
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          showError(data.error || 'Почта недоступна');
+          return;
+        }
+        document.getElementById('email-address').textContent = data.email_address;
+        document.getElementById('max-size').textContent = data.max_file_size_mb + ' МБ';
+        sentBtn.disabled = false;
+      } catch (e) {
+        showError('Ошибка связи с сервером');
+      }
+    })();
+
+    sentBtn.addEventListener('click', async () => {
+      showError('');
+      sentBtn.disabled = true;
+      try {
+        const res = await fetch('/api/kiosk/email/sessions', { method: 'POST' });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          showError(data.error || 'Не удалось начать ожидание письма');
+          sentBtn.disabled = false;
+          return;
+        }
+        location.href = '/print/email/wait/?session=' + encodeURIComponent(data.session.id);
+      } catch (e) {
+        showError('Ошибка связи с сервером');
+        sentBtn.disabled = false;
+      }
+    });
+  </script>
+  <script src="/static/idle.js"></script>
+</body>
+</html>

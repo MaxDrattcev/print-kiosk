@@ -1,0 +1,51 @@
+name: Build Windows
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build Windows amd64
+        env:
+          CGO_ENABLED: "0"
+          GOOS: windows
+          GOARCH: amd64
+        run: |
+          mkdir -p dist/windows
+          go build -trimpath -ldflags="-s -w" -o dist/windows/print-kiosk.exe .
+          cp configs/config.example.yaml dist/windows/config.example.yaml
+          cp deploy/windows/start.bat dist/windows/start.bat
+          cp deploy/windows/README.txt dist/windows/README.txt
+
+      - name: Pack zip
+        run: |
+          cd dist/windows
+          zip -9 ../print-kiosk-windows-amd64.zip \
+            print-kiosk.exe \
+            config.example.yaml \
+            start.bat \
+            README.txt
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: print-kiosk-windows-amd64
+          path: dist/print-kiosk-windows-amd64.zip
+          if-no-files-found: error
+          retention-days: 30

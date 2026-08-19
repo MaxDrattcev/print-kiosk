@@ -1,0 +1,44 @@
+server:
+  addr: ":8080"
+  # Opens http://127.0.0.1:8080/ on start (default: true on Windows)
+  # open_browser: true
+
+admin:
+  username: admin
+  password: change-me
+
+database:
+  path: data/kiosk.db
+
+logging:
+  path: logs/kiosk.log
+  level: info
+
+telegram:
+  bot_token: ""
+  chat_id: ""
+
+payment:
+  driver_url: "http://localhost:8081"
+
+# Windows target machine settings
+printer:
+  # Exact printer queue name from Windows (Settings → Printers). Empty = default.
+  name: ""
+  # Optional: path to SumatraPDF.exe for silent PDF print (recommended on Windows).
+  # If empty, looks next to the .exe and in Program Files.
+  sumatra: ""
+  # true = do not send jobs to a real printer (local UI development)
+  dry_run: false
+
+paths:
+  # Windows example after LibreOffice install:
+  # libreoffice: "C:\\Program Files\\LibreOffice\\program\\soffice.exe"
+  libreoffice: "soffice"
+  # On Windows: if LibreOffice is missing, install via winget (or MSI download).
+  # May show a UAC prompt. Default: true on Windows.
+  # libreoffice_auto_install: true
+  # Optional fixed MSI URL (otherwise latest stable is resolved):
+  # libreoffice_msi_url: ""
+  uploads: data/uploads
+  print_jobs: data/print-jobs

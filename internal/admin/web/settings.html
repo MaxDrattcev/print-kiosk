@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Настройки — админ-панель</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/admin/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <strong>Админ-панель</strong>
+      <span class="muted" id="username"></span>
+    </div>
+    <div class="topbar-actions">
+      <button type="button" class="button secondary" id="home-link">Вернуться в основное меню</button>
+      <button type="button" class="button" id="logout-btn">Выйти</button>
+    </div>
+  </header>
+
+  <main class="settings-page">
+    <form class="card settings-form" id="settings-form">
+      <h1>Настройки киоска</h1>
+      <p class="unsaved-hint" id="unsaved-hint" hidden>Есть несохранённые изменения</p>
+
+      <section>
+        <h2>Печать и бумага</h2>
+        <div class="grid">
+          <label>Цена ч/б за лист (₽)
+            <input type="number" step="0.01" min="0" name="price_bw" required>
+          </label>
+          <label>Цена цветной за лист (₽)
+            <input type="number" step="0.01" min="0" name="price_color" required>
+          </label>
+          <label>Цена копии документа (₽)
+            <input type="number" step="0.01" min="0" name="price_copy" required>
+          </label>
+          <label>Цена скана документа (₽)
+            <input type="number" step="0.01" min="0" name="price_scan" required>
+          </label>
+          <label>Остаток бумаги (листы)
+            <input type="number" min="0" step="1" name="paper_remaining" required>
+          </label>
+          <label>Порог уведомления о бумаге
+            <input type="number" min="0" step="1" name="paper_alert_threshold" required>
+          </label>
+        </div>
+        <div class="paper-actions">
+          <button type="button" class="paper-refilled-btn" id="paper-refilled-btn">Бумага загружена</button>
+          <div class="paper-status" id="paper-status">
+            <span class="paper-status-label">В принтере</span>
+            <strong class="paper-status-value" id="paper-status-value">—</strong>
+          </div>
+          <span class="muted paper-actions-hint">Кнопка сбрасывает остаток на 500 листов</span>
+        </div>
+      </section>
+
+      <section>
+        <h2>Telegram</h2>
+        <div class="grid">
+          <label>Периодичность heartbeat
+            <input type="text" name="telegram_heartbeat_interval" placeholder="24h" required>
+          </label>
+          <label class="checkbox">
+            <input type="checkbox" name="telegram_cartridge_alerts" value="true">
+            Уведомления о картридже
+          </label>
+        </div>
+      </section>
+
+      <section>
+        <h2>Почта</h2>
+        <p class="muted">Один ящик: приём документов на печать (IMAP) и отправка сканов клиенту (SMTP).</p>
+        <div class="grid">
+          <label>Адрес электронной почты
+            <input type="email" name="email_address">
+          </label>
+          <label>Логин
+            <input type="text" name="email_login" autocomplete="off">
+          </label>
+          <label>Пароль приложения
+            <input type="password" name="email_password" autocomplete="new-password" placeholder="оставьте ******** чтобы не менять">
+          </label>
+          <label>Интервал проверки (сек)
+            <input type="number" min="0" step="1" name="email_poll_interval_sec" required>
+          </label>
+          <label>Макс. размер файла (МБ)
+            <input type="number" min="0" step="1" name="email_max_file_size_mb" required>
+          </label>
+        </div>
+      </section>
+
+      <section>
+        <h2>Киоск и оплата</h2>
+        <div class="grid">
+          <label class="checkbox">
+            <input type="checkbox" name="payment_enabled" value="true">
+            Приём оплаты включён
+          </label>
+          <label>Таймаут сессии (сек)
+            <input type="number" min="0" step="1" name="session_timeout_sec" required>
+          </label>
+          <label class="full">Текст / телефон поддержки
+            <textarea name="support_text" rows="3" required></textarea>
+          </label>
+        </div>
+      </section>
+
+      <p class="error" id="error" hidden></p>
+      <p class="success" id="success" hidden>Сохранено</p>
+
+      <div class="actions">
+        <button type="submit">Сохранить</button>
+      </div>
+    </form>
+  </main>
+
+  <dialog class="unsaved-modal" id="unsaved-modal">
+    <div class="unsaved-card">
+      <h2>Сохранить изменения?</h2>
+      <p>Вы изменили настройки, но не сохранили их.</p>
+      <div class="unsaved-actions">
+        <button type="button" class="unsaved-save" id="unsaved-save-btn">Сохранить</button>
+        <button type="button" class="unsaved-discard" id="unsaved-discard-btn">Не сохранять</button>
+        <button type="button" class="unsaved-cancel" id="unsaved-cancel-btn">Отмена</button>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog class="unsaved-modal" id="paper-confirm-modal">
+    <div class="unsaved-card">
+      <h2>Загрузка бумаги</h2>
+      <p>Вы уверены, что загрузили бумагу в количестве 500 листов?</p>
+      <div class="unsaved-actions">
+        <button type="button" class="unsaved-save paper-confirm-yes" id="paper-confirm-yes">Да, бумага загружена</button>
+        <button type="button" class="unsaved-cancel" id="paper-confirm-no">Отмена</button>
+      </div>
+    </div>
+  </dialog>
+
+  <script src="/admin/keyboard.js"></script>
+  <script src="/admin/admin-idle.js"></script>
+  <script>
+    KioskKeyboard.bind(document);
+
+    const boolFields = new Set(['telegram_cartridge_alerts', 'payment_enabled']);
+    const PASSWORD_MASK = '********';
+    let dirty = false;
+    let pendingLeave = null; // { type: 'href'|'logout', href? }
+    let allowLeave = false;
+
+    async function requireAuth() {
+      const res = await fetch('/api/admin/me', { credentials: 'same-origin' });
+      if (!res.ok) {
+        location.href = '/admin/';
+        return null;
+      }
+      return res.json();
+    }
+
+    function pluralRu(n, one, few, many) {
+      const abs = Math.abs(Number(n)) % 100;
+      const n1 = abs % 10;
+      if (abs > 10 && abs < 20) return many;
+      if (n1 > 1 && n1 < 5) return few;
+      if (n1 === 1) return one;
+      return many;
+    }
+
+    function updatePaperStatus(raw) {
+      const box = document.getElementById('paper-status');
+      const valueEl = document.getElementById('paper-status-value');
+      if (raw === undefined || raw === null || raw === '') {
+        raw = document.querySelector('input[name="paper_remaining"]')?.value;
+      }
+      const n = parseInt(String(raw), 10);
+      if (Number.isNaN(n)) {
+        valueEl.textContent = '—';
+        box.classList.remove('low');
+        return;
+      }
+      valueEl.textContent = n + ' ' + pluralRu(n, 'лист', 'листа', 'листов');
+      box.classList.toggle('low', n < 30);
+    }
+
+    function fillForm(settings) {
+      const form = document.getElementById('settings-form');
+      for (const [key, value] of Object.entries(settings)) {
+        const el = form.elements.namedItem(key);
+        if (!el) continue;
+        if (boolFields.has(key)) {
+          el.checked = value === 'true';
+        } else {
+          el.value = value;
+        }
+      }
+      updatePaperStatus(settings.paper_remaining);
+      markClean();
+    }
+
+    function collectForm(form) {
+      const data = {};
+      for (const el of form.elements) {
+        if (!el.name) continue;
+        if (boolFields.has(el.name)) {
+          data[el.name] = el.checked ? 'true' : 'false';
+        } else {
+          data[el.name] = el.value;
+        }
+      }
+      return data;
+    }
+
+    function markClean() {
+      dirty = false;
+      updateUnsavedHint();
+    }
+
+    function markDirty() {
+      dirty = true;
+      updateUnsavedHint();
+    }
+
+    function isDirty() {
+      return dirty;
+    }
+
+    function updateUnsavedHint() {
+      const hint = document.getElementById('unsaved-hint');
+      if (!hint) return;
+      hint.hidden = !dirty;
+    }
+
+    async function saveSettings() {
+      const errorEl = document.getElementById('error');
+      const successEl = document.getElementById('success');
+      errorEl.hidden = true;
+      successEl.hidden = true;
+
+      const form = document.getElementById('settings-form');
+      const payload = collectForm(form);
+      const res = await fetch('/api/admin/settings', {
+        method: 'PUT',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        errorEl.textContent = data.error || 'Ошибка сохранения';
+        errorEl.hidden = false;
+        return false;
+      }
+      if (payload.email_password && payload.email_password !== PASSWORD_MASK) {
+        form.elements.namedItem('email_password').value = PASSWORD_MASK;
+      }
+      updatePaperStatus(payload.paper_remaining);
+      markClean();
+      successEl.textContent = 'Сохранено';
+      successEl.hidden = false;
+      return true;
+    }
+
+    async function leaveNow() {
+      const action = pendingLeave;
+      pendingLeave = null;
+      allowLeave = true;
+      if (!action) return;
+      if (action.type === 'logout') {
+        await fetch('/api/admin/logout', { method: 'POST', credentials: 'same-origin' });
+        location.href = '/admin/';
+        return;
+      }
+      location.href = action.href || '/';
+    }
+
+    function askLeave(action) {
+      if (!isDirty()) {
+        pendingLeave = action;
+        leaveNow();
+        return;
+      }
+      pendingLeave = action;
+      document.getElementById('unsaved-modal').showModal();
+    }
+
+    (async () => {
+      const me = await requireAuth();
+      if (!me) return;
+      document.getElementById('username').textContent = me.username;
+
+      const res = await fetch('/api/admin/settings', { credentials: 'same-origin' });
+      const data = await res.json();
+      if (!res.ok) {
+        document.getElementById('error').textContent = data.error || 'Ошибка загрузки';
+        document.getElementById('error').hidden = false;
+        return;
+      }
+      fillForm(data.settings);
+
+      const form = document.getElementById('settings-form');
+      form.addEventListener('input', markDirty);
+      form.addEventListener('change', markDirty);
+
+      const paperInput = document.querySelector('input[name="paper_remaining"]');
+      if (paperInput) {
+        paperInput.addEventListener('input', () => updatePaperStatus(paperInput.value));
+        paperInput.addEventListener('change', () => updatePaperStatus(paperInput.value));
+      }
+    })();
+
+    document.getElementById('home-link').addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      askLeave({ type: 'href', href: '/' });
+    });
+
+    document.getElementById('logout-btn').addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      askLeave({ type: 'logout' });
+    });
+
+    document.getElementById('unsaved-save-btn').addEventListener('click', async () => {
+      const ok = await saveSettings();
+      if (!ok) {
+        document.getElementById('unsaved-modal').close();
+        pendingLeave = null;
+        return;
+      }
+      document.getElementById('unsaved-modal').close();
+      await leaveNow();
+    });
+
+    document.getElementById('unsaved-discard-btn').addEventListener('click', async () => {
+      // Discard without writing form values to the server
+      markClean();
+      document.getElementById('unsaved-modal').close();
+      await leaveNow();
+    });
+
+    document.getElementById('unsaved-cancel-btn').addEventListener('click', () => {
+      pendingLeave = null;
+      document.getElementById('unsaved-modal').close();
+    });
+
+    window.addEventListener('beforeunload', (e) => {
+      if (allowLeave || !isDirty()) return;
+      e.preventDefault();
+      e.returnValue = '';
+    });
+
+    document.getElementById('paper-refilled-btn').addEventListener('click', () => {
+      document.getElementById('paper-confirm-modal').showModal();
+    });
+
+    document.getElementById('paper-confirm-no').addEventListener('click', () => {
+      document.getElementById('paper-confirm-modal').close();
+    });
+
+    document.getElementById('paper-confirm-yes').addEventListener('click', async () => {
+      document.getElementById('paper-confirm-modal').close();
+
+      const errorEl = document.getElementById('error');
+      const successEl = document.getElementById('success');
+      errorEl.hidden = true;
+      successEl.hidden = true;
+
+      const res = await fetch('/api/admin/settings', {
+        method: 'PUT',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ paper_remaining: '500' }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        errorEl.textContent = data.error || 'Не удалось обновить остаток бумаги';
+        errorEl.hidden = false;
+        return;
+      }
+      const input = document.querySelector('input[name="paper_remaining"]');
+      if (input) input.value = '500';
+      updatePaperStatus(500);
+      successEl.textContent = 'Бумага загружена: остаток 500 листов';
+      successEl.hidden = false;
+    });
+
+    document.getElementById('settings-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      await saveSettings();
+    });
+  </script>
+</body>
+</html>

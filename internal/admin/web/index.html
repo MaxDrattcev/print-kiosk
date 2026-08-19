@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>Вход — админ-панель</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/admin/style.css">
+</head>
+<body>
+  <main class="auth-page">
+    <form class="card" id="login-form">
+      <h1>Вход для специалиста</h1>
+      <p class="muted">Введите логин и пароль. Клавиатура появится при нажатии на поле.</p>
+
+      <label>
+        Логин
+        <input type="text" name="username" autocomplete="off" inputmode="none" required autofocus>
+      </label>
+
+      <label>
+        Пароль
+        <input type="password" name="password" autocomplete="off" inputmode="none" required>
+      </label>
+
+      <p class="error" id="error" hidden></p>
+
+      <button type="submit">Войти</button>
+      <a class="back-link" href="/">← Вернуться в основное меню</a>
+    </form>
+  </main>
+
+  <script src="/admin/keyboard.js"></script>
+  <script>
+    KioskKeyboard.bind(document);
+
+    async function ensureGuest() {
+      const res = await fetch('/api/admin/me', { credentials: 'same-origin' });
+      if (res.ok) {
+        location.href = '/admin/settings.html';
+      }
+    }
+
+    ensureGuest();
+
+    document.getElementById('login-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const errorEl = document.getElementById('error');
+      errorEl.hidden = true;
+
+      const form = e.target;
+      const body = {
+        username: form.username.value.trim(),
+        password: form.password.value,
+      };
+
+      const res = await fetch('/api/admin/login', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        errorEl.textContent = data.error || 'Ошибка входа';
+        errorEl.hidden = false;
+        return;
+      }
+
+      location.href = '/admin/settings.html';
+    });
+  </script>
+</body>
+</html>

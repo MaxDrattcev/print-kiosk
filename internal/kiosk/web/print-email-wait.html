@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>Ожидание письма — PrintStart</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="screen">
+    <header class="top top-nav">
+      <a class="back-btn" href="/print/email/">
+        <span aria-hidden="true">‹</span>
+        Назад
+      </a>
+    </header>
+
+    <section class="prompt-card" id="wait-panel">
+      <div class="spinner" aria-hidden="true" style="margin:0 auto 18px"></div>
+      <h1>Ищем ваше письмо…</h1>
+      <p id="status-text">Проверяем почтовый ящик. Ожидание до 2 минут.</p>
+      <p class="scan-price" id="countdown" hidden></p>
+      <p class="error" id="error" hidden></p>
+      <button type="button" class="secondary-btn" id="cancel-btn">Отмена</button>
+    </section>
+
+    <section class="prompt-card" id="confirm-panel" hidden>
+      <h1>Это ваша почта?</h1>
+      <p>Найдено письмо. Подтвердите, что это ваши файлы.</p>
+      <p class="scan-price" id="from-address">—</p>
+      <ul class="scan-steps" id="file-preview"></ul>
+      <p class="error" id="confirm-error" hidden></p>
+      <button type="button" class="primary-btn" id="yes-btn">Да, это мои файлы</button>
+      <button type="button" class="secondary-btn" id="no-btn" style="margin-top:12px">Нет, ждать другое письмо</button>
+    </section>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(location.search);
+    const sessionId = params.get('session');
+    const errorEl = document.getElementById('error');
+    const confirmErrorEl = document.getElementById('confirm-error');
+    const statusText = document.getElementById('status-text');
+    const countdownEl = document.getElementById('countdown');
+    const waitPanel = document.getElementById('wait-panel');
+    const confirmPanel = document.getElementById('confirm-panel');
+    const fromAddressEl = document.getElementById('from-address');
+    const filePreviewEl = document.getElementById('file-preview');
+    const yesBtn = document.getElementById('yes-btn');
+    const noBtn = document.getElementById('no-btn');
+    let timer = null;
+    let countdownTimer = null;
+    let stopped = false;
+    let deadlineMs = 0;
+    let busy = false;
+
+    function showError(msg) {
+      errorEl.textContent = msg || '';
+      errorEl.hidden = !msg;
+    }
+
+    function showConfirmError(msg) {
+      confirmErrorEl.textContent = msg || '';
+      confirmErrorEl.hidden = !msg;
+    }
+
+    function formatRemain(ms) {
+      const sec = Math.max(0, Math.ceil(ms / 1000));
+      const m = Math.floor(sec / 60);
+      const s = sec % 60;
+      return m + ':' + String(s).padStart(2, '0');
+    }
+
+    function tickCountdown() {
+      if (!deadlineMs) {
+        countdownEl.hidden = true;
+        return;
+      }
+      const left = deadlineMs - Date.now();
+      if (left <= 0) {
+        countdownEl.textContent = '0:00';
+        countdownEl.hidden = false;
+        return;
+      }
+      countdownEl.textContent = 'Осталось ' + formatRemain(left);
+      countdownEl.hidden = false;
+    }
+
+    function showWait() {
+      waitPanel.hidden = false;
+      confirmPanel.hidden = true;
+      showConfirmError('');
+    }
+
+    function showConfirm(sess) {
+      waitPanel.hidden = true;
+      confirmPanel.hidden = false;
+      fromAddressEl.textContent = sess.from || 'Адрес отправителя неизвестен';
+      filePreviewEl.innerHTML = '';
+      (sess.files || []).forEach((f) => {
+        const li = document.createElement('li');
+        li.textContent = f.name;
+        filePreviewEl.appendChild(li);
+      });
+      if (!(sess.files || []).length) {
+        const li = document.createElement('li');
+        li.textContent = 'Файлы не найдены';
+        filePreviewEl.appendChild(li);
+      }
+    }
+
+    async function poll() {
+      if (stopped || !sessionId) return;
+      try {
+        const res = await fetch('/api/kiosk/email/sessions/' + encodeURIComponent(sessionId));
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          showError(data.error || 'Сессия не найдена');
+          stop();
+          return;
+        }
+        const sess = data.session;
+        if (sess.deadline_ms) {
+          deadlineMs = sess.deadline_ms;
+          tickCountdown();
+        }
+
+        if (sess.status === 'confirm') {
+          showConfirm(sess);
+          return;
+        }
+        if (sess.status === 'found') {
+          stop();
+          location.href = '/print/email/files/?session=' + encodeURIComponent(sessionId);
+          return;
+        }
+        if (sess.status === 'timeout') {
+          stop();
+          location.href = '/print/email/?timeout=1';
+          return;
+        }
+        if (sess.status === 'error') {
+          stop();
+          location.href = '/print/email/?timeout=1';
+          return;
+        }
+
+        showWait();
+        if (sess.error) {
+          statusText.textContent = 'Проверяем почту… (' + sess.error + ')';
+        } else {
+          statusText.textContent = 'Проверяем почтовый ящик. Ожидание до 2 минут.';
+        }
+      } catch (e) {
+        statusText.textContent = 'Нет связи, повторяем…';
+      }
+    }
+
+    function stop() {
+      stopped = true;
+      if (timer) clearInterval(timer);
+      if (countdownTimer) clearInterval(countdownTimer);
+    }
+
+    document.getElementById('cancel-btn').addEventListener('click', () => {
+      stop();
+      location.href = '/print/email/';
+    });
+
+    yesBtn.addEventListener('click', async () => {
+      if (busy) return;
+      busy = true;
+      showConfirmError('');
+      yesBtn.disabled = true;
+      noBtn.disabled = true;
+      try {
+        const res = await fetch(
+          '/api/kiosk/email/sessions/' + encodeURIComponent(sessionId) + '/confirm',
+          { method: 'POST' }
+        );
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          showConfirmError(data.error || 'Не удалось подтвердить');
+          busy = false;
+          yesBtn.disabled = false;
+          noBtn.disabled = false;
+          return;
+        }
+        stop();
+        location.href = '/print/email/files/?session=' + encodeURIComponent(sessionId);
+      } catch (e) {
+        showConfirmError('Ошибка связи с сервером');
+        busy = false;
+        yesBtn.disabled = false;
+        noBtn.disabled = false;
+      }
+    });
+
+    noBtn.addEventListener('click', async () => {
+      if (busy) return;
+      busy = true;
+      showConfirmError('');
+      yesBtn.disabled = true;
+      noBtn.disabled = true;
+      try {
+        const res = await fetch(
+          '/api/kiosk/email/sessions/' + encodeURIComponent(sessionId) + '/reject',
+          { method: 'POST' }
+        );
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          showConfirmError(data.error || 'Не удалось отклонить');
+          busy = false;
+          yesBtn.disabled = false;
+          noBtn.disabled = false;
+          return;
+        }
+        if (data.session && data.session.deadline_ms) {
+          deadlineMs = data.session.deadline_ms;
+          tickCountdown();
+        }
+        busy = false;
+        yesBtn.disabled = false;
+        noBtn.disabled = false;
+        showWait();
+        statusText.textContent = 'Ждём другое письмо… Ожидание до 2 минут.';
+      } catch (e) {
+        showConfirmError('Ошибка связи с сервером');
+        busy = false;
+        yesBtn.disabled = false;
+        noBtn.disabled = false;
+      }
+    });
+
+    if (!sessionId) {
+      showError('Сессия не указана');
+    } else {
+      poll();
+      timer = setInterval(poll, 2000);
+      countdownTimer = setInterval(tickCountdown, 1000);
+    }
+  </script>
+  <script src="/static/idle.js"></script>
+</body>
+</html>

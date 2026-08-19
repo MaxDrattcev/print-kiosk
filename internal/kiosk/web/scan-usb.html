@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>Сохранить на USB — PrintStart</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="screen">
+    <header class="top top-nav">
+      <a class="back-btn" id="back-btn" href="/scan/delivery/">
+        <span aria-hidden="true">‹</span>
+        Назад
+      </a>
+    </header>
+
+    <section class="prompt-card">
+      <div class="prompt-icon" aria-hidden="true">
+        <svg viewBox="0 0 96 96" fill="none">
+          <rect x="34" y="12" width="28" height="28" rx="6" fill="#3d7eff"/>
+          <rect x="22" y="36" width="52" height="42" rx="10" fill="#5b9bff"/>
+          <rect x="34" y="48" width="28" height="8" rx="4" fill="#fff"/>
+          <rect x="34" y="62" width="28" height="8" rx="4" fill="#fff"/>
+          <circle cx="48" cy="22" r="4" fill="#fff"/>
+        </svg>
+      </div>
+      <h1>Вставьте флешку в USB-разъём</h1>
+      <p id="file-hint">После подключения нажмите «Сохранить», и скан скопируется на флешку</p>
+      <p class="error" id="error" hidden></p>
+      <button type="button" class="primary-btn" id="save-btn">Сохранить на флешку</button>
+    </section>
+  </div>
+
+  <dialog class="modal" id="drives-modal">
+    <form method="dialog" class="modal-card">
+      <h2>Выберите флешку</h2>
+      <div class="drive-list" id="drive-list"></div>
+      <button value="cancel" class="secondary-btn">Отмена</button>
+    </form>
+  </dialog>
+
+  <dialog class="modal flow-modal" id="success-modal">
+    <div class="modal-card flow-card">
+      <div class="flow-icon success-icon" aria-hidden="true"></div>
+      <h2>Скан сохранён</h2>
+      <p class="muted" id="success-text">Файл записан на флешку. Можете извлечь накопитель.</p>
+      <button type="button" class="primary-btn" id="success-home">На главную</button>
+    </div>
+  </dialog>
+
+  <div class="loading-overlay" id="loading-overlay" hidden>
+    <div class="loading-card">
+      <div class="spinner" aria-hidden="true"></div>
+      <h2>Копирование</h2>
+      <p class="muted">Сохраняем файл на флешку…</p>
+    </div>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(location.search);
+    const jobId = params.get('job');
+    document.getElementById('back-btn').href = '/scan/delivery/?job=' + encodeURIComponent(jobId || '');
+
+    const errorEl = document.getElementById('error');
+    const saveBtn = document.getElementById('save-btn');
+    const drivesModal = document.getElementById('drives-modal');
+    const driveList = document.getElementById('drive-list');
+    const successModal = document.getElementById('success-modal');
+    const loadingOverlay = document.getElementById('loading-overlay');
+
+    function showError(msg) {
+      errorEl.textContent = msg || '';
+      errorEl.hidden = !msg;
+    }
+
+    function setLoading(show) {
+      loadingOverlay.hidden = !show;
+      document.body.classList.toggle('loading-lock', show);
+    }
+
+    async function loadJob() {
+      if (!jobId) {
+        showError('Заказ не найден');
+        saveBtn.disabled = true;
+        return;
+      }
+      const res = await fetch('/api/kiosk/scan/jobs/' + encodeURIComponent(jobId));
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        showError(data.error || 'Заказ не найден');
+        saveBtn.disabled = true;
+        return;
+      }
+      document.getElementById('file-hint').textContent =
+        'Файл «' + data.job.file_name + '» будет сохранён в корень флешки';
+    }
+
+    async function saveToDrive(drivePath) {
+      showError('');
+      setLoading(true);
+      saveBtn.disabled = true;
+      try {
+        const res = await fetch('/api/kiosk/scan/jobs/' + encodeURIComponent(jobId) + '/save-usb', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ drive_path: drivePath }),
+        });
+        const data = await res.json().catch(() => ({}));
+        setLoading(false);
+        if (!res.ok) {
+          showError(data.error || 'Не удалось сохранить на флешку');
+          saveBtn.disabled = false;
+          return;
+        }
+        document.getElementById('success-text').textContent =
+          'Файл «' + (data.job && data.job.file_name ? data.job.file_name : 'scan.pdf') +
+          '» записан. Можете извлечь флешку.';
+        successModal.showModal();
+      } catch (e) {
+        setLoading(false);
+        showError('Ошибка связи с сервером');
+        saveBtn.disabled = false;
+      }
+    }
+
+    function showDrivePicker(drives) {
+      driveList.innerHTML = '';
+      drives.forEach((drive) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'drive-item';
+        btn.textContent = drive.label || drive.name;
+        btn.addEventListener('click', () => {
+          drivesModal.close();
+          saveToDrive(drive.path);
+        });
+        driveList.appendChild(btn);
+      });
+      drivesModal.showModal();
+    }
+
+    saveBtn.addEventListener('click', async () => {
+      showError('');
+      saveBtn.disabled = true;
+      try {
+        const res = await fetch('/api/kiosk/usb/drives');
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          showError(data.error || 'Не удалось проверить USB');
+          saveBtn.disabled = false;
+          return;
+        }
+        const drives = data.drives || [];
+        if (drives.length === 0) {
+          showError('Флешка не найдена. Вставьте USB-накопитель и попробуйте снова');
+          saveBtn.disabled = false;
+          return;
+        }
+        if (drives.length === 1) {
+          await saveToDrive(drives[0].path);
+          return;
+        }
+        saveBtn.disabled = false;
+        showDrivePicker(drives);
+      } catch (e) {
+        showError('Ошибка связи с сервером');
+        saveBtn.disabled = false;
+      }
+    });
+
+    document.getElementById('success-home').addEventListener('click', () => {
+      location.href = '/';
+    });
+
+    loadJob();
+  </script>
+  <script src="/static/idle.js"></script>
+</body>
+</html>

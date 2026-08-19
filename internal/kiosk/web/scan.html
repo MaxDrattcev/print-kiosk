@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>Сканирование — PrintStart</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="screen">
+    <header class="top top-nav">
+      <a class="back-btn" href="/">
+        <span aria-hidden="true">‹</span>
+        Назад
+      </a>
+    </header>
+
+    <section class="prompt-card">
+      <div class="prompt-icon" aria-hidden="true">
+        <svg viewBox="0 0 96 96" fill="none">
+          <path d="M20 28l56-16" stroke="#8d5cff" stroke-width="4" stroke-linecap="round"/>
+          <path d="M20 28v20M76 12v20" stroke="#8d5cff" stroke-width="4" stroke-linecap="round"/>
+          <rect x="16" y="48" width="64" height="28" rx="8" fill="#8d5cff"/>
+          <rect x="28" y="84" width="40" height="6" rx="3" fill="#dcc8ff"/>
+        </svg>
+      </div>
+      <h1>Подготовьте документ</h1>
+      <ol class="scan-steps">
+        <li>Откройте крышку сканера / МФУ</li>
+        <li>Положите документ на стекло текстом вниз</li>
+        <li>Закройте крышку</li>
+        <li>Нажмите кнопку ниже, когда документ готов</li>
+      </ol>
+      <p class="scan-price" id="price-line">Стоимость: …</p>
+      <p class="error" id="error" hidden></p>
+      <button type="button" class="primary-btn" id="ready-btn">Документ готов к сканированию</button>
+    </section>
+  </div>
+
+  <dialog class="modal flow-modal" id="method-modal">
+    <div class="modal-card flow-card">
+      <h2>Выберите способ оплаты</h2>
+      <p class="muted" id="pay-sum">—</p>
+      <button type="button" class="primary-btn" id="pay-terminal-btn">Оплатить через терминал</button>
+      <button type="button" class="secondary-btn" id="pay-qr-btn" disabled>Оплатить через QR-код</button>
+      <button type="button" class="text-btn modal-cancel" id="method-cancel">Отмена</button>
+    </div>
+  </dialog>
+
+  <dialog class="modal flow-modal" id="terminal-modal">
+    <div class="modal-card flow-card">
+      <div class="flow-icon terminal-icon" aria-hidden="true"></div>
+      <h2>Внимание на терминал оплаты</h2>
+      <p class="muted">Следуйте подсказкам на экране терминала</p>
+      <div class="spinner" aria-hidden="true"></div>
+    </div>
+  </dialog>
+
+  <div class="loading-overlay" id="scan-overlay" hidden>
+    <div class="loading-card">
+      <div class="spinner" aria-hidden="true"></div>
+      <h2>Сканирование</h2>
+      <p class="muted">Не открывайте крышку, идёт сканирование документа…</p>
+    </div>
+  </div>
+
+  <script>
+    let jobId = null;
+    let price = 0;
+    let busy = false;
+
+    const errorEl = document.getElementById('error');
+    const readyBtn = document.getElementById('ready-btn');
+    const methodModal = document.getElementById('method-modal');
+    const terminalModal = document.getElementById('terminal-modal');
+    const scanOverlay = document.getElementById('scan-overlay');
+
+    function money(n) {
+      return Number(n).toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) + ' ₽';
+    }
+
+    function showError(msg) {
+      errorEl.textContent = msg || '';
+      errorEl.hidden = !msg;
+    }
+
+    async function createJob() {
+      const res = await fetch('/api/kiosk/scan/jobs', { method: 'POST' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Не удалось начать сканирование');
+      jobId = data.job.id;
+      price = data.price;
+      document.getElementById('price-line').textContent = 'Стоимость: ' + money(price);
+      document.getElementById('pay-sum').textContent = 'К оплате: ' + money(price);
+    }
+
+    readyBtn.addEventListener('click', async () => {
+      if (busy) return;
+      showError('');
+      try {
+        if (!jobId) await createJob();
+        methodModal.showModal();
+      } catch (e) {
+        showError(e.message || 'Ошибка');
+      }
+    });
+
+    document.getElementById('method-cancel').addEventListener('click', () => methodModal.close());
+    document.getElementById('pay-qr-btn').addEventListener('click', () => {
+      showError('Оплата через QR-код пока не подключена');
+      methodModal.close();
+    });
+
+    document.getElementById('pay-terminal-btn').addEventListener('click', async () => {
+      if (busy || !jobId) return;
+      busy = true;
+      readyBtn.disabled = true;
+      methodModal.close();
+      terminalModal.showModal();
+      showError('');
+
+      try {
+        const payRes = await fetch('/api/kiosk/scan/jobs/' + encodeURIComponent(jobId) + '/pay', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ method: 'terminal' }),
+        });
+        const payData = await payRes.json().catch(() => ({}));
+        terminalModal.close();
+        if (!payRes.ok) {
+          showError(payData.error || 'Ошибка оплаты');
+          busy = false;
+          readyBtn.disabled = false;
+          return;
+        }
+
+        scanOverlay.hidden = false;
+        document.body.classList.add('loading-lock');
+
+        const scanRes = await fetch('/api/kiosk/scan/jobs/' + encodeURIComponent(jobId) + '/scan', {
+          method: 'POST',
+        });
+        const scanData = await scanRes.json().catch(() => ({}));
+        scanOverlay.hidden = true;
+        document.body.classList.remove('loading-lock');
+
+        if (!scanRes.ok) {
+          showError(scanData.error || 'Не удалось отсканировать документ');
+          busy = false;
+          readyBtn.disabled = false;
+          return;
+        }
+
+        location.href = '/scan/name/?job=' + encodeURIComponent(jobId);
+      } catch (e) {
+        terminalModal.close();
+        scanOverlay.hidden = true;
+        document.body.classList.remove('loading-lock');
+        showError('Ошибка связи с сервером');
+        busy = false;
+        readyBtn.disabled = false;
+      }
+    });
+
+    createJob().catch((e) => showError(e.message || 'Ошибка загрузки'));
+  </script>
+  <script src="/static/idle.js"></script>
+</body>
+</html>

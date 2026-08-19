@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>Имя файла — PrintStart</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="screen">
+    <header class="top top-nav">
+      <a class="back-btn" href="/scan/">
+        <span aria-hidden="true">‹</span>
+        Назад
+      </a>
+    </header>
+
+    <section class="hero compact">
+      <h1>Как назвать файл?</h1>
+      <p>Введите имя для отсканированного документа</p>
+    </section>
+
+    <div class="name-form">
+      <div class="preview-mini" id="preview" hidden>
+        <iframe id="preview-frame" title="Превью скана"></iframe>
+      </div>
+      <label for="file-name">Имя файла</label>
+      <input id="file-name" type="text" inputmode="none" autocomplete="off" maxlength="76">
+      <p class="hint">Расширение .pdf добавится автоматически. Используйте экранную клавиатуру.</p>
+      <p class="error" id="error" hidden></p>
+      <button type="button" class="primary-btn" id="continue-btn">Продолжить</button>
+    </div>
+  </div>
+
+  <script src="/static/keyboard.js"></script>
+  <script>
+    KioskKeyboard.bind(document);
+
+    const params = new URLSearchParams(location.search);
+    const jobId = params.get('job');
+    const nameInput = document.getElementById('file-name');
+    const errorEl = document.getElementById('error');
+    const continueBtn = document.getElementById('continue-btn');
+
+    function showError(msg) {
+      errorEl.textContent = msg || '';
+      errorEl.hidden = !msg;
+    }
+
+    async function loadJob() {
+      if (!jobId) {
+        showError('Заказ не найден');
+        continueBtn.disabled = true;
+        return;
+      }
+      const res = await fetch('/api/kiosk/scan/jobs/' + encodeURIComponent(jobId));
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        showError(data.error || 'Заказ не найден');
+        continueBtn.disabled = true;
+        return;
+      }
+      const job = data.job;
+      if (job.status !== 'scanned' && job.status !== 'named') {
+        showError('Сначала выполните сканирование');
+        continueBtn.disabled = true;
+        return;
+      }
+      let name = job.file_name || '';
+      if (name.toLowerCase().endsWith('.pdf')) name = name.slice(0, -4);
+      nameInput.value = name;
+      if (job.preview_url) {
+        document.getElementById('preview').hidden = false;
+        document.getElementById('preview-frame').src = job.preview_url;
+      }
+      nameInput.focus();
+    }
+
+    continueBtn.addEventListener('click', async () => {
+      showError('');
+      continueBtn.disabled = true;
+      const res = await fetch('/api/kiosk/scan/jobs/' + encodeURIComponent(jobId) + '/name', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: nameInput.value }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        showError(data.error || 'Не удалось сохранить имя');
+        continueBtn.disabled = false;
+        return;
+      }
+      location.href = '/scan/delivery/?job=' + encodeURIComponent(jobId);
+    });
+
+    loadJob();
+  </script>
+  <script src="/static/idle.js"></script>
+</body>
+</html>

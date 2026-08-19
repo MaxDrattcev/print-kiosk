@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>Отправить скан на Email — PrintStart</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="screen">
+    <header class="top top-nav">
+      <a class="back-btn" id="back-btn" href="/scan/delivery/">
+        <span aria-hidden="true">‹</span>
+        Назад
+      </a>
+    </header>
+
+    <section class="hero compact">
+      <h1>Отправить на Email</h1>
+      <p id="file-hint">Введите адрес почты, куда отправить скан</p>
+    </section>
+
+    <div class="name-form">
+      <label for="email">Email получателя</label>
+      <input id="email" type="email" inputmode="none" autocomplete="off" placeholder="name@example.com">
+      <p class="hint">Используйте экранную клавиатуру. Файл придёт вложением PDF.</p>
+      <p class="error" id="error" hidden></p>
+      <button type="button" class="primary-btn" id="send-btn">Отправить</button>
+    </div>
+  </div>
+
+  <div class="loading-overlay" id="loading-overlay" hidden>
+    <div class="loading-card">
+      <div class="spinner" aria-hidden="true"></div>
+      <h2>Отправка письма</h2>
+      <p class="muted" id="loading-text">Отправляем скан на email…</p>
+    </div>
+  </div>
+
+  <dialog class="modal flow-modal" id="success-modal">
+    <div class="modal-card flow-card">
+      <div class="flow-icon success-icon" aria-hidden="true"></div>
+      <h2>Готово</h2>
+      <p class="muted" id="success-text">Скан отправлен на email.</p>
+      <button type="button" class="primary-btn" id="success-home">На главную</button>
+    </div>
+  </dialog>
+
+  <script src="/static/keyboard.js"></script>
+  <script>
+    KioskKeyboard.bind(document);
+
+    const params = new URLSearchParams(location.search);
+    const jobId = params.get('job');
+    const emailInput = document.getElementById('email');
+    const errorEl = document.getElementById('error');
+    const sendBtn = document.getElementById('send-btn');
+    const loadingOverlay = document.getElementById('loading-overlay');
+    const successModal = document.getElementById('success-modal');
+    let fileName = '';
+
+    document.getElementById('back-btn').href = '/scan/delivery/?job=' + encodeURIComponent(jobId || '');
+
+    function showError(msg) {
+      errorEl.textContent = msg || '';
+      errorEl.hidden = !msg;
+    }
+
+    function setLoading(show) {
+      loadingOverlay.hidden = !show;
+      document.body.classList.toggle('loading-lock', show);
+    }
+
+    function looksLikeEmail(s) {
+      const v = String(s || '').trim();
+      const at = v.lastIndexOf('@');
+      if (at < 1 || at === v.length - 1) return false;
+      const domain = v.slice(at + 1);
+      return domain.includes('.') && !domain.startsWith('.') && !domain.endsWith('.');
+    }
+
+    async function loadJob() {
+      if (!jobId) {
+        showError('Заказ не найден');
+        sendBtn.disabled = true;
+        return;
+      }
+      const res = await fetch('/api/kiosk/scan/jobs/' + encodeURIComponent(jobId));
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        showError(data.error || 'Заказ не найден');
+        sendBtn.disabled = true;
+        return;
+      }
+      const job = data.job;
+      fileName = job.file_name || 'scan.pdf';
+      document.getElementById('file-hint').textContent = 'Файл: ' + fileName;
+      if (job.status !== 'named' && job.status !== 'scanned' && job.status !== 'sent_email' && job.status !== 'saved_usb') {
+        showError('Сначала завершите сканирование и укажите имя файла');
+        sendBtn.disabled = true;
+        return;
+      }
+      emailInput.focus();
+    }
+
+    sendBtn.addEventListener('click', async () => {
+      showError('');
+      const email = emailInput.value.trim();
+      if (!looksLikeEmail(email)) {
+        showError('Введите корректный email');
+        return;
+      }
+      sendBtn.disabled = true;
+      setLoading(true);
+      try {
+        const res = await fetch('/api/kiosk/scan/jobs/' + encodeURIComponent(jobId) + '/send-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: email }),
+        });
+        const data = await res.json().catch(() => ({}));
+        setLoading(false);
+        if (!res.ok) {
+          showError(data.error || 'Не удалось отправить письмо');
+          sendBtn.disabled = false;
+          return;
+        }
+        document.getElementById('success-text').textContent =
+          'Скан «' + fileName + '» отправлен на ' + (data.email || email);
+        successModal.showModal();
+      } catch (e) {
+        setLoading(false);
+        showError('Ошибка связи с сервером');
+        sendBtn.disabled = false;
+      }
+    });
+
+    document.getElementById('success-home').addEventListener('click', () => {
+      location.href = '/';
+    });
+
+    loadJob();
+  </script>
+  <script src="/static/idle.js"></script>
+</body>
+</html>
