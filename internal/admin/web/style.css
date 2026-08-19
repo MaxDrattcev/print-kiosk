@@ -1,26 +1,31 @@
 :root {
-  --bg-top: #f8fbff;
-  --bg-bottom: #edf5ff;
-  --card: rgba(255, 255, 255, 0.94);
-  --text: #10275d;
+  --bg-top: #f7faff;
+  --bg-bottom: #eef4ff;
+  --bg: #f4f8ff;
+  --card: #ffffff;
+  --text: #142d68;
   --title: #142d68;
-  --muted: #6b7b9f;
-  --line: #d5e1f4;
-  --accent: #2479ff;
-  --accent-dark: #0055e9;
-  --danger: #c62828;
-  --ok: #049f5d;
-  --shadow: 0 18px 48px rgba(37, 72, 133, 0.08);
-  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+  --muted: #6d7ea3;
+  --line: rgba(20, 45, 104, 0.08);
+  --accent: #1769ff;
+  --accent-bright: #2479ff;
+  --accent-dark: #0d52e0;
+  --danger: #d32f2f;
+  --ok: #18c97a;
+  --shadow: 0 12px 40px rgba(20, 45, 104, 0.08);
+  --radius: 24px;
+  --font: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+  font-family: var(--font);
 }
 
-* { box-sizing: border-box; }
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
 body {
   margin: 0;
+  font-family: var(--font);
   background:
-    radial-gradient(circle at 80% 20%, rgba(88, 174, 255, 0.14), transparent 32%),
-    linear-gradient(180deg, var(--bg-top) 0%, var(--bg-bottom) 100%);
+    radial-gradient(circle at 82% 12%, rgba(36, 121, 255, 0.1), transparent 28%),
+    linear-gradient(180deg, var(--bg-top) 0%, var(--bg) 50%, var(--bg-bottom) 100%);
   color: var(--text);
   min-height: 100vh;
 }
@@ -32,6 +37,31 @@ body {
   padding: 24px;
 }
 
+.auth-card {
+  width: min(100%, 420px);
+  padding: 32px 28px;
+}
+
+.auth-card h1 {
+  font-size: 1.45rem;
+  margin-bottom: 6px;
+}
+
+.auth-card input {
+  min-height: 60px;
+  border-radius: 14px;
+  padding: 14px 16px;
+  font-size: 1.05rem;
+}
+
+.auth-card button[type="submit"] {
+  width: 100%;
+  min-height: 56px;
+  margin-top: 8px;
+  border-radius: 14px;
+  font-size: 1.05rem;
+}
+
 .settings-page {
   max-width: 920px;
   margin: 0 auto;
@@ -41,7 +71,7 @@ body {
 .card {
   background: var(--card);
   border: 1px solid var(--line);
-  border-radius: 24px;
+  border-radius: var(--radius);
   box-shadow: var(--shadow);
   padding: 28px;
   width: min(100%, 420px);

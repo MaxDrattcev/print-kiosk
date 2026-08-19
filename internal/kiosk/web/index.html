@@ -4,14 +4,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
   <title>PrintStart — терминал самообслуживания</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/style.css">
 </head>
-<body>
+<body class="kiosk-user">
   <div class="app">
-    <header class="header">
+    <header class="app-header">
       <div class="brand">
         <div class="brand-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -117,7 +114,7 @@
             <path d="M9 16h6"/>
           </svg>
         </div>
-        <div class="secondary-title">Прайс<br>всех услуг</div>
+        <div class="secondary-title">Прайс всех услуг</div>
         <div class="secondary-arrow" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round">
             <path d="M9 18l6-6-6-6"/>
@@ -134,7 +131,7 @@
             <path d="M18 19c0 2-2 3-5 3"/>
           </svg>
         </div>
-        <div class="secondary-title">Связаться<br>с менеджером</div>
+        <div class="secondary-title">Связаться с менеджером</div>
         <div class="secondary-arrow" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round">
             <path d="M9 18l6-6-6-6"/>
@@ -146,12 +143,12 @@
 
   <dialog class="modal" id="price-modal">
     <form method="dialog" class="modal-card">
-      <h2>Прайс услуг</h2>
+      <h2>Стоимость услуг</h2>
       <div class="price-rows">
         <div><span>Чёрно-белая печать</span><strong id="price-bw">—</strong></div>
         <div><span>Цветная печать</span><strong id="price-color">—</strong></div>
-        <div><span>Копия документа</span><strong id="price-copy">—</strong></div>
-        <div><span>Скан документа</span><strong id="price-scan">—</strong></div>
+        <div><span>Копирование</span><strong id="price-copy">—</strong></div>
+        <div><span>Сканирование</span><strong id="price-scan">—</strong></div>
       </div>
       <button value="close">Закрыть</button>
     </form>
@@ -159,12 +156,15 @@
 
   <dialog class="modal" id="support-modal">
     <form method="dialog" class="modal-card">
-      <h2>Связаться с менеджером</h2>
+      <h2>Нужна помощь?</h2>
+      <p>Свяжитесь с менеджером</p>
+      <p class="support-phone" id="support-phone" hidden></p>
       <p id="support-text">—</p>
       <button value="close">Закрыть</button>
     </form>
   </dialog>
 
+  <script src="/static/ui.js"></script>
   <script>
     async function loadInfo() {
       const res = await fetch('/api/kiosk/info');
@@ -175,7 +175,12 @@
     function formatPrice(value) {
       const n = Number(value);
       if (Number.isNaN(n)) return value + ' ₽';
-      return n.toLocaleString('ru-RU') + ' ₽ / лист';
+      return n.toLocaleString('ru-RU') + ' ₽';
+    }
+
+    function extractPhone(text) {
+      const m = String(text || '').match(/(?:\+7|8)[\s\-]?\(?\d{3}\)?[\s\-]?\d{3}[\s\-]?\d{2}[\s\-]?\d{2}/);
+      return m ? m[0] : '';
     }
 
     (async () => {
@@ -185,7 +190,19 @@
       document.getElementById('price-color').textContent = formatPrice(info.price_color);
       document.getElementById('price-copy').textContent = formatPrice(info.price_copy);
       document.getElementById('price-scan').textContent = formatPrice(info.price_scan);
-      document.getElementById('support-text').textContent = info.support_text || 'Обратитесь к администратору';
+      const support = info.support_text || 'Обратитесь к администратору';
+      const phone = extractPhone(support);
+      const phoneEl = document.getElementById('support-phone');
+      const textEl = document.getElementById('support-text');
+      if (phone) {
+        phoneEl.hidden = false;
+        phoneEl.textContent = phone;
+        const rest = support.replace(phone, '').trim();
+        textEl.textContent = rest || '';
+        textEl.hidden = !rest;
+      } else {
+        textEl.textContent = support;
+      }
     })();
 
     document.getElementById('price-btn').addEventListener('click', () => {

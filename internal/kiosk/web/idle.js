@@ -13,6 +13,8 @@
   if (path === "/") return;
   // Waiting for IMAP mail can take up to 2 minutes without touch input.
   if (path === "/print/email/wait") return;
+  if (path === "/print/max/wait") return;
+  if (path === "/scan/max") return;
 
   let lastActive = Date.now();
   let warnVisible = false;

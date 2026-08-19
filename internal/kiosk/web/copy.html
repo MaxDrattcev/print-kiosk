@@ -4,13 +4,27 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
   <title>Копирование — PrintStart</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/style.css">
 </head>
-<body>
+<body class="kiosk-user">
   <div class="screen">
+    <header class="app-header app-header--inner">
+      <a class="brand" href="/">
+        <div class="brand-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M6 9V3h12v6"/>
+            <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
+            <rect x="6" y="14" width="12" height="7" rx="1"/>
+          </svg>
+        </div>
+        <div>
+          <div class="brand-title">PrintStart</div>
+          <div class="brand-subtitle">Сервис печати</div>
+        </div>
+      </a>
+      <a class="specialist-link" href="/admin/">Вход для специалиста</a>
+    </header>
+
     <header class="top top-nav">
       <a class="back-btn" href="/">
         <span aria-hidden="true">‹</span>
@@ -18,37 +32,79 @@
       </a>
     </header>
 
-    <section class="prompt-card">
-      <div class="prompt-icon" aria-hidden="true">
-        <svg viewBox="0 0 96 96" fill="none">
-          <rect x="22" y="18" width="36" height="46" rx="6" fill="#18c97a" opacity=".55"/>
-          <rect x="38" y="30" width="36" height="46" rx="6" fill="#18c97a"/>
-          <path d="M46 46h20M46 56h20M46 66h12" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
-        </svg>
+    <section class="prepare-screen">
+      <div class="page-head">
+        <h1 class="page-title">Подготовьте документ</h1>
+        <p class="page-subtitle">Положите оригинал на стекло сканера</p>
       </div>
-      <h1>Подготовьте документ</h1>
-      <ol class="scan-steps">
-        <li>Откройте крышку копира / МФУ</li>
-        <li>Положите документ на стекло текстом вниз</li>
-        <li>Закройте крышку</li>
-        <li>Нажмите кнопку ниже, чтобы перейти к настройкам</li>
-      </ol>
+
+      <div class="steps">
+        <div class="step green">
+          <div class="step-num">ШАГ 1</div>
+          <div class="step-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+              <path d="M4 20V8l8-4 8 4v12"/>
+              <path d="M4 8h16"/>
+            </svg>
+          </div>
+          <div>
+            <div class="step-title">Откройте крышку</div>
+          </div>
+        </div>
+        <div class="step green">
+          <div class="step-num">ШАГ 2</div>
+          <div class="step-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+              <rect x="5" y="4" width="14" height="16" rx="2"/>
+              <path d="M8 9h8M8 13h6"/>
+            </svg>
+          </div>
+          <div>
+            <div class="step-title">Положите документ</div>
+            <div class="step-sub">Текстом вниз</div>
+          </div>
+        </div>
+        <div class="step green">
+          <div class="step-num">ШАГ 3</div>
+          <div class="step-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+              <rect x="4" y="10" width="16" height="10" rx="2"/>
+              <path d="M4 10V8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v2"/>
+            </svg>
+          </div>
+          <div>
+            <div class="step-title">Закройте крышку</div>
+          </div>
+        </div>
+      </div>
+
       <p class="error" id="error" hidden></p>
-      <button type="button" class="primary-btn" id="ready-btn">Документ готов к копированию</button>
+      <button type="button" class="cta-btn cta-btn--green" id="ready-btn">Продолжить →</button>
     </section>
   </div>
 
+  <dialog class="modal kiosk-sheet" id="error-modal">
+    <div class="modal-card error-state">
+      <div class="error-icon" aria-hidden="true">!</div>
+      <h2>Что-то пошло не так</h2>
+      <p id="error-detail">Попробуйте ещё раз. Если ошибка повторится, обратитесь к специалисту.</p>
+      <button type="button" class="cta-btn" id="error-retry">Попробовать снова</button>
+      <a class="secondary-btn" href="/">Главное меню</a>
+    </div>
+  </dialog>
+
+  <script src="/static/ui.js"></script>
   <script>
     const errorEl = document.getElementById('error');
     const readyBtn = document.getElementById('ready-btn');
 
     function showError(msg) {
-      errorEl.textContent = msg || '';
-      errorEl.hidden = !msg;
+      KioskUI.showErrorDialog(document.getElementById('error-modal'), msg);
+      KioskUI.setError(errorEl, msg);
     }
 
     readyBtn.addEventListener('click', async () => {
-      showError('');
+      errorEl.hidden = true;
       readyBtn.disabled = true;
       try {
         const res = await fetch('/api/kiosk/copy/jobs', { method: 'POST' });

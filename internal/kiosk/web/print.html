@@ -4,13 +4,27 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
   <title>Печать документа — PrintStart</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/style.css">
 </head>
-<body>
+<body class="kiosk-user">
   <div class="screen">
+    <header class="app-header app-header--inner">
+      <a class="brand" href="/">
+        <div class="brand-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M6 9V3h12v6"/>
+            <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
+            <rect x="6" y="14" width="12" height="7" rx="1"/>
+          </svg>
+        </div>
+        <div>
+          <div class="brand-title">PrintStart</div>
+          <div class="brand-subtitle">Сервис печати</div>
+        </div>
+      </a>
+      <a class="specialist-link" href="/admin/">Вход для специалиста</a>
+    </header>
+
     <header class="top top-nav">
       <a class="back-btn" href="/">
         <span aria-hidden="true">‹</span>
@@ -18,13 +32,13 @@
       </a>
     </header>
 
-    <section class="hero compact">
-      <h1>Печать документа</h1>
-      <p>Выберите источник файла</p>
+    <section class="page-head">
+      <h1 class="page-title">Печать документа</h1>
+      <p class="page-subtitle">Выберите, откуда загрузить документ</p>
     </section>
 
     <main class="actions" aria-label="Источники печати">
-      <a class="action-card" href="/print/usb/">
+      <a class="source-card featured" href="/print/usb/">
         <div class="action-visual">
           <div class="action-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
@@ -35,8 +49,8 @@
           </div>
         </div>
         <div class="action-text">
-          <div class="action-title">Печать с USB</div>
-          <div class="action-description">Выберите файл с флешки</div>
+          <div class="action-title">USB-флешка</div>
+          <div class="action-description">Вставьте флешку в разъём терминала</div>
         </div>
         <div class="arrow" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -45,7 +59,7 @@
         </div>
       </a>
 
-      <a class="action-card green" href="/print/email/">
+      <a class="source-card green" href="/print/email/">
         <div class="action-visual">
           <div class="action-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -55,8 +69,12 @@
           </div>
         </div>
         <div class="action-text">
-          <div class="action-title">Печать с Email</div>
-          <div class="action-description">Документ из входящей почты</div>
+          <div class="action-title">Email</div>
+          <div class="action-description">Отправьте документ на почту терминала</div>
+          <div class="source-meta">
+            <span class="source-email" id="terminal-email" hidden></span>
+            <span class="source-hint-btn">Показать инструкцию</span>
+          </div>
         </div>
         <div class="arrow" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -65,7 +83,7 @@
         </div>
       </a>
 
-      <a class="action-card max" href="/print/max/">
+      <a class="source-card max" href="/print/max/">
         <div class="action-visual">
           <div class="action-icon">
             <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -76,14 +94,14 @@
                   <stop offset="1" stop-color="#9500FF"/>
                 </linearGradient>
               </defs>
-              <!-- MAX-like speech bubble mark -->
               <path fill="url(#maxGradPrint)" fill-rule="evenodd" d="M12 2.8c-5.1 0-9.2 3.7-9.2 8.3 0 2.8 1.5 5.3 3.9 6.8L4.8 21.2c-.25.35.1.82.52.72l4.05-.95c.82.22 1.7.33 2.63.33 5.1 0 9.2-3.7 9.2-8.3S17.1 2.8 12 2.8zm0 3.4c3.55 0 6.4 2.55 6.4 5.7s-2.85 5.7-6.4 5.7c-.95 0-1.85-.15-2.65-.42l-.35-.12-2.35 1.08.55-2.28-.2-.2C6.05 14.5 5.6 13.3 5.6 11.9c0-3.15 2.85-5.7 6.4-5.7z"/>
             </svg>
           </div>
         </div>
         <div class="action-text">
-          <div class="action-title">Печать с MAX</div>
-          <div class="action-description">Файл из сообщения боту</div>
+          <div class="action-title">MAX</div>
+          <div class="action-description">Отправьте файл боту в MAX</div>
+          <div class="source-qr" id="max-qr" hidden aria-hidden="true"></div>
         </div>
         <div class="arrow" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -93,6 +111,20 @@
       </a>
     </main>
   </div>
+  <script src="/static/ui.js"></script>
+  <script>
+    (async () => {
+      try {
+        const res = await fetch('/api/kiosk/email/info');
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data.email_address) {
+          const el = document.getElementById('terminal-email');
+          el.hidden = false;
+          el.textContent = data.email_address;
+        }
+      } catch (e) {}
+    })();
+  </script>
   <script src="/static/idle.js"></script>
 </body>
 </html>

@@ -4,13 +4,26 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
   <title>Имя файла — PrintStart</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/style.css">
 </head>
-<body>
+<body class="kiosk-user">
   <div class="screen">
+    <header class="app-header app-header--inner">
+      <a class="brand" href="/">
+        <div class="brand-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M6 9V3h12v6"/>
+            <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
+            <rect x="6" y="14" width="12" height="7" rx="1"/>
+          </svg>
+        </div>
+        <div>
+          <div class="brand-title">PrintStart</div>
+          <div class="brand-subtitle">Сервис печати</div>
+        </div>
+      </a>
+      <a class="specialist-link" href="/admin/">Вход для специалиста</a>
+    </header>
     <header class="top top-nav">
       <a class="back-btn" href="/scan/">
         <span aria-hidden="true">‹</span>
@@ -98,6 +111,7 @@
 
     loadJob();
   </script>
+  <script src="/static/ui.js"></script>
   <script src="/static/idle.js"></script>
 </body>
 </html>

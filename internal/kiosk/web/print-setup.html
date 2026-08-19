@@ -4,13 +4,26 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
   <title>Настройка печати</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/style.css">
 </head>
-<body>
+<body class="kiosk-user">
   <div class="screen setup-screen">
+    <header class="app-header app-header--inner">
+      <a class="brand" href="/">
+        <div class="brand-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M6 9V3h12v6"/>
+            <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
+            <rect x="6" y="14" width="12" height="7" rx="1"/>
+          </svg>
+        </div>
+        <div>
+          <div class="brand-title">PrintStart</div>
+          <div class="brand-subtitle">Сервис печати</div>
+        </div>
+      </a>
+      <a class="specialist-link" href="/admin/">Вход для специалиста</a>
+    </header>
     <header class="top top-nav">
       <a class="back-btn" id="back-btn" href="/print/usb/browse/">
         <span aria-hidden="true">‹</span>
@@ -80,34 +93,70 @@
     </div>
   </dialog>
 
-  <dialog class="modal flow-modal" id="method-modal">
+  <dialog class="modal flow-modal kiosk-sheet" id="method-modal">
     <div class="modal-card flow-card">
       <h2>Выберите способ оплаты</h2>
-      <button type="button" class="primary-btn" id="pay-terminal-btn">Оплатить через терминал</button>
-      <button type="button" class="secondary-btn" id="pay-qr-btn" disabled>Оплатить через QR-код</button>
-      <button type="button" class="text-btn modal-cancel" id="method-cancel">Отмена</button>
+      <p class="pay-total">К оплате: <strong id="pay-sum">—</strong></p>
+      <button type="button" class="pay-method" id="pay-terminal-btn">
+        <div class="pay-method-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+            <rect x="2" y="6" width="20" height="12" rx="2"/>
+            <path d="M2 10h20"/>
+          </svg>
+        </div>
+        <div>
+          <div class="pay-method-title">Оплатить картой</div>
+          <div class="pay-method-sub">Приложите карту или телефон к терминалу</div>
+        </div>
+      </button>
+      <button type="button" class="pay-method" id="pay-qr-btn" disabled>
+        <div class="pay-method-icon qr" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <rect x="3" y="3" width="7" height="7" rx="1"/>
+            <rect x="14" y="3" width="7" height="7" rx="1"/>
+            <rect x="3" y="14" width="7" height="7" rx="1"/>
+            <path d="M14 14h3v3h-3zM20 14v7h-7"/>
+          </svg>
+        </div>
+        <div>
+          <div class="pay-method-title">Оплатить по QR</div>
+          <div class="pay-method-sub">Отсканируйте QR-код камерой телефона</div>
+        </div>
+      </button>
+      <button type="button" class="text-btn pay-cancel" id="method-cancel">← Отмена</button>
     </div>
   </dialog>
 
-  <dialog class="modal flow-modal" id="terminal-modal">
-    <div class="modal-card flow-card">
-      <div class="flow-icon terminal-icon" aria-hidden="true"></div>
-      <h2>Внимание на терминал оплаты</h2>
-      <p class="muted">Следуйте подсказкам на экране терминала</p>
-      <div class="spinner" aria-hidden="true"></div>
+  <dialog class="modal flow-modal kiosk-sheet" id="terminal-modal">
+    <div class="modal-card flow-card status-screen">
+      <div class="status-illustration card-terminal" aria-hidden="true"></div>
+      <h2>Завершите оплату</h2>
+      <p>Следуйте подсказкам на платёжном терминале</p>
+      <div class="dots-loader" aria-hidden="true"><span></span><span></span><span></span></div>
     </div>
   </dialog>
 
-  <dialog class="modal flow-modal" id="success-modal">
-    <div class="modal-card flow-card">
+  <dialog class="modal flow-modal kiosk-sheet" id="success-modal">
+    <div class="modal-card flow-card success-state">
       <div class="flow-icon success-icon" aria-hidden="true"></div>
-      <h2 id="success-title">Оплата прошла успешно</h2>
-      <p class="muted" id="success-text">Отправляем документ на печать…</p>
+      <h2 id="success-title">Готово!</h2>
+      <p class="muted" id="success-text">Документ отправлен на печать</p>
       <button type="button" class="primary-btn" id="success-more" hidden>Печатать ещё документы</button>
-      <button type="button" class="primary-btn" id="success-home" hidden>На главную</button>
+      <button type="button" class="primary-btn" id="success-home" hidden>Вернуться в главное меню</button>
     </div>
   </dialog>
 
+  <dialog class="modal kiosk-sheet" id="error-modal">
+    <div class="modal-card error-state">
+      <div class="error-icon" aria-hidden="true">!</div>
+      <h2>Что-то пошло не так</h2>
+      <p id="error-detail">Попробуйте ещё раз. Если ошибка повторится, обратитесь к специалисту.</p>
+      <button type="button" class="cta-btn" id="error-retry">Попробовать снова</button>
+      <a class="secondary-btn" href="/">Главное меню</a>
+    </div>
+  </dialog>
+
+  <script src="/static/ui.js"></script>
   <script>
     const params = new URLSearchParams(location.search);
     const jobId = params.get('job');
@@ -201,8 +250,8 @@
     }
 
     function showError(msg) {
-      errorEl.textContent = msg || '';
-      errorEl.hidden = !msg;
+      KioskUI.setError(errorEl, msg);
+      if (msg) KioskUI.showErrorDialog(document.getElementById('error-modal'), msg);
     }
 
     function money(n) {
@@ -325,8 +374,10 @@
 
     document.getElementById('pay-btn').addEventListener('click', () => {
       if (busy) return;
-      showError('');
+      errorEl.hidden = true;
       if (!ensureEnoughPaper()) return;
+      const total = document.getElementById('sum-total').textContent;
+      document.getElementById('pay-sum').textContent = total;
       methodModal.showModal();
     });
 
@@ -335,7 +386,7 @@
     document.getElementById('method-cancel').addEventListener('click', () => methodModal.close());
 
     document.getElementById('pay-qr-btn').addEventListener('click', () => {
-      showError('Оплата через QR-код пока не подключена');
+      KioskUI.setError(errorEl, 'Оплата через QR-код пока не подключена');
       methodModal.close();
     });
 
@@ -394,9 +445,9 @@
           successHomeBtn.className = 'primary-btn';
           successHomeBtn.hidden = false;
         } else {
-          document.getElementById('success-title').textContent = 'Готово';
+          document.getElementById('success-title').textContent = 'Готово!';
           document.getElementById('success-text').textContent =
-            printData.message || 'Документ отправлен на печать. Заберите листы из принтера.';
+            printData.message || 'Документ отправлен на печать';
           if (printData.sheets != null) {
             const current = parseInt(String(prices.paper_remaining || '0'), 10);
             if (!Number.isNaN(current)) {
