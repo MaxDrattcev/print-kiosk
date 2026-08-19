@@ -68,48 +68,63 @@ func imageToPDF(imgPath, pdfPath string) error {
 	if err != nil || st.Size() < 1024 {
 		return fmt.Errorf("сканер вернул пустое изображение. Положите документ на стекло и повторите")
 	}
-
-	pngPath := filepath.Join(filepath.Dir(imgPath), "scan-norm.png")
-	if err := writeNormalizedPNG(imgPath, pngPath); err != nil {
-		return err
-	}
-	defer os.Remove(pngPath)
-
-	// A4 + вписать изображение. pos:full делает страницу размером с пиксели скана —
-	// при печати на A4 выходит только уголок.
-	imp, err := api.Import("formsize:A4, position:c, scalefactor:1", types.POINTS)
-	if err != nil {
-		slog.Warn("scan pdf params", "error", err)
-		return fmt.Errorf("не удалось подготовить скан")
-	}
-	if err := api.ImportImagesFile([]string{pngPath}, pdfPath, imp, nil); err != nil {
+	if err := ImageToA4PDF(imgPath, pdfPath); err != nil {
 		slog.Warn("scan pdf import", "error", err, "image", imgPath, "bytes", st.Size())
 		return fmt.Errorf("не удалось обработать скан. Положите документ на стекло и повторите")
 	}
 	return nil
 }
 
+// ImageToA4PDF places an image on a portrait A4 page, centered and fitted.
+// Needed before printing: SumatraPDF often sends a blank sheet for raw JPEG/PNG.
+func ImageToA4PDF(imgPath, pdfPath string) error {
+	if pdfPath == "" {
+		return fmt.Errorf("не задан файл PDF")
+	}
+	if err := os.MkdirAll(filepath.Dir(pdfPath), 0o755); err != nil {
+		return fmt.Errorf("каталог PDF: %w", err)
+	}
+
+	pngPath := filepath.Join(filepath.Dir(pdfPath), "img-norm.png")
+	if err := writeNormalizedPNG(imgPath, pngPath); err != nil {
+		return err
+	}
+	defer os.Remove(pngPath)
+
+	// pos:full makes the PDF page equal to image pixels — A4 print then shows a corner or a blank sheet.
+	imp, err := api.Import("formsize:A4, position:c, scalefactor:1", types.POINTS)
+	if err != nil {
+		slog.Warn("image pdf params", "error", err)
+		return fmt.Errorf("не удалось подготовить изображение")
+	}
+	if err := api.ImportImagesFile([]string{pngPath}, pdfPath, imp, nil); err != nil {
+		slog.Warn("image pdf import", "error", err, "image", imgPath)
+		return fmt.Errorf("не удалось подготовить изображение к печати")
+	}
+	return nil
+}
+
 func writeNormalizedPNG(src, dest string) error {
 	data, err := os.ReadFile(src)
-	if err != nil || len(data) < 1024 {
-		return fmt.Errorf("сканер вернул пустое изображение. Положите документ на стекло и повторите")
+	if err != nil || len(data) < 32 {
+		return fmt.Errorf("не удалось прочитать изображение")
 	}
 	img, format, err := image.Decode(bytes.NewReader(data))
 	if err != nil {
-		slog.Warn("scan image decode", "error", err, "bytes", len(data), "magic", fmt.Sprintf("%x", data[:min(8, len(data))]))
-		return fmt.Errorf("не удалось обработать скан. Положите документ на стекло и повторите")
+		slog.Warn("image decode", "error", err, "bytes", len(data), "magic", fmt.Sprintf("%x", data[:min(8, len(data))]))
+		return fmt.Errorf("не удалось обработать изображение")
 	}
 	if img.Bounds().Dx() < 8 || img.Bounds().Dy() < 8 {
-		return fmt.Errorf("сканер вернул пустое изображение. Положите документ на стекло и повторите")
+		return fmt.Errorf("изображение слишком маленькое")
 	}
 	f, err := os.Create(dest)
 	if err != nil {
-		return fmt.Errorf("не удалось сохранить скан")
+		return fmt.Errorf("не удалось сохранить изображение")
 	}
 	defer f.Close()
 	if err := png.Encode(f, img); err != nil {
-		slog.Warn("scan png encode", "error", err, "format", format)
-		return fmt.Errorf("не удалось обработать скан")
+		slog.Warn("image png encode", "error", err, "format", format)
+		return fmt.Errorf("не удалось обработать изображение")
 	}
 	return nil
 }

@@ -9,7 +9,6 @@
     max: "MAX",
     payment: "Оплата",
     system: "Система",
-    journal: "Журнал",
   };
   const SAVE_SECTIONS = new Set(["prices", "paper", "print", "email", "max", "system"]);
   const PAPER_CAPACITY = 500;
@@ -92,7 +91,7 @@
     });
     document.getElementById("section-title").textContent = TITLES[id] || id;
     document.getElementById("savebar").hidden = !SAVE_SECTIONS.has(id);
-    if (id === "overview" || id === "print" || id === "journal" || id === "paper") {
+    if (id === "overview" || id === "print" || id === "paper") {
       loadOverview();
     }
     location.hash = id;
@@ -327,8 +326,6 @@
     if (metricsEl) metricsEl.innerHTML = metrics.join("");
 
     applyInfra(data);
-    const journalEl = document.getElementById("journal-metrics");
-    if (journalEl) journalEl.innerHTML = metrics.join("");
   }
 
   function applyInfra(data) {
@@ -352,8 +349,6 @@
     setDeviceStatus("copy-device-status", data.copy);
     const listen = document.getElementById("listen-addr");
     if (listen) listen.textContent = "Адрес API: " + (data.listen_addr || "—");
-    const logPath = document.getElementById("log-path");
-    if (logPath) logPath.textContent = "Файл: " + (data.log_path || "logs/kiosk.log");
     if (data.email) {
       const imap = document.getElementById("email-imap");
       const smtp = document.getElementById("email-smtp");

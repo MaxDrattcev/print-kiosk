@@ -15,6 +15,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/pdfcpu/pdfcpu/pkg/api"
 
+	"print-kiosk/internal/device"
 	"print-kiosk/internal/libreoffice"
 	"print-kiosk/internal/usb"
 )
@@ -256,7 +257,11 @@ func (s *Service) buildPreview(sourcePath, dir string) (string, PreviewKind, int
 		return preview, PreviewPDF, pages, nil
 
 	case ".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff":
-		return sourcePath, PreviewImage, 1, nil
+		preview := filepath.Join(dir, "preview.pdf")
+		if err := device.ImageToA4PDF(sourcePath, preview); err != nil {
+			return "", "", 0, err
+		}
+		return preview, PreviewImage, 1, nil
 
 	default:
 		preview, err := s.convertWithLibreOffice(sourcePath, dir)

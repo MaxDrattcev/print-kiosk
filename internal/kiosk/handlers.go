@@ -204,6 +204,10 @@ func (h *Handler) PreviewPrintJob(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "заказ не найден"})
 		return
 	}
+	if job.PreviewKind == printjob.PreviewImage && job.SourcePath != "" {
+		c.File(job.SourcePath)
+		return
+	}
 	c.File(job.PreviewPath)
 }
 
