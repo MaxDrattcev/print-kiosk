@@ -154,13 +154,21 @@ func validateSetting(key, value string) error {
 		if err != nil || n < 0 {
 			return errInvalid(key, "ожидается целое число ≥ 0")
 		}
-	case storage.SettingTelegramCartridgeAlerts, storage.SettingPaymentEnabled:
+	case storage.SettingTelegramCartridgeAlerts, storage.SettingPaymentEnabled,
+		storage.SettingMaxEnabled, storage.SettingMaxInkAlerts:
 		if value != "true" && value != "false" {
 			return errInvalid(key, "ожидается true или false")
 		}
 	case storage.SettingTelegramHeartbeatInterval:
 		if value == "" {
 			return errInvalid(key, "значение не может быть пустым")
+		}
+	case storage.SettingMaxAdminID:
+		if value == "" {
+			return nil
+		}
+		if _, err := strconv.ParseInt(value, 10, 64); err != nil {
+			return errInvalid(key, "ожидается числовой user_id")
 		}
 	case storage.SettingSupportText:
 		if value == "" {

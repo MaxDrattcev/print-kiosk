@@ -8,8 +8,12 @@ const (
 	SettingPriceScan                 = "price_scan"
 	SettingPaperRemaining            = "paper_remaining"
 	SettingPaperAlertThreshold       = "paper_alert_threshold"
-	SettingTelegramHeartbeatInterval = "telegram_heartbeat_interval"
-	SettingTelegramCartridgeAlerts   = "telegram_cartridge_alerts"
+	SettingTelegramHeartbeatInterval = "telegram_heartbeat_interval" // legacy, unused
+	SettingTelegramCartridgeAlerts   = "telegram_cartridge_alerts"   // legacy
+	SettingMaxEnabled                = "max_enabled"
+	SettingMaxBotToken               = "max_bot_token"
+	SettingMaxAdminID                = "max_admin_id"
+	SettingMaxInkAlerts              = "max_ink_alerts"
 	SettingEmailAddress              = "email_address"
 	SettingEmailLogin                = "email_login"
 	SettingEmailPassword             = "email_password"

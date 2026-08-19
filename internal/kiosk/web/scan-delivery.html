@@ -65,7 +65,7 @@
         </div>
       </a>
 
-      <button type="button" class="action-card max" id="max-btn" disabled>
+      <a class="action-card max" id="max-link" href="#">
         <div class="action-visual">
           <div class="action-icon">
             <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -82,14 +82,14 @@
         </div>
         <div class="action-text">
           <div class="action-title">Отправить в MAX</div>
-          <div class="action-description">Скоро будет доступно</div>
+          <div class="action-description" id="max-desc">Получить PDF в мессенджер</div>
         </div>
         <div class="arrow" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
             <path d="M9 18l6-6-6-6"/>
           </svg>
         </div>
-      </button>
+      </a>
     </main>
   </div>
 
@@ -99,8 +99,20 @@
     document.getElementById('back-btn').href = '/scan/name/?job=' + encodeURIComponent(jobId || '');
     document.getElementById('usb-link').href = '/scan/usb/?job=' + encodeURIComponent(jobId || '');
     document.getElementById('email-link').href = '/scan/email/?job=' + encodeURIComponent(jobId || '');
+    const maxLink = document.getElementById('max-link');
+    maxLink.href = '/scan/max/?job=' + encodeURIComponent(jobId || '');
 
     (async () => {
+      try {
+        const info = await fetch('/api/kiosk/max/info').then((r) => r.json()).catch(() => ({}));
+        if (!info.enabled) {
+          maxLink.classList.add('disabled');
+          maxLink.removeAttribute('href');
+          document.getElementById('max-desc').textContent = 'Не активирован в настройках';
+          maxLink.style.opacity = '0.55';
+          maxLink.style.pointerEvents = 'none';
+        }
+      } catch (e) {}
       if (!jobId) return;
       const res = await fetch('/api/kiosk/scan/jobs/' + encodeURIComponent(jobId));
       const data = await res.json().catch(() => ({}));

@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>Файлы из MAX — PrintStart</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="screen browse-screen">
+    <header class="top top-nav browse-top">
+      <a class="back-btn" href="/print/max/">
+        <span aria-hidden="true">‹</span>
+        Назад
+      </a>
+    </header>
+
+    <section class="browse-header">
+      <h1>Файлы из MAX</h1>
+      <p id="subtitle">Выберите документ для печати</p>
+    </section>
+
+    <p class="error panel-error" id="error" hidden></p>
+    <div class="file-list" id="file-list"></div>
+  </div>
+
+  <div class="loading-overlay" id="loading-overlay" hidden>
+    <div class="loading-card">
+      <div class="spinner" aria-hidden="true"></div>
+      <h2>Подготовка документа</h2>
+      <p class="muted" id="loading-text">Конвертация файла, пожалуйста подождите…</p>
+    </div>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(location.search);
+    const sessionId = params.get('session');
+    const listEl = document.getElementById('file-list');
+    const errorEl = document.getElementById('error');
+    const loadingOverlay = document.getElementById('loading-overlay');
+    const loadingText = document.getElementById('loading-text');
+
+    function showError(msg) {
+      errorEl.textContent = msg || '';
+      errorEl.hidden = !msg;
+    }
+
+    function formatSize(bytes) {
+      if (!bytes && bytes !== 0) return '';
+      if (bytes < 1024) return bytes + ' Б';
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' КБ';
+      return (bytes / (1024 * 1024)).toFixed(1) + ' МБ';
+    }
+
+    function setLoading(show, fileName) {
+      if (show) {
+        loadingText.textContent = fileName
+          ? 'Конвертация «' + fileName + '», пожалуйста подождите…'
+          : 'Конвертация файла, пожалуйста подождите…';
+        loadingOverlay.hidden = false;
+        document.body.classList.add('loading-lock');
+      } else {
+        loadingOverlay.hidden = true;
+        document.body.classList.remove('loading-lock');
+      }
+    }
+
+    async function prepareFile(file) {
+      showError('');
+      setLoading(true, file.name);
+      try {
+        const res = await fetch('/api/kiosk/max/print/prepare', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ session_id: sessionId, file_id: file.id }),
+        });
+        const data = await res.json().catch(() => ({}));
+        setLoading(false);
+        if (!res.ok) {
+          showError(data.error || 'Не удалось подготовить файл');
+          return;
+        }
+        location.href = '/print/setup/?job=' + encodeURIComponent(data.job.id)
+          + '&from=max'
+          + '&session=' + encodeURIComponent(sessionId)
+          + '&file=' + encodeURIComponent(file.id);
+      } catch (e) {
+        setLoading(false);
+        showError('Ошибка связи с сервером');
+      }
+    }
+
+    function renderFiles(files) {
+      listEl.innerHTML = '';
+      const pending = files.filter((f) => !f.printed);
+      if (!pending.length) {
+        listEl.innerHTML = '<div class="empty-state">Все документы из MAX уже напечатаны</div>';
+        return;
+      }
+      pending.forEach((file) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'file-item';
+        btn.innerHTML =
+          '<span class="file-icon" aria-hidden="true"></span>' +
+          '<span class="file-meta"><span class="file-name"></span><span class="file-sub"></span></span>' +
+          '<span class="mini-arrow" aria-hidden="true">›</span>';
+        btn.querySelector('.file-name').textContent = file.name;
+        btn.querySelector('.file-sub').textContent = formatSize(file.size);
+        btn.addEventListener('click', () => prepareFile(file));
+        listEl.appendChild(btn);
+      });
+    }
+
+    (async () => {
+      if (!sessionId) {
+        showError('Сессия не указана');
+        return;
+      }
+      const res = await fetch('/api/kiosk/max/print/sessions/' + encodeURIComponent(sessionId));
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        showError(data.error || 'Сессия не найдена');
+        return;
+      }
+      if (data.session.status !== 'found') {
+        showError(data.session.error || 'Файлы ещё не готовы');
+        return;
+      }
+      const files = data.session.files || [];
+      const pending = files.filter((f) => !f.printed);
+      const done = files.length - pending.length;
+      if (done > 0 && pending.length > 0) {
+        document.getElementById('subtitle').textContent =
+          'Осталось файлов: ' + pending.length + '. Выберите следующий документ';
+      } else if (pending.length === 0) {
+        document.getElementById('subtitle').textContent = 'Все документы из MAX напечатаны';
+      } else {
+        document.getElementById('subtitle').textContent =
+          'Найдено файлов: ' + files.length + '. Выберите документ для печати';
+      }
+      renderFiles(files);
+    })();
+  </script>
+  <script src="/static/idle.js"></script>
+</body>
+</html>

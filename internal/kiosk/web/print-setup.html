@@ -114,6 +114,7 @@
     const fromSource = params.get('from') || 'usb';
     const emailSessionId = params.get('session') || '';
     const emailFileId = params.get('file') || '';
+    const isInbox = fromSource === 'email' || fromSource === 'max';
     let job = null;
     let prices = { bw: 0, color: 0 };
     let busy = false;
@@ -124,6 +125,10 @@
       backBtn.href = emailSessionId
         ? '/print/email/files/?session=' + encodeURIComponent(emailSessionId)
         : '/print/email/';
+    } else if (fromSource === 'max') {
+      backBtn.href = emailSessionId
+        ? '/print/max/files/?session=' + encodeURIComponent(emailSessionId)
+        : '/print/max/';
     } else {
       backBtn.href = '/print/usb/browse/';
     }
@@ -161,27 +166,27 @@
     }
 
     async function finishEmailPrintSuccess() {
-      if (fromSource !== 'email' || !emailSessionId || !emailFileId) {
+      if (!isInbox || !emailSessionId || !emailFileId) {
         successMoreBtn.hidden = true;
         successHomeBtn.className = 'primary-btn';
         successHomeBtn.hidden = false;
         return;
       }
+      const printedURL = fromSource === 'max'
+        ? '/api/kiosk/max/print/sessions/' + encodeURIComponent(emailSessionId) + '/printed'
+        : '/api/kiosk/email/sessions/' + encodeURIComponent(emailSessionId) + '/printed';
       try {
-        const markRes = await fetch(
-          '/api/kiosk/email/sessions/' + encodeURIComponent(emailSessionId) + '/printed',
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ file_id: emailFileId }),
-          }
-        );
+        const markRes = await fetch(printedURL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ file_id: emailFileId }),
+        });
         const markData = await markRes.json().catch(() => ({}));
         const remaining = markRes.ok ? Number(markData.session && markData.session.remaining || 0) : 0;
         if (remaining > 0) {
           document.getElementById('success-text').textContent =
             (document.getElementById('success-text').textContent || '') +
-            ' В письме ещё есть документы (' + remaining + ').';
+            ' Ещё есть документы (' + remaining + ').';
           successMoreBtn.hidden = false;
           successHomeBtn.className = 'secondary-btn';
           successHomeBtn.hidden = false;
@@ -412,10 +417,11 @@
 
     successMoreBtn.addEventListener('click', () => {
       if (!emailSessionId) {
-        location.href = '/print/email/';
+        location.href = fromSource === 'max' ? '/print/max/' : '/print/email/';
         return;
       }
-      location.href = '/print/email/files/?session=' + encodeURIComponent(emailSessionId);
+      const base = fromSource === 'max' ? '/print/max/files/' : '/print/email/files/';
+      location.href = base + '?session=' + encodeURIComponent(emailSessionId);
     });
 
     successHomeBtn.addEventListener('click', () => {

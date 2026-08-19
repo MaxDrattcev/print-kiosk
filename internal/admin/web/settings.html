@@ -60,16 +60,24 @@
 
       <section>
         <h2>MAX</h2>
-        <p class="muted">Уведомления администратору в мессенджер MAX (вместо Telegram).</p>
+        <p class="muted">Уведомления, печать и отправка сканов через мессенджер MAX. Работает только при активной галочке.</p>
         <div class="grid">
-          <label>Периодичность heartbeat
-            <input type="text" name="telegram_heartbeat_interval" placeholder="24h" required>
+          <label class="checkbox">
+            <input type="checkbox" name="max_enabled" value="true">
+            Активировать MAX
+          </label>
+          <label>Токен бота
+            <input type="password" name="max_bot_token" autocomplete="new-password" placeholder="оставьте ******** чтобы не менять">
+          </label>
+          <label>ID админа (user_id)
+            <input type="text" name="max_admin_id" inputmode="numeric" placeholder="например 123456789">
           </label>
           <label class="checkbox">
-            <input type="checkbox" name="telegram_cartridge_alerts" value="true">
-            Уведомления о картридже
+            <input type="checkbox" name="max_ink_alerts" value="true">
+            Уведомления о чернилах / тонере
           </label>
         </div>
+        <p class="muted">Пуши: старт/стоп приложения, ошибки, бумага, ежедневная статистика в 22:00.</p>
       </section>
 
       <section>
@@ -147,7 +155,8 @@
   <script>
     KioskKeyboard.bind(document);
 
-    const boolFields = new Set(['telegram_cartridge_alerts', 'payment_enabled']);
+    const boolFields = new Set(['max_enabled', 'max_ink_alerts', 'telegram_cartridge_alerts', 'payment_enabled']);
+    const sensitiveFields = new Set(['email_password', 'max_bot_token']);
     const PASSWORD_MASK = '********';
     let dirty = false;
     let pendingLeave = null; // { type: 'href'|'logout', href? }

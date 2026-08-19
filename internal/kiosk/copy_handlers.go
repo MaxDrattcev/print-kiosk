@@ -1,6 +1,7 @@
 package kiosk
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strconv"
@@ -168,8 +169,20 @@ func (h *Handler) ExecuteCopyJob(c *gin.Context) {
 	job, sheets, err := h.copies.Execute(c.Param("id"))
 	if err != nil {
 		_, _ = h.settings.RefundPaper(sheetsNeeded)
+		h.notifyErr(err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
+	}
+	if h.stats != nil {
+		priceBW, priceColor, _, _ := h.copyPrices()
+		price := priceBW
+		if job.Color {
+			price = priceColor
+		}
+		_ = h.stats.AddCopy(price*float64(job.Copies), job.Copies, sheets, job.Color)
+	}
+	if h.max != nil {
+		h.max.CheckPaperAlert(context.Background())
 	}
 	c.JSON(http.StatusOK, gin.H{
 		"ok":      true,

@@ -161,8 +161,8 @@ func (s *Service) SaveToUSB(id, drivePath string) (*Job, error) {
 	return job, nil
 }
 
-// MarkSentEmail marks job as emailed (call after successful SMTP send).
-func (s *Service) MarkSentEmail(id, toAddr string) (*Job, error) {
+// MarkDelivered marks the job as sent (email or MAX) and deletes the local PDF.
+func (s *Service) MarkDelivered(id, dest string) (*Job, error) {
 	job, err := s.mustGet(id)
 	if err != nil {
 		return nil, err
@@ -174,12 +174,17 @@ func (s *Service) MarkSentEmail(id, toAddr string) (*Job, error) {
 		return nil, fmt.Errorf("укажите имя файла")
 	}
 	s.mu.Lock()
-	job.SentToEmail = strings.TrimSpace(toAddr)
+	job.SentToEmail = strings.TrimSpace(dest)
 	job.Status = StatusSentEmail
 	s.mu.Unlock()
 
 	s.CleanupFiles(id)
 	return job, nil
+}
+
+// MarkSentEmail is MarkDelivered for SMTP.
+func (s *Service) MarkSentEmail(id, toAddr string) (*Job, error) {
+	return s.MarkDelivered(id, toAddr)
 }
 
 // CleanupFiles removes the local scan PDF after successful delivery to the user.

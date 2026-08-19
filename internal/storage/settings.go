@@ -96,6 +96,10 @@ func IsKnownSetting(key string) bool {
 		SettingPaperAlertThreshold,
 		SettingTelegramHeartbeatInterval,
 		SettingTelegramCartridgeAlerts,
+		SettingMaxEnabled,
+		SettingMaxBotToken,
+		SettingMaxAdminID,
+		SettingMaxInkAlerts,
 		SettingEmailAddress,
 		SettingEmailLogin,
 		SettingEmailPassword,
@@ -112,5 +116,5 @@ func IsKnownSetting(key string) bool {
 
 // SensitiveSettings are masked in API responses.
 func IsSensitiveSetting(key string) bool {
-	return key == SettingEmailPassword
+	return key == SettingEmailPassword || key == SettingMaxBotToken
 }

@@ -19,7 +19,8 @@ Print Kiosk — Windows deploy
      C:\Program Files\LibreOffice\program\soffice.exe
 
 4) Run start.bat (or print-kiosk.exe -config config.yaml)
-   The start page opens in the browser automatically.
+   The start page opens fullscreen in Edge/Chrome (kiosk, no address bar).
+   Exit the browser with Alt+F4.
 
 5) Kiosk: http://127.0.0.1:8080/
    Admin: http://127.0.0.1:8080/admin/

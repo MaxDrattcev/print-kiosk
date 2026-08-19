@@ -5,7 +5,9 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
@@ -14,7 +16,6 @@ import (
 func publicURL(addr string) string {
 	host, port, err := net.SplitHostPort(addr)
 	if err != nil {
-		// addr may be ":8080"
 		if strings.HasPrefix(addr, ":") {
 			return "http://127.0.0.1" + addr + "/"
 		}
@@ -36,7 +37,7 @@ func openBrowserWhenReady(url string) {
 				if err := openBrowser(url); err != nil {
 					slog.Warn("failed to open browser", "url", url, "error", err)
 				} else {
-					slog.Info("opened browser", "url", url)
+					slog.Info("opened kiosk browser", "url", url)
 				}
 				return
 			}
@@ -47,15 +48,88 @@ func openBrowserWhenReady(url string) {
 }
 
 func openBrowser(url string) error {
-	var cmd *exec.Cmd
+	profile := filepath.Join("data", "browser-kiosk")
+	_ = os.MkdirAll(profile, 0o755)
+
 	switch runtime.GOOS {
 	case "windows":
-		// start is a shell builtin; empty title arg avoids issues with quoted URLs
-		cmd = exec.Command("cmd", "/c", "start", "", url)
+		if exe, edge := findWindowsChromium(); exe != "" {
+			args := chromiumKioskArgs(url, profile, edge)
+			cmd := exec.Command(exe, args...)
+			return cmd.Start()
+		}
+		return exec.Command("cmd", "/c", "start", "", url).Start()
 	case "darwin":
-		cmd = exec.Command("open", url)
+		if exe := findDarwinChrome(); exe != "" {
+			args := chromiumKioskArgs(url, profile, false)
+			return exec.Command(exe, args...).Start()
+		}
+		return exec.Command("open", url).Start()
 	default:
-		cmd = exec.Command("xdg-open", url)
+		for _, name := range []string{"google-chrome", "chromium-browser", "chromium", "microsoft-edge"} {
+			if path, err := exec.LookPath(name); err == nil {
+				return exec.Command(path, chromiumKioskArgs(url, profile, false)...).Start()
+			}
+		}
+		return exec.Command("xdg-open", url).Start()
 	}
-	return cmd.Start()
+}
+
+func chromiumKioskArgs(url, profile string, edge bool) []string {
+	args := []string{
+		"--user-data-dir=" + profile,
+		"--no-first-run",
+		"--no-default-browser-check",
+		"--disable-session-crashed-bubble",
+		"--disable-infobars",
+		"--disable-translate",
+		"--kiosk",
+		"--start-fullscreen",
+	}
+	if edge {
+		args = append(args, "--edge-kiosk-type=fullscreen")
+	}
+	return append(args, url)
+}
+
+func findWindowsChromium() (exe string, edge bool) {
+	var candidates []string
+	for _, root := range []string{
+		os.Getenv("ProgramFiles"),
+		os.Getenv("ProgramFiles(x86)"),
+		os.Getenv("LOCALAPPDATA"),
+	} {
+		if root == "" {
+			continue
+		}
+		candidates = append(candidates,
+			filepath.Join(root, "Microsoft", "Edge", "Application", "msedge.exe"),
+			filepath.Join(root, "Google", "Chrome", "Application", "chrome.exe"),
+		)
+	}
+	for _, path := range candidates {
+		if st, err := os.Stat(path); err == nil && !st.IsDir() {
+			return path, strings.HasSuffix(strings.ToLower(path), "msedge.exe")
+		}
+	}
+	if path, err := exec.LookPath("msedge"); err == nil {
+		return path, true
+	}
+	if path, err := exec.LookPath("chrome"); err == nil {
+		return path, false
+	}
+	return "", false
+}
+
+func findDarwinChrome() string {
+	for _, path := range []string{
+		"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+		"/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+		"/Applications/Chromium.app/Contents/MacOS/Chromium",
+	} {
+		if st, err := os.Stat(path); err == nil && !st.IsDir() {
+			return path
+		}
+	}
+	return ""
 }

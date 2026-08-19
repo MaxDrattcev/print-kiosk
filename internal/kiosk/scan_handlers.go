@@ -80,6 +80,9 @@ func (h *Handler) PayScanJob(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	if h.stats != nil {
+		_ = h.stats.AddScan(job.PricePerScan)
+	}
 	c.JSON(http.StatusOK, gin.H{
 		"ok":      true,
 		"paid":    true,

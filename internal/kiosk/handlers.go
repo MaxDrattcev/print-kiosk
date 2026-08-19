@@ -1,6 +1,7 @@
 package kiosk
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"os"
@@ -12,8 +13,10 @@ import (
 	"print-kiosk/internal/config"
 	"print-kiosk/internal/copyjob"
 	"print-kiosk/internal/mailinbox"
+	"print-kiosk/internal/maxsvc"
 	"print-kiosk/internal/printjob"
 	"print-kiosk/internal/scanjob"
+	"print-kiosk/internal/stats"
 	"print-kiosk/internal/storage"
 	"print-kiosk/internal/usb"
 )
@@ -25,10 +28,24 @@ type Handler struct {
 	scans    *scanjob.Service
 	copies   *copyjob.Service
 	mail     *mailinbox.Service
+	max      *maxsvc.Service
+	stats    *stats.Repo
 }
 
-func NewHandler(cfg *config.Config, settings *storage.SettingsRepo, jobs *printjob.Service, scans *scanjob.Service, copies *copyjob.Service, mail *mailinbox.Service) *Handler {
-	return &Handler{cfg: cfg, settings: settings, jobs: jobs, scans: scans, copies: copies, mail: mail}
+func NewHandler(
+	cfg *config.Config,
+	settings *storage.SettingsRepo,
+	jobs *printjob.Service,
+	scans *scanjob.Service,
+	copies *copyjob.Service,
+	mail *mailinbox.Service,
+	max *maxsvc.Service,
+	st *stats.Repo,
+) *Handler {
+	return &Handler{
+		cfg: cfg, settings: settings, jobs: jobs, scans: scans,
+		copies: copies, mail: mail, max: max, stats: st,
+	}
 }
 
 func (h *Handler) Info(c *gin.Context) {
@@ -304,8 +321,26 @@ func (h *Handler) ExecutePrintJob(c *gin.Context) {
 		Copies: in.Copies,
 	}); err != nil {
 		_, _ = h.settings.RefundPaper(sheets)
+		h.notifyErr(err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "не удалось отправить на печать: " + err.Error()})
 		return
+	}
+
+	pages := job.Pages * in.Copies
+	if pages < 1 {
+		pages = job.Pages
+	}
+	bw, colorPrice, _ := h.priceValues()
+	price := bw
+	if in.Color {
+		price = colorPrice
+	}
+	revenue := price * float64(pages)
+	if h.stats != nil {
+		_ = h.stats.AddPrint(revenue, pages, in.Color, sheets)
+	}
+	if h.max != nil {
+		h.max.CheckPaperAlert(context.Background())
 	}
 
 	h.jobs.Cleanup(job.ID)

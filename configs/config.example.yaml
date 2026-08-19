@@ -1,6 +1,7 @@
 server:
   addr: ":8080"
   # Opens http://127.0.0.1:8080/ on start (default: true on Windows)
+  # Fullscreen kiosk window (no address bar / tabs). Default: true on Windows.
   # open_browser: true
 
 admin:
@@ -13,10 +14,6 @@ database:
 logging:
   path: logs/kiosk.log
   level: info
-
-telegram:
-  bot_token: ""
-  chat_id: ""
 
 payment:
   driver_url: "http://localhost:8081"

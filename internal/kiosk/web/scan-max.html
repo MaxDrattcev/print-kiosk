@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>Отправить в MAX — PrintStart</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="screen">
+    <header class="top top-nav">
+      <a class="back-btn" id="back-btn" href="/scan/delivery/">
+        <span aria-hidden="true">‹</span>
+        Назад
+      </a>
+    </header>
+
+    <section class="hero compact">
+      <h1>Отправить в MAX</h1>
+      <p id="file-hint">Откройте бота и отправьте код с экрана</p>
+    </section>
+
+    <div class="name-form">
+      <p class="muted">Бот:</p>
+      <p class="scan-price" id="bot-link">…</p>
+      <p class="muted">Напишите боту этот код:</p>
+      <p class="scan-price" id="code" style="font-size:2.4rem;letter-spacing:0.12em">…</p>
+      <p class="hint">Ожидание до 2 минут. После получения кода скан уйдёт вам в MAX.</p>
+      <p class="error" id="error" hidden></p>
+      <p class="scan-price" id="countdown" hidden></p>
+      <button type="button" class="secondary-btn" id="cancel-btn">Отмена</button>
+    </div>
+  </div>
+
+  <div class="loading-overlay" id="loading-overlay" hidden>
+    <div class="loading-card">
+      <div class="spinner" aria-hidden="true"></div>
+      <h2>Отправка в MAX</h2>
+      <p class="muted">Отправляем скан…</p>
+    </div>
+  </div>
+
+  <dialog class="modal flow-modal" id="success-modal">
+    <div class="modal-card flow-card">
+      <div class="flow-icon success-icon" aria-hidden="true"></div>
+      <h2>Готово</h2>
+      <p class="muted" id="success-text">Скан отправлен в MAX.</p>
+      <button type="button" class="primary-btn" id="success-home">На главную</button>
+    </div>
+  </dialog>
+
+  <script>
+    const params = new URLSearchParams(location.search);
+    const jobId = params.get('job');
+    const errorEl = document.getElementById('error');
+    const codeEl = document.getElementById('code');
+    const botLinkEl = document.getElementById('bot-link');
+    const countdownEl = document.getElementById('countdown');
+    const loadingOverlay = document.getElementById('loading-overlay');
+    const successModal = document.getElementById('success-modal');
+    let sessionId = '';
+    let deadlineMs = 0;
+    let timer = null;
+    let completing = false;
+
+    document.getElementById('back-btn').href = '/scan/delivery/?job=' + encodeURIComponent(jobId || '');
+    document.getElementById('cancel-btn').addEventListener('click', () => {
+      location.href = '/scan/delivery/?job=' + encodeURIComponent(jobId || '');
+    });
+    document.getElementById('success-home').addEventListener('click', () => { location.href = '/'; });
+
+    function showError(msg) {
+      errorEl.textContent = msg || '';
+      errorEl.hidden = !msg;
+    }
+
+    function tick() {
+      if (!deadlineMs) return;
+      const left = deadlineMs - Date.now();
+      if (left <= 0) {
+        countdownEl.textContent = '0:00';
+        countdownEl.hidden = false;
+        return;
+      }
+      const sec = Math.ceil(left / 1000);
+      countdownEl.textContent = 'Осталось ' + Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0');
+      countdownEl.hidden = false;
+    }
+
+    async function complete() {
+      if (completing) return;
+      completing = true;
+      clearInterval(timer);
+      loadingOverlay.hidden = false;
+      try {
+        const res = await fetch('/api/kiosk/max/scan/sessions/' + encodeURIComponent(sessionId) + '/complete', {
+          method: 'POST',
+        });
+        const data = await res.json().catch(() => ({}));
+        loadingOverlay.hidden = true;
+        if (!res.ok) {
+          showError(data.error || 'Не удалось отправить скан');
+          completing = false;
+          return;
+        }
+        document.getElementById('success-text').textContent = data.message || 'Скан отправлен в MAX.';
+        successModal.showModal();
+      } catch (e) {
+        loadingOverlay.hidden = true;
+        showError('Ошибка связи с сервером');
+        completing = false;
+      }
+    }
+
+    async function poll() {
+      if (!sessionId || completing) return;
+      try {
+        const res = await fetch('/api/kiosk/max/scan/sessions/' + encodeURIComponent(sessionId));
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          showError(data.error || 'Сессия не найдена');
+          clearInterval(timer);
+          return;
+        }
+        const sess = data.session;
+        if (sess.deadline_ms) deadlineMs = sess.deadline_ms;
+        if (sess.status === 'found') {
+          await complete();
+          return;
+        }
+        if (sess.status === 'timeout' || sess.status === 'error') {
+          clearInterval(timer);
+          showError(sess.error || 'Время ожидания истекло');
+        }
+      } catch (e) {}
+    }
+
+    (async () => {
+      if (!jobId) {
+        showError('Заказ не найден');
+        return;
+      }
+      try {
+        const res = await fetch('/api/kiosk/scan/jobs/' + encodeURIComponent(jobId) + '/max/sessions', {
+          method: 'POST',
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          showError(data.error || 'MAX недоступен');
+          return;
+        }
+        sessionId = data.session.id;
+        codeEl.textContent = data.session.code;
+        botLinkEl.textContent = data.bot_link || ('@' + (data.bot_username || ''));
+        if (data.session.deadline_ms) deadlineMs = data.session.deadline_ms;
+        timer = setInterval(() => { tick(); poll(); }, 1500);
+        tick();
+        poll();
+      } catch (e) {
+        showError('Ошибка связи с сервером');
+      }
+    })();
+  </script>
+  <script src="/static/idle.js"></script>
+</body>
+</html>

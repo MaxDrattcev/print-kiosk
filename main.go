@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"io"
@@ -8,8 +9,11 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"runtime"
+	"syscall"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
@@ -79,7 +83,8 @@ func main() {
 	})
 
 	settingsRepo := storage.NewSettingsRepo(db)
-	if err := kiosk.RegisterRoutes(r, cfg, settingsRepo); err != nil {
+	maxSvc, err := kiosk.RegisterRoutes(r, cfg, settingsRepo, db)
+	if err != nil {
 		slog.Error("failed to register kiosk routes", "error", err)
 		os.Exit(1)
 	}
@@ -97,14 +102,30 @@ func main() {
 	url := publicURL(cfg.Server.Addr)
 	slog.Info("starting server", "addr", cfg.Server.Addr, "url", url)
 
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	go maxSvc.Run(ctx)
+
+	srv := &http.Server{Handler: r}
+	go func() {
+		if err := srv.Serve(ln); err != nil && err != http.ErrServerClosed {
+			slog.Error("server stopped", "error", err)
+			stop()
+		}
+	}()
+
 	if cfg.ShouldOpenBrowser(runtime.GOOS) {
 		go openBrowserWhenReady(url)
 	}
 
-	if err := r.RunListener(ln); err != nil {
-		slog.Error("server stopped", "error", err)
-		os.Exit(1)
-	}
+	<-ctx.Done()
+	slog.Info("shutting down")
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+	defer cancel()
+	maxSvc.NotifyShutdown(shutdownCtx)
+	_ = srv.Shutdown(shutdownCtx)
 }
 
 func ensureDirs(cfg *config.Config) error {
@@ -115,6 +136,7 @@ func ensureDirs(cfg *config.Config) error {
 		cfg.Paths.PrintJobs,
 		cfg.ScanJobsDir(),
 		cfg.EmailInboxDir(),
+		filepath.Join(cfg.DataRoot(), "max-inbox"),
 	}
 	for _, dir := range dirs {
 		if dir == "" || dir == "." {
