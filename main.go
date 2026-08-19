@@ -113,8 +113,8 @@ func ensureDirs(cfg *config.Config) error {
 		filepath.Dir(cfg.Logging.Path),
 		cfg.Paths.Uploads,
 		cfg.Paths.PrintJobs,
-		filepath.Join(filepath.Dir(cfg.Paths.PrintJobs), "scan-jobs"),
-		filepath.Join(filepath.Dir(cfg.Paths.PrintJobs), "email-inbox"),
+		cfg.ScanJobsDir(),
+		cfg.EmailInboxDir(),
 	}
 	for _, dir := range dirs {
 		if dir == "" || dir == "." {

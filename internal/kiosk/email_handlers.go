@@ -91,11 +91,11 @@ func (h *Handler) MarkEmailPrinted(c *gin.Context) {
 		return
 	}
 
-	// Fallback cleanup if deletion right after download failed.
+	// Fallback cleanup if deletion right after confirm failed.
 	if uid, ok := h.mail.TakeDeleteUID(c.Param("id")); ok {
 		cfg, _, credErr := h.emailCredentials()
 		if credErr == nil {
-			if delErr := mailinbox.DeleteThroughUID(cfg, uid); delErr != nil {
+			if delErr := mailinbox.DeleteUIDs(cfg, []uint32{uid}); delErr != nil {
 				// Allow retry next time.
 				h.mail.ResetDeleteFlag(c.Param("id"), uid)
 			}
@@ -188,10 +188,6 @@ func (h *Handler) emailCredentials() (mailinbox.Credentials, time.Duration, erro
 }
 
 var errEmailNotConfigured = errString("Электронная почта ещё не настроена. Обратитесь к администратору.")
-
-type errString string
-
-func (e errString) Error() string { return string(e) }
 
 func emailSessionJSON(sess *mailinbox.Session) gin.H {
 	files := make([]gin.H, 0, len(sess.Files))

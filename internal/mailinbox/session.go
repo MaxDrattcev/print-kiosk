@@ -188,9 +188,9 @@ func (s *Service) Confirm(sessionID string) (*Session, error) {
 	}
 	s.mu.Unlock()
 
-	// Delete only after the user confirms — otherwise a "No" wiped other pending letters too.
+	// Delete only the confirmed letter — older inbox mail must stay for other users.
 	if !alreadyDeleted && uid > 0 {
-		if err := DeleteThroughUID(cfg, uid); err != nil {
+		if err := DeleteUIDs(cfg, []uint32{uid}); err != nil {
 			slog.Warn("email cleanup after confirm failed", "session", sessionID, "uid", uid, "error", err)
 		} else {
 			s.mu.Lock()
@@ -198,7 +198,7 @@ func (s *Service) Confirm(sessionID string) (*Session, error) {
 				sess.MailDeleted = true
 			}
 			s.mu.Unlock()
-			slog.Info("email cleaned after confirm", "session", sessionID, "through_uid", uid)
+			slog.Info("email cleaned after confirm", "session", sessionID, "uid", uid)
 		}
 	}
 

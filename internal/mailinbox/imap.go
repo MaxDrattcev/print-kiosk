@@ -12,6 +12,8 @@ import (
 	"github.com/emersion/go-imap"
 	"github.com/emersion/go-imap/client"
 	"github.com/emersion/go-message/mail"
+
+	"print-kiosk/internal/mailcfg"
 )
 
 type Credentials struct {
@@ -45,26 +47,7 @@ type FetchResult struct {
 }
 
 func ResolveHost(address string) (host string, port int) {
-	port = 993
-	addr := strings.ToLower(strings.TrimSpace(address))
-	at := strings.LastIndex(addr, "@")
-	domain := ""
-	if at >= 0 {
-		domain = addr[at+1:]
-	}
-	switch domain {
-	case "yandex.ru", "yandex.com", "ya.ru", "yandex.by", "yandex.kz":
-		return "imap.yandex.ru", port
-	case "mail.ru", "inbox.ru", "bk.ru", "list.ru", "internet.ru":
-		return "imap.mail.ru", port
-	case "gmail.com", "googlemail.com":
-		return "imap.gmail.com", port
-	default:
-		if domain != "" {
-			return "imap." + domain, port
-		}
-		return "imap.yandex.ru", port
-	}
+	return mailcfg.IMAPHost(address)
 }
 
 func connect(cfg Credentials) (*client.Client, error) {
@@ -267,34 +250,6 @@ func DeleteUIDs(cfg Credentials, uids []uint32) error {
 
 	set := new(imap.SeqSet)
 	set.AddNum(uids...)
-	item := imap.FormatFlagsOp(imap.AddFlags, true)
-	flags := []interface{}{imap.DeletedFlag}
-	if err := c.UidStore(set, item, flags, nil); err != nil {
-		return fmt.Errorf("пометить письма на удаление: %w", err)
-	}
-	if err := c.Expunge(nil); err != nil {
-		return fmt.Errorf("удалить письма: %w", err)
-	}
-	return nil
-}
-
-// DeleteThroughUID marks Deleted and expunges all INBOX messages with UID <= throughUID.
-func DeleteThroughUID(cfg Credentials, throughUID uint32) error {
-	if throughUID == 0 {
-		return nil
-	}
-	c, err := connect(cfg)
-	if err != nil {
-		return err
-	}
-	defer c.Logout()
-
-	if _, err := c.Select("INBOX", false); err != nil {
-		return fmt.Errorf("открыть INBOX: %w", err)
-	}
-
-	set := new(imap.SeqSet)
-	set.AddRange(1, throughUID)
 	item := imap.FormatFlagsOp(imap.AddFlags, true)
 	flags := []interface{}{imap.DeletedFlag}
 	if err := c.UidStore(set, item, flags, nil); err != nil {

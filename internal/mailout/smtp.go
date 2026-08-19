@@ -11,6 +11,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"print-kiosk/internal/mailcfg"
 )
 
 type Credentials struct {
@@ -27,26 +29,7 @@ type Attachment struct {
 }
 
 func ResolveHost(address string) (host string, port int) {
-	port = 587
-	addr := strings.ToLower(strings.TrimSpace(address))
-	at := strings.LastIndex(addr, "@")
-	domain := ""
-	if at >= 0 {
-		domain = addr[at+1:]
-	}
-	switch domain {
-	case "yandex.ru", "yandex.com", "ya.ru", "yandex.by", "yandex.kz":
-		return "smtp.yandex.ru", port
-	case "mail.ru", "inbox.ru", "bk.ru", "list.ru", "internet.ru":
-		return "smtp.mail.ru", port
-	case "gmail.com", "googlemail.com":
-		return "smtp.gmail.com", port
-	default:
-		if domain != "" {
-			return "smtp." + domain, port
-		}
-		return "smtp.yandex.ru", port
-	}
+	return mailcfg.SMTPHost(address)
 }
 
 // SendMail sends a message with one file attachment to toAddr.

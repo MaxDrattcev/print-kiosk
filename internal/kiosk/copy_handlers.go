@@ -1,10 +1,9 @@
 package kiosk
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
-	"strings"
-	"time"
 
 	"github.com/gin-gonic/gin"
 
@@ -119,14 +118,12 @@ func (h *Handler) PayCopyJob(c *gin.Context) {
 		return
 	}
 
-	switch strings.ToLower(strings.TrimSpace(in.Method)) {
-	case "qr":
-		c.JSON(http.StatusNotImplemented, gin.H{"error": "Оплата через QR пока не подключена"})
-		return
-	case "terminal", "":
-		time.Sleep(5 * time.Second)
-	default:
-		c.JSON(http.StatusBadRequest, gin.H{"error": "неизвестный способ оплаты"})
+	if err := simulatePayment(in.Method); err != nil {
+		if errors.Is(err, errPaymentQR) {
+			c.JSON(http.StatusNotImplemented, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -155,21 +152,25 @@ func (h *Handler) ExecuteCopyJob(c *gin.Context) {
 	if sheetsNeeded < 1 {
 		sheetsNeeded = 1
 	}
-	if err := h.ensurePaper(sheetsNeeded); err != nil {
-		c.JSON(http.StatusConflict, gin.H{
-			"error":           err.Error(),
-			"code":            "paper_insufficient",
-			"sheets_required": sheetsNeeded,
-			"paper_remaining": h.paperRemaining(),
-		})
+	if _, err := h.settings.ConsumePaper(sheetsNeeded); err != nil {
+		if errors.Is(err, storage.ErrInsufficientPaper) {
+			c.JSON(http.StatusConflict, gin.H{
+				"error":           "В принтере недостаточно бумаги для печати",
+				"code":            "paper_insufficient",
+				"sheets_required": sheetsNeeded,
+				"paper_remaining": h.paperRemaining(),
+			})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "не удалось обновить счётчик бумаги"})
 		return
 	}
 	job, sheets, err := h.copies.Execute(c.Param("id"))
 	if err != nil {
+		_, _ = h.settings.RefundPaper(sheetsNeeded)
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	_ = h.consumePaper(sheets)
 	c.JSON(http.StatusOK, gin.H{
 		"ok":      true,
 		"message": "Документ отправлен на копирование",

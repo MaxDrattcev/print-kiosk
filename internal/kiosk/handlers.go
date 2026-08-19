@@ -6,7 +6,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/gin-gonic/gin"
 
@@ -240,15 +239,12 @@ func (h *Handler) PayPrintJob(c *gin.Context) {
 		return
 	}
 
-	switch strings.ToLower(strings.TrimSpace(in.Method)) {
-	case "qr":
-		c.JSON(http.StatusNotImplemented, gin.H{"error": "Оплата через QR пока не подключена"})
-		return
-	case "terminal", "":
-		// Stub until Sber terminal driver is integrated.
-		time.Sleep(5 * time.Second)
-	default:
-		c.JSON(http.StatusBadRequest, gin.H{"error": "неизвестный способ оплаты"})
+	if err := simulatePayment(in.Method); err != nil {
+		if errors.Is(err, errPaymentQR) {
+			c.JSON(http.StatusNotImplemented, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -270,6 +266,10 @@ func (h *Handler) ExecutePrintJob(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "заказ не найден"})
 		return
 	}
+	if !job.Paid {
+		c.JSON(http.StatusPaymentRequired, gin.H{"error": "сначала оплатите печать"})
+		return
+	}
 
 	var in printjob.QuoteInput
 	if err := c.ShouldBindJSON(&in); err != nil {
@@ -284,13 +284,17 @@ func (h *Handler) ExecutePrintJob(c *gin.Context) {
 	}
 
 	sheets := printjob.PaperSheets(job.Pages, in.Copies, in.Duplex)
-	if err := h.ensurePaper(sheets); err != nil {
-		c.JSON(http.StatusConflict, gin.H{
-			"error":           err.Error(),
-			"code":            "paper_insufficient",
-			"sheets_required": sheets,
-			"paper_remaining": h.paperRemaining(),
-		})
+	if _, err := h.settings.ConsumePaper(sheets); err != nil {
+		if errors.Is(err, storage.ErrInsufficientPaper) {
+			c.JSON(http.StatusConflict, gin.H{
+				"error":           "В принтере недостаточно бумаги для печати",
+				"code":            "paper_insufficient",
+				"sheets_required": sheets,
+				"paper_remaining": h.paperRemaining(),
+			})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "не удалось обновить счётчик бумаги"})
 		return
 	}
 
@@ -299,11 +303,11 @@ func (h *Handler) ExecutePrintJob(c *gin.Context) {
 		Duplex: in.Duplex,
 		Copies: in.Copies,
 	}); err != nil {
+		_, _ = h.settings.RefundPaper(sheets)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "не удалось отправить на печать: " + err.Error()})
 		return
 	}
 
-	_ = h.consumePaper(sheets)
 	h.jobs.Cleanup(job.ID)
 
 	c.JSON(http.StatusOK, gin.H{
@@ -317,12 +321,8 @@ func (h *Handler) ExecutePrintJob(c *gin.Context) {
 }
 
 func (h *Handler) paperRemaining() int {
-	values, err := h.settings.GetAll()
+	n, err := h.settings.PaperRemaining()
 	if err != nil {
-		return 0
-	}
-	n, err := strconv.Atoi(values[storage.SettingPaperRemaining])
-	if err != nil || n < 0 {
 		return 0
 	}
 	return n
@@ -337,27 +337,6 @@ func (h *Handler) ensurePaper(sheets int) error {
 		return errString("В принтере недостаточно бумаги для печати")
 	}
 	return nil
-}
-
-func (h *Handler) consumePaper(sheets int) error {
-	if sheets <= 0 {
-		return nil
-	}
-	values, err := h.settings.GetAll()
-	if err != nil {
-		return err
-	}
-	current, err := strconv.Atoi(values[storage.SettingPaperRemaining])
-	if err != nil {
-		return err
-	}
-	next := current - sheets
-	if next < 0 {
-		next = 0
-	}
-	return h.settings.SetMany(map[string]string{
-		storage.SettingPaperRemaining: strconv.Itoa(next),
-	})
 }
 
 func (h *Handler) pricePair() (gin.H, error) {

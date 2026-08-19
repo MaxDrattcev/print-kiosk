@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"gopkg.in/yaml.v3"
 )
@@ -125,6 +126,23 @@ func (c *Config) applyDefaults() {
 	if c.Paths.PrintJobs == "" {
 		c.Paths.PrintJobs = "data/print-jobs"
 	}
+}
+
+// DataRoot is the parent directory of print jobs (usually "data").
+func (c *Config) DataRoot() string {
+	dir := filepath.Dir(c.Paths.PrintJobs)
+	if dir == "" || dir == "." {
+		return "data"
+	}
+	return dir
+}
+
+func (c *Config) ScanJobsDir() string {
+	return filepath.Join(c.DataRoot(), "scan-jobs")
+}
+
+func (c *Config) EmailInboxDir() string {
+	return filepath.Join(c.DataRoot(), "email-inbox")
 }
 
 func (c *Config) validate() error {

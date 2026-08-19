@@ -6,7 +6,6 @@ import (
 	"io/fs"
 	"net/http"
 	"path"
-	"path/filepath"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -34,20 +33,12 @@ func RegisterRoutes(r *gin.Engine, cfg *config.Config, settings *storage.Setting
 		return fmt.Errorf("print jobs: %w", err)
 	}
 
-	scanDir := filepath.Join(filepath.Dir(cfg.Paths.PrintJobs), "scan-jobs")
-	if filepath.Dir(cfg.Paths.PrintJobs) == "." || cfg.Paths.PrintJobs == "" {
-		scanDir = "data/scan-jobs"
-	}
-	scans, err := scanjob.NewService(scanDir, cfg.Printer.DryRun)
+	scans, err := scanjob.NewService(cfg.ScanJobsDir(), cfg.Printer.DryRun)
 	if err != nil {
 		return fmt.Errorf("scan jobs: %w", err)
 	}
 
-	mailDir := filepath.Join(filepath.Dir(cfg.Paths.PrintJobs), "email-inbox")
-	if filepath.Dir(cfg.Paths.PrintJobs) == "." || cfg.Paths.PrintJobs == "" {
-		mailDir = "data/email-inbox"
-	}
-	mail, err := mailinbox.NewService(mailDir)
+	mail, err := mailinbox.NewService(cfg.EmailInboxDir())
 	if err != nil {
 		return fmt.Errorf("email inbox: %w", err)
 	}
