@@ -62,6 +62,7 @@ func installViaWinget() error {
 		"install",
 		"--id", "TheDocumentFoundation.LibreOffice",
 		"-e",
+		"--source", "winget",
 		"--accept-package-agreements",
 		"--accept-source-agreements",
 		"--disable-interactivity",

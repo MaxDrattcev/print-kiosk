@@ -299,7 +299,7 @@
         if (!copyRes.ok) {
           document.getElementById('success-title').textContent = 'Оплата прошла успешно';
           document.getElementById('success-text').textContent =
-            copyData.error || 'Не удалось выполнить копирование. Обратитесь к администратору.';
+            KioskUI.friendlyError(copyData.error || 'Не удалось выполнить копирование. Обратитесь к администратору.');
         } else {
           document.getElementById('success-title').textContent = 'Готово!';
           document.getElementById('success-text').textContent =

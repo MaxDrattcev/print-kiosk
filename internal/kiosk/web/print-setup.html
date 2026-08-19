@@ -399,7 +399,7 @@
         if (!printRes.ok) {
           document.getElementById('success-title').textContent = 'Оплата прошла успешно';
           document.getElementById('success-text').textContent =
-            printData.error || 'Не удалось отправить на печать. Обратитесь к администратору.';
+            KioskUI.friendlyError(printData.error || 'Не удалось отправить на печать. Обратитесь к администратору.');
           successMoreBtn.hidden = true;
           successHomeBtn.className = 'primary-btn';
           successHomeBtn.hidden = false;

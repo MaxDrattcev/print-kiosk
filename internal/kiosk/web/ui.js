@@ -5,7 +5,7 @@
   const FRIENDLY =
     "Что-то пошло не так. Попробуйте ещё раз. Если ошибка повторится, обратитесь к специалисту.";
   const TECHNICAL =
-    /connection refused|econnrefused|econnreset|etimedout|enotfound|status code 5\d\d|\b500\b|\b502\b|\b503\b|scanner error|i\/o timeout|eof|sql:|http:|panic|nil pointer|websocket|tls:|json:|libreoffice|failed to|traceback|exception|stack/i;
+    /connection refused|econnrefused|econnreset|etimedout|enotfound|status code 5\d\d|\b500\b|\b502\b|\b503\b|scanner error|i\/o timeout|eof|sql:|http:|panic|nil pointer|websocket|tls:|json:|libreoffice|failed to|traceback|exception|stack|powershell|start-process|categoryinfo|exit status|could not be opened|empty/i;
 
   function isTechnical(msg) {
     const raw = String(msg || "").trim();

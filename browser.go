@@ -49,7 +49,12 @@ func openBrowserWhenReady(url string) {
 
 func openBrowser(url string) error {
 	profile := filepath.Join("data", "browser-kiosk")
-	_ = os.MkdirAll(profile, 0o755)
+	if abs, err := filepath.Abs(profile); err == nil {
+		profile = abs
+	}
+	if err := os.MkdirAll(profile, 0o755); err != nil {
+		return fmt.Errorf("kiosk browser profile: %w", err)
+	}
 
 	switch runtime.GOOS {
 	case "windows":

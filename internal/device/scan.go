@@ -1,7 +1,12 @@
 package device
 
 import (
+	"bytes"
 	"fmt"
+	"image"
+	_ "image/gif"
+	_ "image/jpeg"
+	"image/png"
 	"log/slog"
 	"os"
 	"os/exec"
@@ -11,6 +16,8 @@ import (
 
 	"github.com/pdfcpu/pdfcpu/pkg/api"
 	"github.com/pdfcpu/pdfcpu/pkg/pdfcpu/types"
+	_ "golang.org/x/image/bmp"
+	_ "golang.org/x/image/tiff"
 )
 
 type ScanOptions struct {
@@ -49,6 +56,7 @@ func ScanToPDF(destPDF string, opt ScanOptions, dryRun bool) error {
 		err = scanUnix(destPDF, opt)
 	}
 	if err != nil {
+		slog.Warn("scan failed", "dest", destPDF, "error", err)
 		return err
 	}
 	slog.Info("scan finished", "dest", destPDF)
@@ -56,12 +64,50 @@ func ScanToPDF(destPDF string, opt ScanOptions, dryRun bool) error {
 }
 
 func imageToPDF(imgPath, pdfPath string) error {
+	st, err := os.Stat(imgPath)
+	if err != nil || st.Size() < 1024 {
+		return fmt.Errorf("сканер вернул пустое изображение. Положите документ на стекло и повторите")
+	}
+
+	pngPath := filepath.Join(filepath.Dir(imgPath), "scan-norm.png")
+	if err := writeNormalizedPNG(imgPath, pngPath); err != nil {
+		return err
+	}
+	defer os.Remove(pngPath)
+
 	imp, err := api.Import("formsize:A4, position:full", types.POINTS)
 	if err != nil {
-		return fmt.Errorf("параметры PDF: %w", err)
+		slog.Warn("scan pdf params", "error", err)
+		return fmt.Errorf("не удалось подготовить скан")
 	}
-	if err := api.ImportImagesFile([]string{imgPath}, pdfPath, imp, nil); err != nil {
-		return fmt.Errorf("собрать PDF: %w", err)
+	if err := api.ImportImagesFile([]string{pngPath}, pdfPath, imp, nil); err != nil {
+		slog.Warn("scan pdf import", "error", err, "image", imgPath, "bytes", st.Size())
+		return fmt.Errorf("не удалось обработать скан. Положите документ на стекло и повторите")
+	}
+	return nil
+}
+
+func writeNormalizedPNG(src, dest string) error {
+	data, err := os.ReadFile(src)
+	if err != nil || len(data) < 1024 {
+		return fmt.Errorf("сканер вернул пустое изображение. Положите документ на стекло и повторите")
+	}
+	img, format, err := image.Decode(bytes.NewReader(data))
+	if err != nil {
+		slog.Warn("scan image decode", "error", err, "bytes", len(data), "magic", fmt.Sprintf("%x", data[:min(8, len(data))]))
+		return fmt.Errorf("не удалось обработать скан. Положите документ на стекло и повторите")
+	}
+	if img.Bounds().Dx() < 8 || img.Bounds().Dy() < 8 {
+		return fmt.Errorf("сканер вернул пустое изображение. Положите документ на стекло и повторите")
+	}
+	f, err := os.Create(dest)
+	if err != nil {
+		return fmt.Errorf("не удалось сохранить скан")
+	}
+	defer f.Close()
+	if err := png.Encode(f, img); err != nil {
+		slog.Warn("scan png encode", "error", err, "format", format)
+		return fmt.Errorf("не удалось обработать скан")
 	}
 	return nil
 }

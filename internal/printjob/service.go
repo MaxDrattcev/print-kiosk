@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -293,7 +294,7 @@ func (s *Service) convertWithLibreOffice(sourcePath, dir string) (string, error)
 			return "", fmt.Errorf("create libreoffice profile: %w", err)
 		}
 
-		profileURL := (&url.URL{Scheme: "file", Path: filepath.ToSlash(profileDir)}).String()
+		profileURL := fileURL(profileDir)
 		args := []string{
 			"-env:UserInstallation=" + profileURL,
 			"--headless",
@@ -339,6 +340,18 @@ func (s *Service) convertWithLibreOffice(sourcePath, dir string) (string, error)
 		names = append(names, e.Name())
 	}
 	return "", fmt.Errorf("pdf после конвертации не найден (файлы: %s; libreoffice: %s)", strings.Join(names, ", "), lastOut)
+}
+
+func fileURL(path string) string {
+	abs, err := filepath.Abs(path)
+	if err == nil {
+		path = abs
+	}
+	p := filepath.ToSlash(path)
+	if runtime.GOOS == "windows" && !strings.HasPrefix(p, "/") {
+		p = "/" + p
+	}
+	return (&url.URL{Scheme: "file", Path: p}).String()
 }
 
 func convertFilter(sourcePath string) string {

@@ -109,7 +109,11 @@ func (s *Service) printWindows(filePath string, opt PrintOptions) error {
 	}
 
 	slog.Warn("SumatraPDF не найден, печать через ассоциацию Windows (менее надёжно)")
-	return printWindowsShell(abs, s.printerName, opt)
+	if err := printWindowsShell(abs, s.printerName, opt); err != nil {
+		slog.Warn("windows shell print failed", "error", err)
+		return fmt.Errorf("не найден SumatraPDF. Скачайте SumatraPDF и положите SumatraPDF.exe в папку с киоском")
+	}
+	return nil
 }
 
 func printSumatra(bin, filePath, printer string, opt PrintOptions) error {

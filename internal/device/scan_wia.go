@@ -57,7 +57,7 @@ func scanNAPS2(bin, destPDF string) error {
 
 func scanWIA(destPDF string, opt ScanOptions) error {
 	dir := filepath.Dir(destPDF)
-	img := filepath.Join(dir, "scan.png")
+	img := filepath.Join(dir, "scan.wia")
 	script := filepath.Join(dir, "wia-scan.ps1")
 	color := "0"
 	if opt.Color {
@@ -88,8 +88,8 @@ func scanWIA(destPDF string, opt ScanOptions) error {
 		}
 		return fmt.Errorf("сканирование: %s", msg)
 	}
-	if st, err := os.Stat(img); err != nil || st.Size() == 0 {
-		return fmt.Errorf("сканер не вернул изображение")
+	if st, err := os.Stat(img); err != nil || st.Size() < 1024 {
+		return fmt.Errorf("сканер не вернул изображение. Положите документ на стекло и повторите")
 	}
 	defer os.Remove(img)
 	return imageToPDF(img, destPDF)
@@ -130,8 +130,11 @@ Set-WiaProp $item 6147 $Dpi
 Set-WiaProp $item 6148 $Dpi
 
 $png = "{B96B3CAF-0728-11D3-9D7B-0000F81EF32E}"
+$jpeg = "{B96B3CAE-0728-11D3-9D7B-0000F81EF32E}"
 $image = $null
-try { $image = $item.Transfer($png) } catch { $image = $item.Transfer() }
+try { $image = $item.Transfer($jpeg) } catch {}
+if ($null -eq $image) { try { $image = $item.Transfer($png) } catch {} }
+if ($null -eq $image) { $image = $item.Transfer() }
 if ($null -eq $image) { throw "scan transfer failed" }
 $image.SaveFile($Output)
 `
