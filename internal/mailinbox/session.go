@@ -269,6 +269,27 @@ func (s *Service) Reject(sessionID string) (*Session, error) {
 	return sess, nil
 }
 
+// Abandon stops a wait session and deletes local attachment files.
+func (s *Service) Abandon(id string) {
+	s.mu.Lock()
+	sess, ok := s.sessions[id]
+	if ok {
+		delete(s.sessions, id)
+	}
+	s.mu.Unlock()
+	if !ok || sess == nil {
+		return
+	}
+	for _, f := range sess.Files {
+		if f.Path != "" {
+			_ = os.Remove(f.Path)
+		}
+	}
+	if sess.Dir != "" {
+		_ = os.RemoveAll(sess.Dir)
+	}
+}
+
 // Start creates a wait session and polls mailbox for new attachments.
 func (s *Service) Start(cfg Credentials, pollEvery, timeout time.Duration) (*Session, error) {
 	if cfg.Address == "" || cfg.Password == "" {

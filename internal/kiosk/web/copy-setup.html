@@ -75,49 +75,6 @@
     </div>
   </dialog>
 
-  <dialog class="modal flow-modal kiosk-sheet" id="method-modal">
-    <div class="modal-card flow-card">
-      <h2>Выберите способ оплаты</h2>
-      <p class="pay-total">К оплате: <strong id="pay-sum">—</strong></p>
-      <button type="button" class="pay-method" id="pay-terminal-btn">
-        <div class="pay-method-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
-            <rect x="2" y="6" width="20" height="12" rx="2"/>
-            <path d="M2 10h20"/>
-          </svg>
-        </div>
-        <div>
-          <div class="pay-method-title">Оплатить картой</div>
-          <div class="pay-method-sub">Приложите карту или телефон к терминалу</div>
-        </div>
-      </button>
-      <button type="button" class="pay-method" id="pay-qr-btn" disabled>
-        <div class="pay-method-icon qr" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-            <rect x="3" y="3" width="7" height="7" rx="1"/>
-            <rect x="14" y="3" width="7" height="7" rx="1"/>
-            <rect x="3" y="14" width="7" height="7" rx="1"/>
-            <path d="M14 14h3v3h-3zM20 14v7h-7"/>
-          </svg>
-        </div>
-        <div>
-          <div class="pay-method-title">Оплатить по QR</div>
-          <div class="pay-method-sub">Отсканируйте QR-код камерой телефона</div>
-        </div>
-      </button>
-      <button type="button" class="text-btn pay-cancel" id="method-cancel">← Отмена</button>
-    </div>
-  </dialog>
-
-  <dialog class="modal flow-modal kiosk-sheet" id="terminal-modal">
-    <div class="modal-card flow-card status-screen">
-      <div class="status-illustration card-terminal" aria-hidden="true"></div>
-      <h2>Завершите оплату</h2>
-      <p>Следуйте подсказкам на платёжном терминале</p>
-      <div class="dots-loader" aria-hidden="true"><span></span><span></span><span></span></div>
-    </div>
-  </dialog>
-
   <dialog class="modal flow-modal kiosk-sheet" id="success-modal">
     <div class="modal-card flow-card success-state">
       <div class="flow-icon success-icon" aria-hidden="true"></div>
@@ -147,6 +104,7 @@
   </dialog>
 
   <script src="/static/ui.js"></script>
+  <script src="/static/payment.js"></script>
   <script>
     const params = new URLSearchParams(location.search);
     const jobId = params.get('job');
@@ -157,8 +115,6 @@
 
     const errorEl = document.getElementById('error');
     const payBtn = document.getElementById('pay-btn');
-    const methodModal = document.getElementById('method-modal');
-    const terminalModal = document.getElementById('terminal-modal');
     const successModal = document.getElementById('success-modal');
     const paperModal = document.getElementById('paper-modal');
     const copyOverlay = document.getElementById('copy-overlay');
@@ -251,7 +207,7 @@
       document.getElementById('sum-copies').textContent = String(data.copies);
       document.getElementById('sum-page-price').textContent = money(data.price_per_copy);
       document.getElementById('sum-total').textContent = money(data.total);
-      document.getElementById('pay-sum').textContent = money(data.total);
+      KioskPayment.setAmount(money(data.total));
     }
 
     async function loadJob() {
@@ -292,23 +248,17 @@
       if (busy) return;
       showError('');
       if (!ensureEnoughPaper()) return;
-      methodModal.showModal();
+      KioskPayment.open();
     });
 
     document.getElementById('paper-modal-ok').addEventListener('click', () => paperModal.close());
-    document.getElementById('method-cancel').addEventListener('click', () => methodModal.close());
-    document.getElementById('pay-qr-btn').addEventListener('click', () => {
-      KioskUI.setError(errorEl, 'Оплата через QR-код пока не подключена');
-      methodModal.close();
-    });
 
     document.getElementById('pay-terminal-btn').addEventListener('click', async () => {
       if (busy || !jobId) return;
       if (!ensureEnoughPaper()) return;
       busy = true;
       payBtn.disabled = true;
-      methodModal.close();
-      terminalModal.showModal();
+      KioskPayment.showWaiting();
       showError('');
 
       const body = { ...settings(), method: 'terminal' };
@@ -319,7 +269,7 @@
           body: JSON.stringify(body),
         });
         const payData = await payRes.json().catch(() => ({}));
-        terminalModal.close();
+        KioskPayment.closeWaiting();
 
         if (!payRes.ok) {
           if (payData.code === 'paper_insufficient') {
@@ -365,7 +315,7 @@
         }
         successModal.showModal();
       } catch (e) {
-        terminalModal.close();
+        KioskPayment.closeWaiting();
         copyOverlay.hidden = true;
         document.body.classList.remove('loading-lock');
         showError('Ошибка связи с сервером');

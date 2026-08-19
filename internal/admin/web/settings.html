@@ -3,135 +3,307 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Настройки — админ-панель</title>
+  <title>Админ-панель — PrintStart</title>
   <link rel="stylesheet" href="/admin/style.css">
 </head>
-<body>
-  <header class="topbar">
-    <div>
-      <strong>Админ-панель</strong>
-      <span class="muted" id="username"></span>
-    </div>
-    <div class="topbar-actions">
-      <button type="button" class="button secondary" id="home-link">Вернуться в основное меню</button>
-      <button type="button" class="button" id="logout-btn">Выйти</button>
-    </div>
-  </header>
-
-  <main class="settings-page">
-    <form class="card settings-form" id="settings-form">
-      <h1>Настройки киоска</h1>
-      <p class="unsaved-hint" id="unsaved-hint" hidden>Есть несохранённые изменения</p>
-
-      <section>
-        <h2>Печать и бумага</h2>
-        <div class="grid">
-          <label>Цена ч/б за лист (₽)
-            <input type="number" step="0.01" min="0" name="price_bw" required>
-          </label>
-          <label>Цена цветной за лист (₽)
-            <input type="number" step="0.01" min="0" name="price_color" required>
-          </label>
-          <label>Цена копии документа (₽)
-            <input type="number" step="0.01" min="0" name="price_copy" required>
-          </label>
-          <label>Цена скана документа (₽)
-            <input type="number" step="0.01" min="0" name="price_scan" required>
-          </label>
-          <label>Остаток бумаги (листы)
-            <input type="number" min="0" step="1" name="paper_remaining" required>
-          </label>
-          <label>Порог уведомления о бумаге
-            <input type="number" min="0" step="1" name="paper_alert_threshold" required>
-          </label>
-        </div>
-        <div class="paper-actions">
-          <button type="button" class="paper-refilled-btn" id="paper-refilled-btn">Бумага загружена</button>
-          <div class="paper-status" id="paper-status">
-            <span class="paper-status-label">В принтере</span>
-            <strong class="paper-status-value" id="paper-status-value">—</strong>
-          </div>
-          <span class="muted paper-actions-hint">Кнопка сбрасывает остаток на 500 листов</span>
-        </div>
-      </section>
-
-      <section>
-        <h2>MAX</h2>
-        <p class="muted">Уведомления, печать и отправка сканов через мессенджер MAX. Работает только при активной галочке.</p>
-        <div class="grid">
-          <label class="checkbox">
-            <input type="checkbox" name="max_enabled" value="true">
-            Активировать MAX
-          </label>
-          <label>Токен бота
-            <input type="password" name="max_bot_token" autocomplete="new-password" placeholder="оставьте ******** чтобы не менять">
-          </label>
-          <label>ID админа (user_id)
-            <input type="text" name="max_admin_id" inputmode="numeric" placeholder="например 123456789">
-          </label>
-          <label class="checkbox">
-            <input type="checkbox" name="max_ink_alerts" value="true">
-            Уведомления о чернилах / тонере
-          </label>
-        </div>
-        <p class="muted">Пуши: старт/стоп приложения, ошибки, бумага, ежедневная статистика в 22:00.</p>
-      </section>
-
-      <section>
-        <h2>Почта</h2>
-        <p class="muted">Один ящик: приём документов на печать (IMAP) и отправка сканов клиенту (SMTP).</p>
-        <div class="grid">
-          <label>Адрес электронной почты
-            <input type="email" name="email_address">
-          </label>
-          <label>Логин
-            <input type="text" name="email_login" autocomplete="off">
-          </label>
-          <label>Пароль приложения
-            <input type="password" name="email_password" autocomplete="new-password" placeholder="оставьте ******** чтобы не менять">
-          </label>
-          <label>Интервал проверки (сек)
-            <input type="number" min="0" step="1" name="email_poll_interval_sec" required>
-          </label>
-          <label>Макс. размер файла (МБ)
-            <input type="number" min="0" step="1" name="email_max_file_size_mb" required>
-          </label>
-        </div>
-      </section>
-
-      <section>
-        <h2>Киоск и оплата</h2>
-        <div class="grid">
-          <label class="checkbox">
-            <input type="checkbox" name="payment_enabled" value="true">
-            Приём оплаты включён
-          </label>
-          <label>Таймаут сессии (сек)
-            <input type="number" min="0" step="1" name="session_timeout_sec" required>
-          </label>
-          <label class="full">Текст / телефон поддержки
-            <textarea name="support_text" rows="3" required></textarea>
-          </label>
-        </div>
-      </section>
-
-      <p class="error" id="error" hidden></p>
-      <p class="success" id="success" hidden>Сохранено</p>
-
-      <div class="actions">
-        <button type="submit">Сохранить</button>
+<body class="admin-app">
+  <div class="admin-shell">
+    <aside class="admin-nav">
+      <div class="admin-nav-brand">PrintStart<span>Администратор</span></div>
+      <nav class="admin-nav-list" aria-label="Разделы">
+        <button type="button" class="admin-nav-item is-active" data-section="overview">Обзор</button>
+        <button type="button" class="admin-nav-item" data-section="prices">Цены</button>
+        <button type="button" class="admin-nav-item" data-section="paper">Бумага</button>
+        <button type="button" class="admin-nav-item" data-section="print">Печать</button>
+        <button type="button" class="admin-nav-item" data-section="scan">Сканирование</button>
+        <button type="button" class="admin-nav-item" data-section="email">Email</button>
+        <button type="button" class="admin-nav-item" data-section="max">MAX</button>
+        <button type="button" class="admin-nav-item" data-section="payment">Оплата</button>
+        <button type="button" class="admin-nav-item" data-section="system">Система</button>
+        <button type="button" class="admin-nav-item" data-section="journal">Журнал</button>
+      </nav>
+      <div class="admin-nav-foot">
+        <span class="admin-nav-user" id="username">Администратор</span>
+        <button type="button" class="admin-nav-exit" id="logout-btn">Выйти</button>
       </div>
-    </form>
-  </main>
+    </aside>
+
+    <div class="admin-main">
+      <header class="admin-top">
+        <h1 id="section-title">Обзор</h1>
+        <div class="admin-top-actions">
+          <p class="unsaved-hint" id="unsaved-hint" hidden>Есть несохранённые изменения</p>
+          <button type="button" class="admin-home" id="home-link">В меню терминала</button>
+        </div>
+      </header>
+
+      <div class="admin-content">
+        <section class="admin-panel" id="panel-overview">
+          <div class="admin-grid" id="overview-status"></div>
+          <div class="admin-grid" style="margin-top:12px" id="overview-metrics"></div>
+        </section>
+
+        <form class="settings-form" id="settings-form">
+          <section class="admin-panel" id="panel-prices" hidden>
+            <div class="admin-card">
+              <h2>Печать</h2>
+              <div class="admin-row" style="margin-bottom:12px">
+                <div>
+                  <h3>Услуга доступна</h3>
+                  <p class="admin-muted" style="margin:0">Карточка «Печать» на терминале</p>
+                </div>
+                <label class="admin-toggle"><input type="checkbox" name="service_print_enabled" value="true"><span class="admin-toggle-ui"></span></label>
+              </div>
+              <label class="admin-field">Чёрно-белая A4
+                <input type="number" step="0.01" min="0" name="price_bw" required>
+                <span class="admin-help">₽ / лист</span>
+              </label>
+              <label class="admin-field">Цветная A4
+                <input type="number" step="0.01" min="0" name="price_color" required>
+                <span class="admin-help">₽ / лист</span>
+              </label>
+            </div>
+            <div class="admin-card" style="margin-top:12px">
+              <h2>Копирование</h2>
+              <div class="admin-row" style="margin-bottom:12px">
+                <div>
+                  <h3>Услуга доступна</h3>
+                  <p class="admin-muted" style="margin:0">Карточка «Копирование» на терминале</p>
+                </div>
+                <label class="admin-toggle"><input type="checkbox" name="service_copy_enabled" value="true"><span class="admin-toggle-ui"></span></label>
+              </div>
+              <label class="admin-field">Чёрно-белая копия
+                <input type="number" step="0.01" min="0" name="price_copy" required>
+                <span class="admin-help">₽ за копию. Цветная копия использует цену цветной печати.</span>
+              </label>
+            </div>
+            <div class="admin-card" style="margin-top:12px">
+              <h2>Сканирование</h2>
+              <div class="admin-row" style="margin-bottom:12px">
+                <div>
+                  <h3>Услуга доступна</h3>
+                  <p class="admin-muted" style="margin:0">Карточка «Сканирование» на терминале</p>
+                </div>
+                <label class="admin-toggle"><input type="checkbox" name="service_scan_enabled" value="true"><span class="admin-toggle-ui"></span></label>
+              </div>
+              <label class="admin-field">Сканирование документа
+                <input type="number" step="0.01" min="0" name="price_scan" required>
+                <span class="admin-help">₽ за документ</span>
+              </label>
+            </div>
+          </section>
+
+          <section class="admin-panel" id="panel-paper" hidden>
+            <div class="admin-card">
+              <h2>Остаток бумаги</h2>
+              <p class="admin-muted">Тот же счётчик, который списывается при печати и копировании.</p>
+              <div class="paper-meter" id="paper-meter">
+                <div class="paper-meter-top">
+                  <strong id="paper-meter-label">—</strong>
+                  <span id="paper-meter-warn" class="admin-status warn" hidden><i></i> Ниже порога</span>
+                </div>
+                <div class="paper-bar" id="paper-bar"><span id="paper-bar-fill"></span></div>
+              </div>
+              <label class="admin-field">Остаток (листы)
+                <input type="number" min="0" step="1" name="paper_remaining" required>
+              </label>
+              <label class="admin-field">Порог уведомления в MAX
+                <input type="number" min="0" step="1" name="paper_alert_threshold" required>
+                <span class="admin-help">Если остаток ниже этого значения, бот MAX отправит предупреждение (когда MAX включён).</span>
+              </label>
+              <div class="paper-actions">
+                <button type="button" class="paper-refilled-btn" id="paper-refilled-btn">Бумага загружена</button>
+                <div class="paper-status" id="paper-status">
+                  <span class="paper-status-label">В принтере</span>
+                  <strong class="paper-status-value" id="paper-status-value">—</strong>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="admin-panel" id="panel-print" hidden>
+            <div class="admin-card">
+              <h2>Принтер</h2>
+              <p class="admin-muted">Эти параметры задаются в configs/config.yaml и применяются при запуске приложения.</p>
+              <label class="admin-field">Очередь печати
+                <input type="text" id="printer-name" readonly>
+              </label>
+              <label class="admin-field">Режим
+                <input type="text" id="printer-mode" readonly>
+              </label>
+              <label class="admin-field">SumatraPDF
+                <input type="text" id="sumatra-status" readonly>
+              </label>
+              <label class="admin-field">LibreOffice
+                <input type="text" id="libreoffice-status" readonly>
+              </label>
+            </div>
+            <div class="admin-card" style="margin-top:12px">
+              <div class="admin-row">
+                <div>
+                  <h3>USB-флешка</h3>
+                  <p class="admin-muted" style="margin:0">Печать с флешки и сохранение сканов на USB</p>
+                </div>
+                <label class="admin-toggle"><input type="checkbox" name="source_usb_enabled" value="true"><span class="admin-toggle-ui"></span></label>
+              </div>
+            </div>
+          </section>
+
+          <section class="admin-panel" id="panel-scan" hidden>
+            <div class="admin-card">
+              <h2>Сканер</h2>
+              <p class="admin-status" id="scan-device-status"><i></i> —</p>
+              <p class="admin-muted" id="scan-device-help">Сканирование снимает страницу со стекла МФУ (Windows WIA или NAPS2) и сохраняет PDF. В режиме dry_run файл тестовый.</p>
+            </div>
+            <div class="admin-card" style="margin-top:12px">
+              <h2>Копирование</h2>
+              <p class="admin-status" id="copy-device-status"><i></i> —</p>
+              <p class="admin-muted" id="copy-device-help">Копия — скан со стекла и печать на ту же очередь, что и обычная печать (SumatraPDF / системный принтер). Цвет и число копий задаёт посетитель.</p>
+            </div>
+          </section>
+
+          <section class="admin-panel" id="panel-email" hidden>
+            <div class="admin-card">
+              <div class="admin-row">
+                <div>
+                  <h3>Email</h3>
+                  <p class="admin-muted" style="margin:0">Печать по письму и отправка сканов</p>
+                </div>
+                <label class="admin-toggle"><input type="checkbox" name="source_email_enabled" value="true"><span class="admin-toggle-ui"></span></label>
+              </div>
+              <p class="admin-muted">Без адреса и пароля приложения карточка Email на терминале скрыта. Изменения применяются сразу, без перезапуска.</p>
+              <label class="admin-field">Адрес терминала
+                <input type="email" name="email_address">
+              </label>
+              <label class="admin-field">Логин
+                <input type="text" name="email_login" autocomplete="off">
+                <span class="admin-help">Если пусто, используется адрес.</span>
+              </label>
+              <label class="admin-field">Пароль приложения
+                <div class="admin-secret">
+                  <input type="password" name="email_password" autocomplete="new-password" placeholder="оставьте ******** чтобы не менять">
+                  <button type="button" class="admin-btn secondary" data-reveal="email_password">Изменить</button>
+                </div>
+              </label>
+              <label class="admin-field">IMAP
+                <input type="text" id="email-imap" readonly>
+                <span class="admin-help">Определяется по домену адреса, не хранится отдельно.</span>
+              </label>
+              <label class="admin-field">SMTP
+                <input type="text" id="email-smtp" readonly>
+              </label>
+              <label class="admin-field">Интервал проверки (сек)
+                <input type="number" min="5" step="1" name="email_poll_interval_sec" required>
+                <span class="admin-help">Минимум 5 секунд. Используется при ожидании письма на терминале.</span>
+              </label>
+              <label class="admin-field">Макс. размер файла (МБ)
+                <input type="number" min="0" step="1" name="email_max_file_size_mb" required>
+              </label>
+              <p class="admin-muted" id="email-test-result"></p>
+              <button type="button" class="admin-btn secondary" id="email-test-btn">Проверить подключение</button>
+            </div>
+          </section>
+
+          <section class="admin-panel" id="panel-max" hidden>
+            <div class="admin-card">
+              <div class="admin-row">
+                <div>
+                  <h3>Бот MAX</h3>
+                  <p class="admin-muted" style="margin:0">Галочка и токен включают MAX в печати и сканировании. ID админа нужен только для уведомлений о бумаге.</p>
+                </div>
+                <label class="admin-toggle"><input type="checkbox" name="max_enabled" value="true"><span class="admin-toggle-ui"></span></label>
+              </div>
+              <p class="admin-muted">Включение и выключение применяются сразу, без перезапуска приложения.</p>
+              <p class="admin-muted" id="max-token-state">Токен бота: не задан</p>
+              <label class="admin-field">ID админа (user_id)
+                <input type="text" name="max_admin_id" inputmode="numeric" placeholder="например 123456789">
+              </label>
+              <label class="admin-field">Токен бота
+                <div class="admin-secret">
+                  <input type="password" name="max_bot_token" autocomplete="new-password" placeholder="оставьте ******** чтобы не менять">
+                  <button type="button" class="admin-btn secondary" data-reveal="max_bot_token">Изменить</button>
+                </div>
+              </label>
+              <p class="admin-muted" id="max-test-result"></p>
+              <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <button type="button" class="admin-btn secondary" id="max-test-btn">Проверить MAX</button>
+                <button type="button" class="admin-btn secondary" id="max-send-btn">Отправить тестовое сообщение</button>
+              </div>
+            </div>
+          </section>
+
+          <section class="admin-panel" id="panel-payment" hidden>
+            <div class="admin-card">
+              <h2>Режим оплаты</h2>
+              <p class="admin-status warn"><i></i> Тестовый режим</p>
+              <p class="admin-muted">Реальный платёжный терминал пока не подключён. Система имитирует успешную оплату примерно через 5 секунд. Длительность заглушки задана в коде и не настраивается.</p>
+            </div>
+          </section>
+
+          <section class="admin-panel" id="panel-system" hidden>
+            <div class="admin-card">
+              <h2>Терминал</h2>
+              <label class="admin-field">Название терминала
+                <input type="text" name="kiosk_name">
+                <span class="admin-help">Показывается в обзоре админ-панели.</span>
+              </label>
+              <label class="admin-field">ID терминала
+                <input type="text" name="kiosk_id">
+              </label>
+              <label class="admin-field">Местоположение
+                <input type="text" name="kiosk_location">
+              </label>
+            </div>
+            <div class="admin-card" style="margin-top:12px">
+              <h2>Сессия посетителя</h2>
+              <label class="admin-field">Автовозврат на главный экран
+                <input type="number" min="0" step="1" name="session_timeout_sec" required>
+                <span class="admin-help">Секунды бездействия на терминале. 0 — не возвращать автоматически. Значения меньше 15 секунд округляются до 15. Текущее задание и временные файлы будут удалены.</span>
+              </label>
+              <label class="admin-field">Текст / телефон поддержки
+                <textarea name="support_text" rows="3" required></textarea>
+              </label>
+            </div>
+            <div class="admin-card" style="margin-top:12px">
+              <h2>Приложение</h2>
+              <p class="admin-muted" id="listen-addr">Адрес API: —</p>
+              <p class="admin-muted">Логин и пароль администратора задаются в configs/config.yaml.</p>
+            </div>
+            <div class="admin-card admin-danger" style="margin-top:16px">
+              <h2>Сброс</h2>
+              <p class="admin-muted">Цены, бумага и флаги услуг вернутся к значениям по умолчанию. Токены и пароль почты не трогаем.</p>
+              <button type="button" class="admin-btn danger" data-danger="reset">Сбросить настройки</button>
+            </div>
+          </section>
+
+          <p class="error" id="error" hidden></p>
+          <p class="success" id="success" hidden>✓ Настройки сохранены</p>
+          <div class="admin-savebar" id="savebar" hidden>
+            <span></span>
+            <button type="submit" class="admin-btn">Сохранить изменения</button>
+          </div>
+        </form>
+
+        <section class="admin-panel" id="panel-journal" hidden>
+          <div class="admin-card">
+            <h2>Журнал приложения</h2>
+            <p class="admin-muted" id="log-path">Файл: —</p>
+            <p class="admin-muted">Технические ошибки пишутся в этот файл. Просмотр содержимого в админке не подключён.</p>
+          </div>
+          <div class="admin-grid" style="margin-top:12px" id="journal-metrics"></div>
+        </section>
+      </div>
+    </div>
+  </div>
 
   <dialog class="unsaved-modal" id="unsaved-modal">
     <div class="unsaved-card">
-      <h2>Сохранить изменения?</h2>
-      <p>Вы изменили настройки, но не сохранили их.</p>
+      <h2>Есть несохранённые изменения</h2>
+      <p>Сохранить перед переходом?</p>
       <div class="unsaved-actions">
-        <button type="button" class="unsaved-save" id="unsaved-save-btn">Сохранить</button>
-        <button type="button" class="unsaved-discard" id="unsaved-discard-btn">Не сохранять</button>
-        <button type="button" class="unsaved-cancel" id="unsaved-cancel-btn">Отмена</button>
+        <button type="button" class="unsaved-save" id="unsaved-save-btn">Сохранить и перейти</button>
+        <button type="button" class="unsaved-discard" id="unsaved-discard-btn">Не сохранять и перейти</button>
+        <button type="button" class="unsaved-cancel" id="unsaved-cancel-btn">Остаться</button>
       </div>
     </div>
   </dialog>
@@ -147,258 +319,19 @@
     </div>
   </dialog>
 
+  <dialog class="unsaved-modal" id="danger-modal">
+    <div class="unsaved-card">
+      <h2 id="danger-title">Подтверждение</h2>
+      <p id="danger-text"></p>
+      <div class="unsaved-actions">
+        <button type="button" class="unsaved-save" id="danger-yes">Подтвердить</button>
+        <button type="button" class="unsaved-cancel" id="danger-no">Отмена</button>
+      </div>
+    </div>
+  </dialog>
+
   <script src="/admin/keyboard.js"></script>
   <script src="/admin/admin-idle.js"></script>
-  <script>
-    KioskKeyboard.bind(document);
-
-    const boolFields = new Set(['max_enabled', 'max_ink_alerts', 'telegram_cartridge_alerts', 'payment_enabled']);
-    const sensitiveFields = new Set(['email_password', 'max_bot_token']);
-    const PASSWORD_MASK = '********';
-    let dirty = false;
-    let pendingLeave = null; // { type: 'href'|'logout', href? }
-    let allowLeave = false;
-
-    async function requireAuth() {
-      const res = await fetch('/api/admin/me', { credentials: 'same-origin' });
-      if (!res.ok) {
-        location.href = '/admin/';
-        return null;
-      }
-      return res.json();
-    }
-
-    function pluralRu(n, one, few, many) {
-      const abs = Math.abs(Number(n)) % 100;
-      const n1 = abs % 10;
-      if (abs > 10 && abs < 20) return many;
-      if (n1 > 1 && n1 < 5) return few;
-      if (n1 === 1) return one;
-      return many;
-    }
-
-    function updatePaperStatus(raw) {
-      const box = document.getElementById('paper-status');
-      const valueEl = document.getElementById('paper-status-value');
-      if (raw === undefined || raw === null || raw === '') {
-        raw = document.querySelector('input[name="paper_remaining"]')?.value;
-      }
-      const n = parseInt(String(raw), 10);
-      if (Number.isNaN(n)) {
-        valueEl.textContent = '—';
-        box.classList.remove('low');
-        return;
-      }
-      valueEl.textContent = n + ' ' + pluralRu(n, 'лист', 'листа', 'листов');
-      box.classList.toggle('low', n < 30);
-    }
-
-    function fillForm(settings) {
-      const form = document.getElementById('settings-form');
-      for (const [key, value] of Object.entries(settings)) {
-        const el = form.elements.namedItem(key);
-        if (!el) continue;
-        if (boolFields.has(key)) {
-          el.checked = value === 'true';
-        } else {
-          el.value = value;
-        }
-      }
-      updatePaperStatus(settings.paper_remaining);
-      markClean();
-    }
-
-    function collectForm(form) {
-      const data = {};
-      for (const el of form.elements) {
-        if (!el.name) continue;
-        if (boolFields.has(el.name)) {
-          data[el.name] = el.checked ? 'true' : 'false';
-        } else {
-          data[el.name] = el.value;
-        }
-      }
-      return data;
-    }
-
-    function markClean() {
-      dirty = false;
-      updateUnsavedHint();
-    }
-
-    function markDirty() {
-      dirty = true;
-      updateUnsavedHint();
-    }
-
-    function isDirty() {
-      return dirty;
-    }
-
-    function updateUnsavedHint() {
-      const hint = document.getElementById('unsaved-hint');
-      if (!hint) return;
-      hint.hidden = !dirty;
-    }
-
-    async function saveSettings() {
-      const errorEl = document.getElementById('error');
-      const successEl = document.getElementById('success');
-      errorEl.hidden = true;
-      successEl.hidden = true;
-
-      const form = document.getElementById('settings-form');
-      const payload = collectForm(form);
-      const res = await fetch('/api/admin/settings', {
-        method: 'PUT',
-        credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        errorEl.textContent = data.error || 'Ошибка сохранения';
-        errorEl.hidden = false;
-        return false;
-      }
-      if (payload.email_password && payload.email_password !== PASSWORD_MASK) {
-        form.elements.namedItem('email_password').value = PASSWORD_MASK;
-      }
-      updatePaperStatus(payload.paper_remaining);
-      markClean();
-      successEl.textContent = 'Сохранено';
-      successEl.hidden = false;
-      return true;
-    }
-
-    async function leaveNow() {
-      const action = pendingLeave;
-      pendingLeave = null;
-      allowLeave = true;
-      if (!action) return;
-      if (action.type === 'logout') {
-        await fetch('/api/admin/logout', { method: 'POST', credentials: 'same-origin' });
-        location.href = '/admin/';
-        return;
-      }
-      location.href = action.href || '/';
-    }
-
-    function askLeave(action) {
-      if (!isDirty()) {
-        pendingLeave = action;
-        leaveNow();
-        return;
-      }
-      pendingLeave = action;
-      document.getElementById('unsaved-modal').showModal();
-    }
-
-    (async () => {
-      const me = await requireAuth();
-      if (!me) return;
-      document.getElementById('username').textContent = me.username;
-
-      const res = await fetch('/api/admin/settings', { credentials: 'same-origin' });
-      const data = await res.json();
-      if (!res.ok) {
-        document.getElementById('error').textContent = data.error || 'Ошибка загрузки';
-        document.getElementById('error').hidden = false;
-        return;
-      }
-      fillForm(data.settings);
-
-      const form = document.getElementById('settings-form');
-      form.addEventListener('input', markDirty);
-      form.addEventListener('change', markDirty);
-
-      const paperInput = document.querySelector('input[name="paper_remaining"]');
-      if (paperInput) {
-        paperInput.addEventListener('input', () => updatePaperStatus(paperInput.value));
-        paperInput.addEventListener('change', () => updatePaperStatus(paperInput.value));
-      }
-    })();
-
-    document.getElementById('home-link').addEventListener('click', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      askLeave({ type: 'href', href: '/' });
-    });
-
-    document.getElementById('logout-btn').addEventListener('click', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      askLeave({ type: 'logout' });
-    });
-
-    document.getElementById('unsaved-save-btn').addEventListener('click', async () => {
-      const ok = await saveSettings();
-      if (!ok) {
-        document.getElementById('unsaved-modal').close();
-        pendingLeave = null;
-        return;
-      }
-      document.getElementById('unsaved-modal').close();
-      await leaveNow();
-    });
-
-    document.getElementById('unsaved-discard-btn').addEventListener('click', async () => {
-      // Discard without writing form values to the server
-      markClean();
-      document.getElementById('unsaved-modal').close();
-      await leaveNow();
-    });
-
-    document.getElementById('unsaved-cancel-btn').addEventListener('click', () => {
-      pendingLeave = null;
-      document.getElementById('unsaved-modal').close();
-    });
-
-    window.addEventListener('beforeunload', (e) => {
-      if (allowLeave || !isDirty()) return;
-      e.preventDefault();
-      e.returnValue = '';
-    });
-
-    document.getElementById('paper-refilled-btn').addEventListener('click', () => {
-      document.getElementById('paper-confirm-modal').showModal();
-    });
-
-    document.getElementById('paper-confirm-no').addEventListener('click', () => {
-      document.getElementById('paper-confirm-modal').close();
-    });
-
-    document.getElementById('paper-confirm-yes').addEventListener('click', async () => {
-      document.getElementById('paper-confirm-modal').close();
-
-      const errorEl = document.getElementById('error');
-      const successEl = document.getElementById('success');
-      errorEl.hidden = true;
-      successEl.hidden = true;
-
-      const res = await fetch('/api/admin/settings', {
-        method: 'PUT',
-        credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ paper_remaining: '500' }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        errorEl.textContent = data.error || 'Не удалось обновить остаток бумаги';
-        errorEl.hidden = false;
-        return;
-      }
-      const input = document.querySelector('input[name="paper_remaining"]');
-      if (input) input.value = '500';
-      updatePaperStatus(500);
-      successEl.textContent = 'Бумага загружена: остаток 500 листов';
-      successEl.hidden = false;
-    });
-
-    document.getElementById('settings-form').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      await saveSettings();
-    });
-  </script>
+  <script src="/admin/admin-app.js"></script>
 </body>
 </html>

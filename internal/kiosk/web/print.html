@@ -38,7 +38,7 @@
     </section>
 
     <main class="actions" aria-label="Источники печати">
-      <a class="source-card featured" href="/print/usb/">
+      <a class="source-card featured" id="source-usb" href="/print/usb/">
         <div class="action-visual">
           <div class="action-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
@@ -50,7 +50,7 @@
         </div>
         <div class="action-text">
           <div class="action-title">USB-флешка</div>
-          <div class="action-description">Вставьте флешку в разъём терминала</div>
+          <div class="action-description">Выберите документ с флешки</div>
         </div>
         <div class="arrow" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -59,7 +59,7 @@
         </div>
       </a>
 
-      <a class="source-card green" href="/print/email/">
+      <a class="source-card green" id="source-email" href="/print/email/">
         <div class="action-visual">
           <div class="action-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -83,7 +83,7 @@
         </div>
       </a>
 
-      <a class="source-card max" href="/print/max/">
+      <a class="source-card max" id="source-max" href="/print/max/">
         <div class="action-visual">
           <div class="action-icon">
             <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -100,7 +100,7 @@
         </div>
         <div class="action-text">
           <div class="action-title">MAX</div>
-          <div class="action-description">Отправьте файл боту в MAX</div>
+          <div class="action-description">Отправьте документ боту в MAX</div>
           <div class="source-qr" id="max-qr" hidden aria-hidden="true"></div>
         </div>
         <div class="arrow" aria-hidden="true">
@@ -113,7 +113,18 @@
   </div>
   <script src="/static/ui.js"></script>
   <script>
+    function setShown(id, on) {
+      const el = document.getElementById(id);
+      if (el) el.hidden = !on;
+    }
+
     (async () => {
+      try {
+        const info = await fetch('/api/kiosk/info').then((r) => r.json()).catch(() => ({}));
+        setShown('source-usb', info.source_usb !== false);
+        setShown('source-email', info.source_email === true);
+        setShown('source-max', info.source_max === true);
+      } catch (e) {}
       try {
         const res = await fetch('/api/kiosk/email/info');
         const data = await res.json().catch(() => ({}));

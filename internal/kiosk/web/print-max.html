@@ -72,7 +72,7 @@
         const data = await res.json().catch(() => ({}));
         document.getElementById('max-size').textContent = (data.max_file_size_mb || '20') + ' МБ';
         if (!data.enabled) {
-          showError(data.error || 'MAX не активирован. Включите в админ-панели.');
+          showError('Печать через MAX временно недоступна');
           return;
         }
         document.getElementById('bot-link').textContent = data.bot_link || ('@' + (data.bot_username || ''));

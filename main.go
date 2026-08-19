@@ -88,7 +88,7 @@ func main() {
 		slog.Error("failed to register kiosk routes", "error", err)
 		os.Exit(1)
 	}
-	if err := admin.RegisterRoutes(r, cfg, settingsRepo); err != nil {
+	if err := admin.RegisterRoutes(r, cfg, settingsRepo, db); err != nil {
 		slog.Error("failed to register admin routes", "error", err)
 		os.Exit(1)
 	}
@@ -137,6 +137,7 @@ func ensureDirs(cfg *config.Config) error {
 		cfg.ScanJobsDir(),
 		cfg.EmailInboxDir(),
 		filepath.Join(cfg.DataRoot(), "max-inbox"),
+		filepath.Join(cfg.DataRoot(), "copy-jobs"),
 	}
 	for _, dir := range dirs {
 		if dir == "" || dir == "." {

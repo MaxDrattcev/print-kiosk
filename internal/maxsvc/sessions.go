@@ -205,3 +205,31 @@ func (s *Service) GetScan(id string) (*ScanSession, bool) {
 	sess, ok := s.scanSess[id]
 	return sess, ok
 }
+
+// AbandonPrint deletes a print wait session and its local files.
+func (s *Service) AbandonPrint(id string) {
+	s.mu.Lock()
+	sess, ok := s.printSess[id]
+	if ok {
+		delete(s.printSess, id)
+	}
+	s.mu.Unlock()
+	if !ok || sess == nil {
+		return
+	}
+	for _, f := range sess.Files {
+		if f.Path != "" {
+			_ = os.Remove(f.Path)
+		}
+	}
+	if sess.Dir != "" {
+		_ = os.RemoveAll(sess.Dir)
+	}
+}
+
+// AbandonScan drops a scan delivery wait session.
+func (s *Service) AbandonScan(id string) {
+	s.mu.Lock()
+	delete(s.scanSess, id)
+	s.mu.Unlock()
+}

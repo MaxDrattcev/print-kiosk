@@ -9,6 +9,8 @@ Print Kiosk — Windows deploy
    - Recommended: put SumatraPDF.exe next to print-kiosk.exe
      (silent PDF printing without dialogs)
      https://www.sumatrapdfreader.org/download-free-pdf-viewer
+   - Scanner/copy: the same MFP must be visible to Windows as a WIA scanner.
+     Optional: install NAPS2 (NAPS2.Console.exe) for more reliable scanning.
 
 2) Copy this folder to the PC, e.g. C:\print-kiosk\
 

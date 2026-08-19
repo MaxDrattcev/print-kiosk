@@ -55,12 +55,27 @@ func (h *Handler) Info(c *gin.Context) {
 		return
 	}
 
+	emailReady := storage.EmailReady(values)
+	emailOn := storage.SettingEnabled(values, storage.SettingSourceEmailEnabled, true) && emailReady
+	timeoutSec, _ := strconv.Atoi(values[storage.SettingSessionTimeoutSec])
+	if timeoutSec < 0 {
+		timeoutSec = 0
+	}
+
 	c.JSON(http.StatusOK, gin.H{
-		"price_bw":     values[storage.SettingPriceBW],
-		"price_color":  values[storage.SettingPriceColor],
-		"price_copy":   values[storage.SettingPriceCopy],
-		"price_scan":   values[storage.SettingPriceScan],
-		"support_text": values[storage.SettingSupportText],
+		"price_bw":            values[storage.SettingPriceBW],
+		"price_color":         values[storage.SettingPriceColor],
+		"price_copy":          values[storage.SettingPriceCopy],
+		"price_scan":          values[storage.SettingPriceScan],
+		"support_text":        values[storage.SettingSupportText],
+		"service_print":       storage.SettingEnabled(values, storage.SettingServicePrintEnabled, true),
+		"service_copy":        storage.SettingEnabled(values, storage.SettingServiceCopyEnabled, true),
+		"service_scan":        storage.SettingEnabled(values, storage.SettingServiceScanEnabled, true),
+		"source_usb":          storage.SettingEnabled(values, storage.SettingSourceUSBEnabled, true),
+		"source_email":        emailOn,
+		"source_max":          storage.MaxKioskReady(values),
+		"payment_qr":          false,
+		"session_timeout_sec": timeoutSec,
 	})
 }
 

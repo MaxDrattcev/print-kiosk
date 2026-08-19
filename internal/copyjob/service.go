@@ -3,10 +3,15 @@ package copyjob
 import (
 	"fmt"
 	"log/slog"
+	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
 	"github.com/google/uuid"
+
+	"print-kiosk/internal/device"
+	"print-kiosk/internal/printjob"
 )
 
 type Status string
@@ -40,16 +45,23 @@ type Job struct {
 }
 
 type Service struct {
-	dryRun bool
-	mu     sync.RWMutex
-	jobs   map[string]*Job
+	dryRun  bool
+	jobsDir string
+	printer *printjob.Service
+	mu      sync.RWMutex
+	jobs    map[string]*Job
 }
 
-func NewService(dryRun bool) *Service {
-	return &Service{
-		dryRun: dryRun,
-		jobs:   make(map[string]*Job),
+func NewService(jobsDir string, printer *printjob.Service, dryRun bool) (*Service, error) {
+	if err := os.MkdirAll(jobsDir, 0o755); err != nil {
+		return nil, err
 	}
+	return &Service{
+		dryRun:  dryRun,
+		jobsDir: jobsDir,
+		printer: printer,
+		jobs:    make(map[string]*Job),
+	}, nil
 }
 
 func (s *Service) Create() *Job {
@@ -109,7 +121,7 @@ func (s *Service) MarkPaid(id string, opt Options) (*Job, error) {
 	return job, nil
 }
 
-// Execute sends a copy job to the MFP. Stub until real device API is wired.
+// Execute scans the platen and sends the page to the same printer as print jobs.
 func (s *Service) Execute(id string) (*Job, int, error) {
 	s.mu.Lock()
 	job, ok := s.jobs[id]
@@ -125,13 +137,38 @@ func (s *Service) Execute(id string) (*Job, int, error) {
 	copies := job.Copies
 	s.mu.Unlock()
 
+	dir := filepath.Join(s.jobsDir, id)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return nil, 0, fmt.Errorf("каталог копии: %w", err)
+	}
+	pdfPath := filepath.Join(dir, "copy.pdf")
+	defer os.RemoveAll(dir)
+
 	slog.Info("copy started", "job", id, "color", color, "copies", copies, "dry_run", s.dryRun)
-	// Simulate platen copy cycle on the MFP.
-	time.Sleep(3 * time.Second)
+	if err := device.ScanToPDF(pdfPath, device.ScanOptions{Color: color, DPI: 200}, s.dryRun); err != nil {
+		return nil, 0, err
+	}
+
+	if s.printer == nil {
+		return nil, 0, fmt.Errorf("принтер не настроен")
+	}
+	if err := s.printer.PrintFile(pdfPath, printjob.PrintOptions{
+		Color:  color,
+		Copies: copies,
+	}); err != nil {
+		return nil, 0, fmt.Errorf("не удалось отправить на печать: %w", err)
+	}
 	slog.Info("copy finished", "job", id)
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	job.Status = StatusDone
 	return job, copies, nil
+}
+
+func (s *Service) Delete(id string) {
+	s.mu.Lock()
+	delete(s.jobs, id)
+	s.mu.Unlock()
+	_ = os.RemoveAll(filepath.Join(s.jobsDir, id))
 }

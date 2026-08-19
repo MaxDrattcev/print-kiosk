@@ -5,6 +5,7 @@ import (
 	"io"
 	"log/slog"
 	"mime"
+	"net"
 	"path/filepath"
 	"strings"
 	"time"
@@ -63,7 +64,8 @@ func connect(cfg Credentials) (*client.Client, error) {
 	if login == "" {
 		login = cfg.Address
 	}
-	c, err := client.DialTLS(fmt.Sprintf("%s:%d", host, port), nil)
+	dialer := &net.Dialer{Timeout: 15 * time.Second}
+	c, err := client.DialWithDialerTLS(dialer, fmt.Sprintf("%s:%d", host, port), nil)
 	if err != nil {
 		return nil, fmt.Errorf("подключение к почте: %w", err)
 	}
@@ -72,6 +74,16 @@ func connect(cfg Credentials) (*client.Client, error) {
 		return nil, fmt.Errorf("вход в почту: %w", err)
 	}
 	return c, nil
+}
+
+// Test dials IMAP and authenticates, then logs out. No mailbox changes.
+func Test(cfg Credentials) error {
+	c, err := connect(cfg)
+	if err != nil {
+		return err
+	}
+	_ = c.Logout()
+	return nil
 }
 
 // HighestUID returns the current highest UID in INBOX (0 if empty).

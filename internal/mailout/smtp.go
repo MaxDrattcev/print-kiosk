@@ -32,6 +32,80 @@ func ResolveHost(address string) (host string, port int) {
 	return mailcfg.SMTPHost(address)
 }
 
+// Test dials SMTP and authenticates. It does not send a message.
+func Test(cfg Credentials) error {
+	if cfg.From == "" || cfg.Password == "" {
+		return fmt.Errorf("почта киоска не настроена")
+	}
+	login := cfg.Login
+	if login == "" {
+		login = cfg.From
+	}
+	host := cfg.Host
+	port := cfg.Port
+	if host == "" {
+		host, port = ResolveHost(cfg.From)
+	}
+	if port == 0 {
+		port = 587
+	}
+	addr := fmt.Sprintf("%s:%d", host, port)
+	auth := smtp.PlainAuth("", login, cfg.Password, host)
+	if port == 465 {
+		return testSMTPS(addr, host, auth)
+	}
+	return testSTARTTLS(addr, host, auth)
+}
+
+func testSTARTTLS(addr, host string, auth smtp.Auth) error {
+	conn, err := net.DialTimeout("tcp", addr, 15*time.Second)
+	if err != nil {
+		return fmt.Errorf("подключение к SMTP: %w", err)
+	}
+	c, err := smtp.NewClient(conn, host)
+	if err != nil {
+		_ = conn.Close()
+		return fmt.Errorf("подключение к SMTP: %w", err)
+	}
+	defer c.Close()
+	if ok, _ := c.Extension("STARTTLS"); ok {
+		tlsCfg := &tls.Config{ServerName: host, MinVersion: tls.VersionTLS12}
+		if err := c.StartTLS(tlsCfg); err != nil {
+			return fmt.Errorf("STARTTLS: %w", err)
+		}
+	}
+	if auth != nil {
+		if ok, _ := c.Extension("AUTH"); ok {
+			if err := c.Auth(auth); err != nil {
+				return fmt.Errorf("авторизация SMTP: %w", err)
+			}
+		}
+	}
+	return c.Quit()
+}
+
+func testSMTPS(addr, host string, auth smtp.Auth) error {
+	tlsCfg := &tls.Config{ServerName: host, MinVersion: tls.VersionTLS12}
+	conn, err := tls.DialWithDialer(&net.Dialer{Timeout: 15 * time.Second}, "tcp", addr, tlsCfg)
+	if err != nil {
+		return fmt.Errorf("подключение к SMTP(S): %w", err)
+	}
+	c, err := smtp.NewClient(conn, host)
+	if err != nil {
+		_ = conn.Close()
+		return err
+	}
+	defer c.Close()
+	if auth != nil {
+		if ok, _ := c.Extension("AUTH"); ok {
+			if err := c.Auth(auth); err != nil {
+				return fmt.Errorf("авторизация SMTP: %w", err)
+			}
+		}
+	}
+	return c.Quit()
+}
+
 // SendMail sends a message with one file attachment to toAddr.
 func SendMail(cfg Credentials, toAddr, subject, bodyText string, att Attachment) error {
 	toAddr = strings.TrimSpace(toAddr)

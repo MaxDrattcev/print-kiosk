@@ -52,9 +52,19 @@
   </div>
 
   <script>
+    const USB_PATH_KEY = 'kiosk_usb_browse_path';
     const params = new URLSearchParams(location.search);
     let currentPath = params.get('path') || '';
     let rootPath = '';
+
+    function lastUsbPath() {
+      try { return sessionStorage.getItem(USB_PATH_KEY) || ''; } catch (e) { return ''; }
+    }
+
+    function rememberUsbPath(path) {
+      if (!path) return;
+      try { sessionStorage.setItem(USB_PATH_KEY, path); } catch (e) {}
+    }
 
     const titleEl = document.getElementById('title');
     const subtitleEl = document.getElementById('subtitle');
@@ -92,14 +102,23 @@
 
     function setPath(path) {
       currentPath = path;
+      rememberUsbPath(path);
       const url = new URL(location.href);
-      url.searchParams.set('path', path);
+      if (path) url.searchParams.set('path', path);
+      else url.searchParams.delete('path');
       history.replaceState({}, '', url);
       loadDir(path);
     }
 
     function renderEntries(data) {
       rootPath = data.root || rootPath;
+      if (data.path) {
+        currentPath = data.path;
+        rememberUsbPath(data.path);
+        const url = new URL(location.href);
+        url.searchParams.set('path', data.path);
+        history.replaceState({}, '', url);
+      }
       titleEl.textContent = data.label || 'USB';
       subtitleEl.textContent = data.path || '';
 
@@ -158,7 +177,10 @@
               return;
             }
             loadingText.textContent = 'Документ готов, открываем настройки…';
-            location.href = '/print/setup/?job=' + encodeURIComponent(data.job.id);
+            const dir = currentPath || rootPath || lastUsbPath();
+            let setup = '/print/setup/?job=' + encodeURIComponent(data.job.id) + '&from=usb';
+            if (dir) setup += '&usb_path=' + encodeURIComponent(dir);
+            location.href = setup;
           } catch (e) {
             setLoading(false);
             showError('Не удалось подготовить файл');
@@ -184,6 +206,14 @@
           return;
         }
         if (data.drives) {
+          const remembered = path || lastUsbPath();
+          const match = remembered && data.drives.find((d) =>
+            remembered === d.path || String(remembered).indexOf(d.path) === 0
+          );
+          if (match) {
+            setPath(remembered.indexOf(match.path) === 0 && remembered !== match.path ? remembered : match.path);
+            return;
+          }
           location.href = '/print/usb/';
           return;
         }
@@ -198,6 +228,7 @@
       if (rootPath) setPath(rootPath);
     });
 
+    if (!currentPath) currentPath = lastUsbPath();
     loadDir(currentPath);
   </script>
   <script src="/static/ui.js"></script>

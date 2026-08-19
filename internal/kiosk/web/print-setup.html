@@ -93,49 +93,6 @@
     </div>
   </dialog>
 
-  <dialog class="modal flow-modal kiosk-sheet" id="method-modal">
-    <div class="modal-card flow-card">
-      <h2>Выберите способ оплаты</h2>
-      <p class="pay-total">К оплате: <strong id="pay-sum">—</strong></p>
-      <button type="button" class="pay-method" id="pay-terminal-btn">
-        <div class="pay-method-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
-            <rect x="2" y="6" width="20" height="12" rx="2"/>
-            <path d="M2 10h20"/>
-          </svg>
-        </div>
-        <div>
-          <div class="pay-method-title">Оплатить картой</div>
-          <div class="pay-method-sub">Приложите карту или телефон к терминалу</div>
-        </div>
-      </button>
-      <button type="button" class="pay-method" id="pay-qr-btn" disabled>
-        <div class="pay-method-icon qr" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-            <rect x="3" y="3" width="7" height="7" rx="1"/>
-            <rect x="14" y="3" width="7" height="7" rx="1"/>
-            <rect x="3" y="14" width="7" height="7" rx="1"/>
-            <path d="M14 14h3v3h-3zM20 14v7h-7"/>
-          </svg>
-        </div>
-        <div>
-          <div class="pay-method-title">Оплатить по QR</div>
-          <div class="pay-method-sub">Отсканируйте QR-код камерой телефона</div>
-        </div>
-      </button>
-      <button type="button" class="text-btn pay-cancel" id="method-cancel">← Отмена</button>
-    </div>
-  </dialog>
-
-  <dialog class="modal flow-modal kiosk-sheet" id="terminal-modal">
-    <div class="modal-card flow-card status-screen">
-      <div class="status-illustration card-terminal" aria-hidden="true"></div>
-      <h2>Завершите оплату</h2>
-      <p>Следуйте подсказкам на платёжном терминале</p>
-      <div class="dots-loader" aria-hidden="true"><span></span><span></span><span></span></div>
-    </div>
-  </dialog>
-
   <dialog class="modal flow-modal kiosk-sheet" id="success-modal">
     <div class="modal-card flow-card success-state">
       <div class="flow-icon success-icon" aria-hidden="true"></div>
@@ -157,6 +114,7 @@
   </dialog>
 
   <script src="/static/ui.js"></script>
+  <script src="/static/payment.js"></script>
   <script>
     const params = new URLSearchParams(location.search);
     const jobId = params.get('job');
@@ -164,10 +122,19 @@
     const emailSessionId = params.get('session') || '';
     const emailFileId = params.get('file') || '';
     const isInbox = fromSource === 'email' || fromSource === 'max';
+    let usbPath = params.get('usb_path') || '';
+    if (!usbPath) {
+      try { usbPath = sessionStorage.getItem('kiosk_usb_browse_path') || ''; } catch (e) {}
+    }
     let job = null;
     let prices = { bw: 0, color: 0 };
     let busy = false;
     let lastSheets = 0;
+
+    function usbBrowseHref() {
+      if (!usbPath) return '/print/usb/browse/';
+      return '/print/usb/browse/?path=' + encodeURIComponent(usbPath);
+    }
 
     const backBtn = document.getElementById('back-btn');
     if (fromSource === 'email') {
@@ -179,13 +146,11 @@
         ? '/print/max/files/?session=' + encodeURIComponent(emailSessionId)
         : '/print/max/';
     } else {
-      backBtn.href = '/print/usb/browse/';
+      backBtn.href = usbBrowseHref();
     }
 
     const errorEl = document.getElementById('error');
     const previewFrame = document.getElementById('preview-frame');
-    const methodModal = document.getElementById('method-modal');
-    const terminalModal = document.getElementById('terminal-modal');
     const successModal = document.getElementById('success-modal');
     const paperModal = document.getElementById('paper-modal');
     const successMoreBtn = document.getElementById('success-more');
@@ -214,11 +179,19 @@
       return true;
     }
 
+    function showSuccessActions(showMore) {
+      successMoreBtn.hidden = !showMore;
+      successHomeBtn.className = showMore ? 'secondary-btn' : 'primary-btn';
+      successHomeBtn.hidden = false;
+    }
+
     async function finishEmailPrintSuccess() {
-      if (!isInbox || !emailSessionId || !emailFileId) {
-        successMoreBtn.hidden = true;
-        successHomeBtn.className = 'primary-btn';
-        successHomeBtn.hidden = false;
+      if (!isInbox) {
+        showSuccessActions(true);
+        return;
+      }
+      if (!emailSessionId || !emailFileId) {
+        showSuccessActions(false);
         return;
       }
       const printedURL = fromSource === 'max'
@@ -236,17 +209,13 @@
           document.getElementById('success-text').textContent =
             (document.getElementById('success-text').textContent || '') +
             ' Ещё есть документы (' + remaining + ').';
-          successMoreBtn.hidden = false;
-          successHomeBtn.className = 'secondary-btn';
-          successHomeBtn.hidden = false;
+          showSuccessActions(true);
           return;
         }
       } catch (e) {
         // fall through to home-only
       }
-      successMoreBtn.hidden = true;
-      successHomeBtn.className = 'primary-btn';
-      successHomeBtn.hidden = false;
+      showSuccessActions(false);
     }
 
     function showError(msg) {
@@ -376,27 +345,17 @@
       if (busy) return;
       errorEl.hidden = true;
       if (!ensureEnoughPaper()) return;
-      const total = document.getElementById('sum-total').textContent;
-      document.getElementById('pay-sum').textContent = total;
-      methodModal.showModal();
+      KioskPayment.open(document.getElementById('sum-total').textContent);
     });
 
     document.getElementById('paper-modal-ok').addEventListener('click', () => paperModal.close());
-
-    document.getElementById('method-cancel').addEventListener('click', () => methodModal.close());
-
-    document.getElementById('pay-qr-btn').addEventListener('click', () => {
-      KioskUI.setError(errorEl, 'Оплата через QR-код пока не подключена');
-      methodModal.close();
-    });
 
     document.getElementById('pay-terminal-btn').addEventListener('click', async () => {
       if (busy) return;
       if (!ensureEnoughPaper()) return;
       busy = true;
       document.getElementById('pay-btn').disabled = true;
-      methodModal.close();
-      terminalModal.showModal();
+      KioskPayment.showWaiting();
       showError('');
 
       const body = { ...settings(), method: 'terminal' };
@@ -407,7 +366,7 @@
           body: JSON.stringify(body),
         });
         const payData = await payRes.json().catch(() => ({}));
-        terminalModal.close();
+        KioskPayment.closeWaiting();
 
         if (!payRes.ok) {
           if (payData.code === 'paper_insufficient') {
@@ -459,7 +418,7 @@
           await finishEmailPrintSuccess();
         }
       } catch (e) {
-        terminalModal.close();
+        KioskPayment.closeWaiting();
         showError('Ошибка связи с сервером');
         busy = false;
         document.getElementById('pay-btn').disabled = false;
@@ -467,12 +426,19 @@
     });
 
     successMoreBtn.addEventListener('click', () => {
-      if (!emailSessionId) {
-        location.href = fromSource === 'max' ? '/print/max/' : '/print/email/';
+      if (fromSource === 'max') {
+        location.href = emailSessionId
+          ? '/print/max/files/?session=' + encodeURIComponent(emailSessionId)
+          : '/print/max/';
         return;
       }
-      const base = fromSource === 'max' ? '/print/max/files/' : '/print/email/files/';
-      location.href = base + '?session=' + encodeURIComponent(emailSessionId);
+      if (fromSource === 'email') {
+        location.href = emailSessionId
+          ? '/print/email/files/?session=' + encodeURIComponent(emailSessionId)
+          : '/print/email/';
+        return;
+      }
+      location.href = usbBrowseHref();
     });
 
     successHomeBtn.addEventListener('click', () => {

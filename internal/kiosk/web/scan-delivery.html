@@ -117,14 +117,13 @@
 
     (async () => {
       try {
-        const info = await fetch('/api/kiosk/max/info').then((r) => r.json()).catch(() => ({}));
-        if (!info.enabled) {
-          maxLink.classList.add('disabled');
-          maxLink.removeAttribute('href');
-          document.getElementById('max-desc').textContent = 'Не активирован в настройках';
-          maxLink.style.opacity = '0.55';
-          maxLink.style.pointerEvents = 'none';
-        }
+        const info = await fetch('/api/kiosk/info').then((r) => r.json()).catch(() => ({}));
+        const usb = document.getElementById('usb-link');
+        const email = document.getElementById('email-link');
+        const max = document.getElementById('max-link');
+        if (usb) usb.hidden = info.source_usb === false;
+        if (email) email.hidden = info.source_email !== true;
+        if (max) max.hidden = info.source_max !== true;
       } catch (e) {}
       if (!jobId) return;
       const res = await fetch('/api/kiosk/scan/jobs/' + encodeURIComponent(jobId));

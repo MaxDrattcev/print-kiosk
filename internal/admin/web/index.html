@@ -36,7 +36,7 @@
     async function ensureGuest() {
       const res = await fetch('/api/admin/me', { credentials: 'same-origin' });
       if (res.ok) {
-        location.href = '/admin/settings.html';
+        location.href = '/admin/settings.html#overview';
       }
     }
 
@@ -67,7 +67,7 @@
         return;
       }
 
-      location.href = '/admin/settings.html';
+      location.href = '/admin/settings.html#overview';
     });
   </script>
 </body>

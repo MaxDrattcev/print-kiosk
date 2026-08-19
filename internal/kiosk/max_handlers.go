@@ -46,6 +46,10 @@ func (h *Handler) MaxInfo(c *gin.Context) {
 		c.JSON(http.StatusOK, out)
 		return
 	}
+	if !h.max.Enabled() {
+		c.JSON(http.StatusOK, out)
+		return
+	}
 	username, enabled, err := h.max.Info(c.Request.Context())
 	out["enabled"] = enabled
 	out["bot_username"] = username

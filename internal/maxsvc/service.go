@@ -90,16 +90,7 @@ func (s *Service) creds() (token string, adminID int64, enabled bool) {
 	if err != nil {
 		return "", 0, false
 	}
-	enabled = values[storage.SettingMaxEnabled] == "true"
-	token = strings.TrimSpace(values[storage.SettingMaxBotToken])
-	adminRaw := strings.TrimSpace(values[storage.SettingMaxAdminID])
-	if adminRaw != "" {
-		adminID, _ = strconv.ParseInt(adminRaw, 10, 64)
-	}
-	if !enabled || token == "" || adminID == 0 {
-		return token, adminID, false
-	}
-	return token, adminID, true
+	return strings.TrimSpace(values[storage.SettingMaxBotToken]), storage.MaxAdminID(values), storage.MaxKioskReady(values)
 }
 
 func (s *Service) Enabled() bool {

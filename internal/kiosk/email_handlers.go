@@ -19,11 +19,11 @@ func (h *Handler) EmailInfo(c *gin.Context) {
 		return
 	}
 	addr := strings.TrimSpace(values[storage.SettingEmailAddress])
-	maxMB := values[storage.SettingEmailMaxFileSizeMB]
-	if addr == "" {
-		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Электронная почта ещё не настроена. Обратитесь к администратору."})
+	if addr == "" || !storage.SettingEnabled(values, storage.SettingSourceEmailEnabled, true) || !storage.EmailReady(values) {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Печать по Email временно недоступна"})
 		return
 	}
+	maxMB := values[storage.SettingEmailMaxFileSizeMB]
 	c.JSON(http.StatusOK, gin.H{
 		"email_address":     addr,
 		"max_file_size_mb":  maxMB,
@@ -157,7 +157,7 @@ func (h *Handler) emailCredentials() (mailinbox.Credentials, time.Duration, erro
 	addr := strings.TrimSpace(values[storage.SettingEmailAddress])
 	login := strings.TrimSpace(values[storage.SettingEmailLogin])
 	pass := values[storage.SettingEmailPassword]
-	if addr == "" || pass == "" {
+	if addr == "" || pass == "" || !storage.SettingEnabled(values, storage.SettingSourceEmailEnabled, true) {
 		return mailinbox.Credentials{}, 0, errEmailNotConfigured
 	}
 	if login == "" {
@@ -173,10 +173,6 @@ func (h *Handler) emailCredentials() (mailinbox.Credentials, time.Duration, erro
 	if pollEvery < 5*time.Second {
 		pollEvery = 5 * time.Second
 	}
-	// While user waits at kiosk, poll a bit more often than admin setting floor.
-	if pollEvery > 10*time.Second {
-		pollEvery = 5 * time.Second
-	}
 	return mailinbox.Credentials{
 		Address:  addr,
 		Login:    login,
@@ -187,7 +183,7 @@ func (h *Handler) emailCredentials() (mailinbox.Credentials, time.Duration, erro
 	}, pollEvery, nil
 }
 
-var errEmailNotConfigured = errString("Электронная почта ещё не настроена. Обратитесь к администратору.")
+var errEmailNotConfigured = errString("Печать по Email временно недоступна")
 
 func emailSessionJSON(sess *mailinbox.Session) gin.H {
 	files := make([]gin.H, 0, len(sess.Files))

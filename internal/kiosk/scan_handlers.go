@@ -95,6 +95,7 @@ func (h *Handler) PayScanJob(c *gin.Context) {
 func (h *Handler) ExecuteScanJob(c *gin.Context) {
 	job, err := h.scans.Scan(c.Param("id"))
 	if err != nil {
+		h.notifyErr(err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
@@ -217,7 +218,7 @@ func (h *Handler) smtpCredentials() (mailout.Credentials, error) {
 	addr := strings.TrimSpace(values[storage.SettingEmailAddress])
 	login := strings.TrimSpace(values[storage.SettingEmailLogin])
 	pass := values[storage.SettingEmailPassword]
-	if addr == "" || pass == "" {
+	if addr == "" || pass == "" || !storage.SettingEnabled(values, storage.SettingSourceEmailEnabled, true) {
 		return mailout.Credentials{}, errEmailNotConfigured
 	}
 	if login == "" {

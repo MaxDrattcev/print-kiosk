@@ -1,6 +1,7 @@
 package admin
 
 import (
+	"database/sql"
 	"embed"
 	"io/fs"
 	"net/http"
@@ -10,15 +11,16 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"print-kiosk/internal/config"
+	"print-kiosk/internal/stats"
 	"print-kiosk/internal/storage"
 )
 
 //go:embed web/*
 var webFS embed.FS
 
-func RegisterRoutes(r *gin.Engine, cfg *config.Config, settings *storage.SettingsRepo) error {
+func RegisterRoutes(r *gin.Engine, cfg *config.Config, settings *storage.SettingsRepo, db *sql.DB) error {
 	sessions := NewSessionStore()
-	h := NewHandler(cfg, sessions, settings)
+	h := NewHandler(cfg, sessions, settings, stats.NewRepo(db))
 
 	api := r.Group("/api/admin")
 	{
@@ -29,8 +31,11 @@ func RegisterRoutes(r *gin.Engine, cfg *config.Config, settings *storage.Setting
 		auth.Use(h.RequireAuth())
 		{
 			auth.GET("/me", h.Me)
+			auth.GET("/overview", h.Overview)
 			auth.GET("/settings", h.GetSettings)
 			auth.PUT("/settings", h.UpdateSettings)
+			auth.POST("/email/test", h.TestEmail)
+			auth.POST("/max/test", h.TestMAX)
 		}
 	}
 

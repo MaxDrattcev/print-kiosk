@@ -21,13 +21,16 @@ func (s *Service) Print(job *Job, opt PrintOptions) error {
 	if job == nil {
 		return fmt.Errorf("job is nil")
 	}
-	if opt.Copies < 1 {
-		opt.Copies = 1
-	}
+	return s.PrintFile(job.PreviewPath, opt)
+}
 
-	filePath := job.PreviewPath
+// PrintFile sends an existing PDF/image to the configured printer.
+func (s *Service) PrintFile(filePath string, opt PrintOptions) error {
 	if filePath == "" {
 		return fmt.Errorf("нет файла для печати")
+	}
+	if opt.Copies < 1 {
+		opt.Copies = 1
 	}
 
 	if s.dryRun {
@@ -197,4 +200,9 @@ func resolveSumatra(configured string) string {
 		}
 	}
 	return ""
+}
+
+// FindSumatra returns the resolved SumatraPDF path, or empty if not found.
+func FindSumatra(configured string) string {
+	return resolveSumatra(configured)
 }

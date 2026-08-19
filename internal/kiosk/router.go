@@ -42,6 +42,11 @@ func RegisterRoutes(r *gin.Engine, cfg *config.Config, settings *storage.Setting
 		return nil, fmt.Errorf("scan jobs: %w", err)
 	}
 
+	copies, err := copyjob.NewService(filepath.Join(cfg.DataRoot(), "copy-jobs"), jobs, cfg.Printer.DryRun)
+	if err != nil {
+		return nil, fmt.Errorf("copy jobs: %w", err)
+	}
+
 	mail, err := mailinbox.NewService(cfg.EmailInboxDir())
 	if err != nil {
 		return nil, fmt.Errorf("email inbox: %w", err)
@@ -53,9 +58,10 @@ func RegisterRoutes(r *gin.Engine, cfg *config.Config, settings *storage.Setting
 		return nil, fmt.Errorf("max service: %w", err)
 	}
 
-	h := NewHandler(cfg, settings, jobs, scans, copyjob.NewService(cfg.Printer.DryRun), mail, maxSvc, st)
+	h := NewHandler(cfg, settings, jobs, scans, copies, mail, maxSvc, st)
 
 	r.GET("/api/kiosk/info", h.Info)
+	r.POST("/api/kiosk/session/end", h.EndSession)
 	r.GET("/api/kiosk/usb/drives", h.ListUSBDrives)
 	r.GET("/api/kiosk/usb/browse", h.BrowseUSB)
 	r.POST("/api/kiosk/print/prepare", h.PreparePrint)

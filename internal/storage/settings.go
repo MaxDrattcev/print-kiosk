@@ -3,6 +3,8 @@ package storage
 import (
 	"database/sql"
 	"fmt"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -106,8 +108,17 @@ func IsKnownSetting(key string) bool {
 		SettingEmailPollIntervalSec,
 		SettingEmailMaxFileSizeMB,
 		SettingPaymentEnabled,
+		SettingPaymentQREnabled,
 		SettingSessionTimeoutSec,
-		SettingSupportText:
+		SettingSupportText,
+		SettingServicePrintEnabled,
+		SettingServiceCopyEnabled,
+		SettingServiceScanEnabled,
+		SettingSourceUSBEnabled,
+		SettingSourceEmailEnabled,
+		SettingKioskName,
+		SettingKioskID,
+		SettingKioskLocation:
 		return true
 	default:
 		return false
@@ -117,4 +128,52 @@ func IsKnownSetting(key string) bool {
 // SensitiveSettings are masked in API responses.
 func IsSensitiveSetting(key string) bool {
 	return key == SettingEmailPassword || key == SettingMaxBotToken
+}
+
+// SettingEnabled reads a boolean setting. Missing/empty values use defaultOn.
+func SettingEnabled(values map[string]string, key string, defaultOn bool) bool {
+	v, ok := values[key]
+	if !ok {
+		return defaultOn
+	}
+	v = strings.TrimSpace(v)
+	if v == "" {
+		return defaultOn
+	}
+	return v == "true"
+}
+
+// EmailReady is true when mailbox address and app password are both set.
+func EmailReady(values map[string]string) bool {
+	return strings.TrimSpace(values[SettingEmailAddress]) != "" &&
+		strings.TrimSpace(values[SettingEmailPassword]) != ""
+}
+
+// MaxTokenSet reports whether a bot token is stored (value itself is not returned).
+func MaxTokenSet(values map[string]string) bool {
+	return strings.TrimSpace(values[SettingMaxBotToken]) != ""
+}
+
+// MaxAdminID parses the stored admin user_id (0 if missing/invalid).
+func MaxAdminID(values map[string]string) int64 {
+	raw := strings.TrimSpace(values[SettingMaxAdminID])
+	if raw == "" {
+		return 0
+	}
+	id, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil {
+		return 0
+	}
+	return id
+}
+
+// MaxKioskReady is true when the bot is switched on and has a token.
+// Admin ID is only required for staff notifications, not for print/scan on the kiosk.
+func MaxKioskReady(values map[string]string) bool {
+	return SettingEnabled(values, SettingMaxEnabled, false) && MaxTokenSet(values)
+}
+
+// MaxReady is true when the bot can also send admin notifications.
+func MaxReady(values map[string]string) bool {
+	return MaxKioskReady(values) && MaxAdminID(values) != 0
 }

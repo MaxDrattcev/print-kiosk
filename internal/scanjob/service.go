@@ -200,6 +200,14 @@ func (s *Service) CleanupFiles(id string) {
 	_ = os.RemoveAll(dir)
 }
 
+// Abandon removes the job and its files so the next visitor cannot open them.
+func (s *Service) Abandon(id string) {
+	s.CleanupFiles(id)
+	s.mu.Lock()
+	delete(s.jobs, id)
+	s.mu.Unlock()
+}
+
 // ReadyForDelivery returns scan path and file name if the job can be delivered.
 func (s *Service) ReadyForDelivery(id string) (scanPath, fileName string, err error) {
 	job, err := s.mustGet(id)

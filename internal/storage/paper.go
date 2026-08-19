@@ -1,12 +1,16 @@
 package storage
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
 	"strconv"
 	"time"
 )
+
+// PaperRefillSheets is the amount written by “Бумага загружена”.
+const PaperRefillSheets = 500
 
 var ErrInsufficientPaper = errors.New("insufficient paper")
 
@@ -29,28 +33,12 @@ func (r *SettingsRepo) ConsumePaper(sheets int) (int, error) {
 	if sheets <= 0 {
 		return r.PaperRemaining()
 	}
-
-	tx, err := r.db.Begin()
-	if err != nil {
-		return 0, fmt.Errorf("begin paper consume: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	current, err := readPaperTx(tx)
-	if err != nil {
-		return 0, err
-	}
-	if current < sheets {
-		return current, ErrInsufficientPaper
-	}
-	next := current - sheets
-	if err := writePaperTx(tx, next); err != nil {
-		return 0, err
-	}
-	if err := tx.Commit(); err != nil {
-		return 0, fmt.Errorf("commit paper consume: %w", err)
-	}
-	return next, nil
+	return r.withPaperLock(func(current int) (int, error) {
+		if current < sheets {
+			return current, ErrInsufficientPaper
+		}
+		return current - sheets, nil
+	})
 }
 
 // RefundPaper adds sheets back (e.g. after a failed print that already consumed).
@@ -58,30 +46,50 @@ func (r *SettingsRepo) RefundPaper(sheets int) (int, error) {
 	if sheets <= 0 {
 		return r.PaperRemaining()
 	}
+	return r.withPaperLock(func(current int) (int, error) {
+		return current + sheets, nil
+	})
+}
 
-	tx, err := r.db.Begin()
+func (r *SettingsRepo) withPaperLock(nextFn func(current int) (int, error)) (int, error) {
+	ctx := context.Background()
+	conn, err := r.db.Conn(ctx)
 	if err != nil {
-		return 0, fmt.Errorf("begin paper refund: %w", err)
+		return 0, fmt.Errorf("paper conn: %w", err)
 	}
-	defer func() { _ = tx.Rollback() }()
+	defer conn.Close()
 
-	current, err := readPaperTx(tx)
+	if _, err := conn.ExecContext(ctx, "BEGIN IMMEDIATE"); err != nil {
+		return 0, fmt.Errorf("begin paper tx: %w", err)
+	}
+	committed := false
+	defer func() {
+		if !committed {
+			_, _ = conn.ExecContext(ctx, "ROLLBACK")
+		}
+	}()
+
+	current, err := readPaperConn(ctx, conn)
 	if err != nil {
 		return 0, err
 	}
-	next := current + sheets
-	if err := writePaperTx(tx, next); err != nil {
+	next, err := nextFn(current)
+	if err != nil {
+		return current, err
+	}
+	if err := writePaperConn(ctx, conn, next); err != nil {
 		return 0, err
 	}
-	if err := tx.Commit(); err != nil {
-		return 0, fmt.Errorf("commit paper refund: %w", err)
+	if _, err := conn.ExecContext(ctx, "COMMIT"); err != nil {
+		return 0, fmt.Errorf("commit paper tx: %w", err)
 	}
+	committed = true
 	return next, nil
 }
 
-func readPaperTx(tx *sql.Tx) (int, error) {
+func readPaperConn(ctx context.Context, conn *sql.Conn) (int, error) {
 	var value string
-	err := tx.QueryRow(`SELECT value FROM settings WHERE key = ?`, SettingPaperRemaining).Scan(&value)
+	err := conn.QueryRowContext(ctx, `SELECT value FROM settings WHERE key = ?`, SettingPaperRemaining).Scan(&value)
 	if err == sql.ErrNoRows {
 		return 0, nil
 	}
@@ -95,9 +103,9 @@ func readPaperTx(tx *sql.Tx) (int, error) {
 	return n, nil
 }
 
-func writePaperTx(tx *sql.Tx, n int) error {
+func writePaperConn(ctx context.Context, conn *sql.Conn, n int) error {
 	now := time.Now().UTC().Format("2006-01-02 15:04:05")
-	_, err := tx.Exec(`
+	_, err := conn.ExecContext(ctx, `
 		INSERT INTO settings (key, value, updated_at)
 		VALUES (?, ?, ?)
 		ON CONFLICT(key) DO UPDATE SET

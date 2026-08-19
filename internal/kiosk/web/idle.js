@@ -1,25 +1,41 @@
 /**
  * Kiosk idle watchdog:
- * - after 50s without interaction → show 10s countdown
- * - at 60s → go to home page
+ * after session_timeout_sec without interaction → home,
+ * with a 10s countdown near the end.
  * Paused while dialogs/loading overlays are open.
+ * Wait screens (email/MAX) skip the timer so the visitor can receive a file.
  */
 (function () {
-  const IDLE_LIMIT_MS = 60 * 1000;
   const WARN_BEFORE_MS = 10 * 1000;
   const TICK_MS = 250;
+  const DEFAULT_LIMIT_MS = 120 * 1000;
 
   const path = location.pathname.replace(/\/+$/, "") || "/";
   if (path === "/") return;
-  // Waiting for IMAP mail can take up to 2 minutes without touch input.
   if (path === "/print/email/wait") return;
   if (path === "/print/max/wait") return;
   if (path === "/scan/max") return;
 
+  let idleLimitMs = DEFAULT_LIMIT_MS;
   let lastActive = Date.now();
   let warnVisible = false;
   let overlay = null;
   let secondsEl = null;
+  let leaving = false;
+
+  fetch("/api/kiosk/info")
+    .then((r) => r.json())
+    .then((info) => {
+      const sec = Number(info && info.session_timeout_sec);
+      if (sec === 0) {
+        idleLimitMs = 0;
+        return;
+      }
+      if (Number.isFinite(sec) && sec > 0) {
+        idleLimitMs = Math.max(15, sec) * 1000;
+      }
+    })
+    .catch(() => {});
 
   function ensureUI() {
     if (overlay) return;
@@ -69,7 +85,43 @@
     document.body.classList.remove("idle-warn");
   }
 
+  function sessionPayload() {
+    const params = new URLSearchParams(location.search);
+    const job = params.get("job") || "";
+    const session = params.get("session") || "";
+    const body = {};
+    if (path.indexOf("/scan") === 0 && job) body.scan_job_id = job;
+    else if (path.indexOf("/copy") === 0 && job) body.copy_job_id = job;
+    else if (job) body.print_job_id = job;
+    if (path.indexOf("/print/max") === 0 && session) body.max_session_id = session;
+    else if (path.indexOf("/scan/max") === 0 && session) body.max_scan_session_id = session;
+    else if (session) body.email_session_id = session;
+    return body;
+  }
+
+  function goHome() {
+    if (leaving) return;
+    leaving = true;
+    const body = sessionPayload();
+    const hasIds = Object.keys(body).length > 0;
+    const finish = () => {
+      location.href = "/";
+    };
+    if (!hasIds) {
+      finish();
+      return;
+    }
+    fetch("/api/kiosk/session/end", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      keepalive: true,
+    }).finally(finish);
+    setTimeout(finish, 800);
+  }
+
   function tick() {
+    if (idleLimitMs === 0) return;
     if (isPaused()) {
       lastActive = Date.now();
       if (warnVisible) hideWarn();
@@ -77,13 +129,14 @@
     }
 
     const idle = Date.now() - lastActive;
-    if (idle >= IDLE_LIMIT_MS) {
-      location.href = "/";
+    if (idle >= idleLimitMs) {
+      goHome();
       return;
     }
 
-    const remaining = IDLE_LIMIT_MS - idle;
-    if (remaining <= WARN_BEFORE_MS) {
+    const remaining = idleLimitMs - idle;
+    const warnMs = Math.min(WARN_BEFORE_MS, Math.max(3000, idleLimitMs / 6));
+    if (remaining <= warnMs) {
       showWarn(Math.ceil(remaining / 1000));
     } else if (warnVisible) {
       hideWarn();
@@ -111,9 +164,6 @@
       { passive: true, capture: true }
     );
   });
-
-  // Don't treat tiny pointer jitters as cancel during warn — only real clicks/keys hide via above.
-  // pointermove still bumps timer so active user watching screen keeps session.
 
   setInterval(tick, TICK_MS);
 })();

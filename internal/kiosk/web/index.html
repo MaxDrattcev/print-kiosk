@@ -39,7 +39,7 @@
     </section>
 
     <main class="actions" aria-label="Основные операции">
-      <a class="action-card" href="/print/">
+      <a class="action-card" id="card-print" href="/print/">
         <div class="action-visual">
           <div class="action-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
@@ -60,7 +60,7 @@
         </div>
       </a>
 
-      <a class="action-card green" href="/copy/">
+      <a class="action-card green" id="card-copy" href="/copy/">
         <div class="action-visual">
           <div class="action-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -80,7 +80,7 @@
         </div>
       </a>
 
-      <a class="action-card purple" href="/scan/">
+      <a class="action-card purple" id="card-scan" href="/scan/">
         <div class="action-visual">
           <div class="action-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -190,6 +190,13 @@
       document.getElementById('price-color').textContent = formatPrice(info.price_color);
       document.getElementById('price-copy').textContent = formatPrice(info.price_copy);
       document.getElementById('price-scan').textContent = formatPrice(info.price_scan);
+      const setCard = (id, on) => {
+        const el = document.getElementById(id);
+        if (el) el.hidden = on === false;
+      };
+      setCard('card-print', info.service_print);
+      setCard('card-copy', info.service_copy);
+      setCard('card-scan', info.service_scan);
       const support = info.support_text || 'Обратитесь к администратору';
       const phone = extractPhone(support);
       const phoneEl = document.getElementById('support-phone');
