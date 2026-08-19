@@ -84,6 +84,7 @@
         <button type="button" class="osk-key osk-space" data-insert=" ">Пробел</button>
         <button type="button" class="osk-key osk-wide" data-osk="back">⌫</button>
         <button type="button" class="osk-key osk-wide" data-osk="clear">Очистить</button>
+        <button type="button" class="osk-key osk-wide osk-enter" data-osk="enter">Ввод</button>
       </div>`;
   }
 
@@ -189,8 +190,61 @@
       }
       return;
     }
+    if (action === "enter") {
+      pressEnter();
+      return;
+    }
     if (btn.dataset.insert != null) {
       insertText(btn.dataset.insert);
+    }
+  }
+
+  function pressEnter() {
+    if (!activeInput) return;
+    const el = activeInput;
+
+    if (el.tagName === "TEXTAREA") {
+      insertText("\n");
+      return;
+    }
+
+    const opts = { key: "Enter", code: "Enter", keyCode: 13, which: 13, bubbles: true, cancelable: true };
+    const down = new KeyboardEvent("keydown", opts);
+    const press = new KeyboardEvent("keypress", opts);
+    const up = new KeyboardEvent("keyup", opts);
+    el.dispatchEvent(down);
+    if (!down.defaultPrevented) {
+      el.dispatchEvent(press);
+    }
+    el.dispatchEvent(up);
+
+    const form = el.form || el.closest("form");
+    if (form && !down.defaultPrevented) {
+      if (typeof form.requestSubmit === "function") {
+        form.requestSubmit();
+      } else {
+        const submitBtn =
+          form.querySelector('button[type="submit"], input[type="submit"]') ||
+          form.querySelector("button.primary-btn, button.button-primary, button.primary");
+        if (submitBtn) {
+          submitBtn.click();
+        } else {
+          form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+        }
+      }
+      hide();
+      return;
+    }
+
+    // Pages without <form>: click the main action near the field.
+    const card = el.closest(".prompt-card, .card, .screen, form, body");
+    const actionBtn =
+      card &&
+      (card.querySelector("button.primary-btn:not([disabled])") ||
+        card.querySelector('button[type="submit"]:not([disabled])'));
+    if (actionBtn) {
+      actionBtn.click();
+      hide();
     }
   }
 

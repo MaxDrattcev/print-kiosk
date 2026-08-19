@@ -128,7 +128,10 @@ func RegisterRoutes(r *gin.Engine, cfg *config.Config, settings *storage.Setting
 	r.GET("/print/email/files/", func(c *gin.Context) {
 		serveFile(c, static, "print-email-files.html")
 	})
-	r.GET("/print/telegram/", placeholder("Печать с Telegram"))
+	r.GET("/print/max/", placeholder("Печать с MAX"))
+	r.GET("/print/telegram/", func(c *gin.Context) {
+		c.Redirect(http.StatusFound, "/print/max/")
+	})
 	r.GET("/static/*filepath", func(c *gin.Context) {
 		name := strings.TrimPrefix(path.Clean("/"+c.Param("filepath")), "/")
 		if name == "" || strings.Contains(name, "..") {

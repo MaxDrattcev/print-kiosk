@@ -521,6 +521,17 @@ textarea.osk-target {
   max-width: 420px;
 }
 
+.osk-enter {
+  background: #1d6b4f;
+  border-color: #155a41;
+  color: #fff;
+  min-width: 96px;
+}
+
+.osk-enter:active {
+  background: #155a41;
+}
+
 @media (orientation: portrait), (max-width: 1100px) {
   .topbar {
     flex-direction: column;
