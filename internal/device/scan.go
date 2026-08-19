@@ -75,7 +75,9 @@ func imageToPDF(imgPath, pdfPath string) error {
 	}
 	defer os.Remove(pngPath)
 
-	imp, err := api.Import("formsize:A4, position:full", types.POINTS)
+	// A4 + вписать изображение. pos:full делает страницу размером с пиксели скана —
+	// при печати на A4 выходит только уголок.
+	imp, err := api.Import("formsize:A4, position:c, scalefactor:1", types.POINTS)
 	if err != nil {
 		slog.Warn("scan pdf params", "error", err)
 		return fmt.Errorf("не удалось подготовить скан")

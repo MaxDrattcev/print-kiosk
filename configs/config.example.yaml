@@ -6,7 +6,7 @@ server:
 
 admin:
   username: admin
-  password: change-me
+  password: 123456
 
 database:
   path: data/kiosk.db

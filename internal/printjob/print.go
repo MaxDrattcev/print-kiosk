@@ -117,7 +117,8 @@ func (s *Service) printWindows(filePath string, opt PrintOptions) error {
 }
 
 func printSumatra(bin, filePath, printer string, opt PrintOptions) error {
-	settings := []string{"noscale", "paper=A4"}
+	// fit — вписать страницу в лист. noscale даёт «только уголок», если PDF не A4.
+	settings := []string{"fit", "paper=A4"}
 	if opt.Duplex {
 		settings = append(settings, "duplex")
 	} else {
@@ -185,6 +186,21 @@ func resolveSumatra(configured string) string {
 		candidates = append(candidates,
 			filepath.Join(dir, "SumatraPDF.exe"),
 			filepath.Join(dir, "tools", "SumatraPDF.exe"),
+		)
+		if matches, err := filepath.Glob(filepath.Join(dir, "SumatraPDF*.exe")); err == nil {
+			for _, m := range matches {
+				base := strings.ToLower(filepath.Base(m))
+				if strings.Contains(base, "install") || strings.Contains(base, "setup") || strings.Contains(base, "uninstall") {
+					continue
+				}
+				candidates = append(candidates, m)
+			}
+		}
+	}
+	if local := os.Getenv("LOCALAPPDATA"); local != "" {
+		candidates = append(candidates,
+			filepath.Join(local, "SumatraPDF", "SumatraPDF.exe"),
+			filepath.Join(local, "Programs", "SumatraPDF", "SumatraPDF.exe"),
 		)
 	}
 	candidates = append(candidates,
