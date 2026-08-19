@@ -6,7 +6,7 @@
   <title>PrintStart — терминал самообслуживания</title>
   <link rel="stylesheet" href="/static/style.css">
 </head>
-<body class="kiosk-user">
+<body class="kiosk-user kiosk-home">
   <div class="app">
     <header class="app-header">
       <div class="brand">
@@ -24,7 +24,7 @@
         </div>
       </div>
 
-      <a class="specialist-button" href="/admin/">
+      <a class="specialist-button" href="/admin/" draggable="false">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <circle cx="12" cy="8" r="4"/>
           <path d="M4 21v-2a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v2"/>
@@ -39,7 +39,7 @@
     </section>
 
     <main class="actions" aria-label="Основные операции">
-      <a class="action-card" id="card-print" href="/print/">
+      <a class="action-card" id="card-print" href="/print/" draggable="false">
         <div class="action-visual">
           <div class="action-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
@@ -60,7 +60,7 @@
         </div>
       </a>
 
-      <a class="action-card green" id="card-copy" href="/copy/">
+      <a class="action-card green" id="card-copy" href="/copy/" draggable="false">
         <div class="action-visual">
           <div class="action-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -80,7 +80,7 @@
         </div>
       </a>
 
-      <a class="action-card purple" id="card-scan" href="/scan/">
+      <a class="action-card purple" id="card-scan" href="/scan/" draggable="false">
         <div class="action-visual">
           <div class="action-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -218,6 +218,14 @@
     document.getElementById('support-btn').addEventListener('click', () => {
       document.getElementById('support-modal').showModal();
     });
+
+    function blockFileHandoff(e) {
+      e.preventDefault();
+      if (e.dataTransfer) e.dataTransfer.dropEffect = 'none';
+    }
+    document.addEventListener('dragstart', blockFileHandoff);
+    document.addEventListener('dragover', blockFileHandoff);
+    document.addEventListener('drop', blockFileHandoff);
   </script>
   <script src="/static/idle.js"></script>
 </body>
