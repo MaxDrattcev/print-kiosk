@@ -12,7 +12,6 @@
     { question: "Файл в телефоне?", before: "", accent: "Отправьте", after: "\nмы напечатаем" },
     { question: "Цените своё время?", before: "Печатайте ", accent: "без очереди", after: "" },
     { question: "Нужна копия?", before: "Сделайте ее ", accent: "прямо здесь", after: "" },
-    { question: "Документ нужен в PDF?", before: "", accent: "Сканируйте", after: "\nза несколько касаний" },
   ];
 
   const message = document.getElementById("hero-message");
@@ -54,6 +53,7 @@
   function tick() {
     if (fading || document.hidden) return;
     fading = true;
+    document.body.classList.add("home-copy-changing");
     message.classList.remove("is-in", "is-enter");
     message.classList.add("is-leave");
 
@@ -62,6 +62,7 @@
       render(PHRASES[index]);
       showEnter();
       fading = false;
+      document.body.classList.remove("home-copy-changing");
     }, FADE_MS);
   }
 
@@ -74,6 +75,7 @@
     if (timer == null) return;
     window.clearInterval(timer);
     timer = null;
+    document.body.classList.remove("home-copy-changing");
   }
 
   render(PHRASES[0]);

@@ -61,7 +61,7 @@
         <div class="step purple">
           <div class="step-num">3</div>
           <div class="step-icon" aria-hidden="true">
-            <img src="/static/img/scanner-step-close.png" alt="">
+            <img class="scan-step-close-corrected" src="/static/img/copy-step-close.png" alt="">
           </div>
           <div>
             <div class="step-title">Закройте крышку</div>
@@ -173,6 +173,7 @@
         const payData = await payRes.json().catch(() => ({}));
         KioskPayment.closeWaiting();
         if (!payRes.ok) {
+          if (window.KioskStages) window.KioskStages.reset();
           showError(payData.error || 'Ошибка оплаты');
           busy = false;
           readyBtn.disabled = false;
@@ -197,16 +198,16 @@
           scanTitle.textContent = 'Ловим каждую строчку';
           scanText.textContent = 'Свет проходит по документу и замечает все детали';
           scanMagic.dataset.stage = 'lines';
-        }, 4400);
+        }, 6500);
         const scanFileStage = setTimeout(() => {
           scanTitle.textContent = 'Собираем цифровой свиток';
           scanText.textContent = 'Превращаем изображение в аккуратный PDF';
           scanMagic.dataset.stage = 'file';
-        }, 7800);
+        }, 10000);
 
         const [scanRes] = await Promise.all([
           fetch('/api/kiosk/scan/jobs/' + encodeURIComponent(jobId) + '/scan', { method: 'POST' }),
-          new Promise((resolve) => setTimeout(resolve, 2500)),
+          new Promise((resolve) => setTimeout(resolve, 6500)),
         ]);
         const scanData = await scanRes.json().catch(() => ({}));
         clearTimeout(scanStartStage);
@@ -228,6 +229,7 @@
         document.getElementById('scan-progress').hidden = true;
         setTimeout(() => { location.href = '/scan/name/?job=' + encodeURIComponent(jobId); }, 1200);
       } catch (e) {
+        if (window.KioskStages) window.KioskStages.reset();
         KioskPayment.closeWaiting();
         scanOverlay.hidden = true;
         document.body.classList.remove('loading-lock');

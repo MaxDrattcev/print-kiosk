@@ -42,7 +42,7 @@
     "</span>" +
     "</button>" +
     '<button type="button" class="payment-cancel" id="method-cancel">← Отмена</button>' +
-    '<p class="payment-secure">🔒 Безопасная оплата</p>' +
+    '<p class="payment-secure"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="5" y="10" width="14" height="10" rx="3"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/><path d="m10 15 1.5 1.5L15 13"/></svg>Безопасная оплата</p>' +
     "</div>" +
     "</dialog>";
 
@@ -78,7 +78,10 @@
     const method = $("method-modal");
     if (cancel && method && cancel.dataset.kioskBound !== "1") {
       cancel.dataset.kioskBound = "1";
-      cancel.addEventListener("click", close);
+      cancel.addEventListener("click", () => {
+        close();
+        if (window.KioskStages) window.KioskStages.reset();
+      });
     }
     [method, $("terminal-modal")].forEach((dialog) => {
       if (!dialog || dialog.dataset.kioskCancelBound === "1") return;
@@ -94,6 +97,7 @@
 
   function open(amountText) {
     if (amountText != null && amountText !== "") setAmount(amountText);
+    if (window.KioskStages) window.KioskStages.payment();
     const d = $("method-modal");
     if (d && typeof d.showModal === "function" && !d.open) d.showModal();
   }

@@ -24,7 +24,12 @@
 
       <label>
         Пароль
-        <input type="password" name="password" autocomplete="off" inputmode="none" required>
+        <span class="auth-password-wrap">
+          <input type="password" name="password" autocomplete="off" inputmode="none" required>
+          <button type="button" class="auth-password-toggle" id="password-toggle" aria-label="Показать пароль" aria-pressed="false">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6z"/><circle cx="12" cy="12" r="2.8"/></svg>
+          </button>
+        </span>
       </label>
 
       <p class="error" id="error" hidden></p>
@@ -47,32 +52,48 @@
 
     ensureGuest();
 
+    const passwordToggle = document.getElementById('password-toggle');
+    const passwordInput = document.querySelector('input[name="password"]');
+    passwordToggle.addEventListener('click', () => {
+      const show = passwordInput.type === 'password';
+      passwordInput.type = show ? 'text' : 'password';
+      passwordToggle.setAttribute('aria-pressed', show ? 'true' : 'false');
+      passwordToggle.setAttribute('aria-label', show ? 'Скрыть пароль' : 'Показать пароль');
+      passwordInput.focus();
+    });
+
     document.getElementById('login-form').addEventListener('submit', async (e) => {
       e.preventDefault();
       const errorEl = document.getElementById('error');
       errorEl.hidden = true;
 
       const form = e.target;
+      const submitBtn = form.querySelector('button[type="submit"]');
+      if (submitBtn.disabled) return;
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Проверяем…';
       const body = {
         username: form.username.value.trim(),
         password: form.password.value,
       };
 
-      const res = await fetch('/api/admin/login', {
-        method: 'POST',
-        credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
+      try {
+        const res = await fetch('/api/admin/login', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
 
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        errorEl.textContent = data.error || 'Ошибка входа';
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || 'Ошибка входа');
+        location.href = '/admin/settings.html#overview';
+      } catch (error) {
+        errorEl.textContent = error.message || 'Не удалось связаться с сервером';
         errorEl.hidden = false;
-        return;
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Войти';
       }
-
-      location.href = '/admin/settings.html#overview';
     });
   </script>
 </body>

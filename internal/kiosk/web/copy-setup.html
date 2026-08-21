@@ -289,6 +289,7 @@
         KioskPayment.closeWaiting();
 
         if (!payRes.ok) {
+          if (window.KioskStages) window.KioskStages.reset();
           if (payData.code === 'paper_insufficient') {
             if (payData.paper_remaining != null) {
               prices.paper_remaining = String(payData.paper_remaining);
@@ -305,14 +306,15 @@
 
         copyOverlay.hidden = false;
         document.body.classList.add('loading-lock');
+        if (window.KioskStages) window.KioskStages.set(4);
         setCopyStage('paid', 'Оплата прошла успешно', 'Всё получилось — начинаем магию копирования');
         const inspectStage = setTimeout(() => setCopyStage('inspect', 'Сейчас посмотрим, что вы принесли', 'Волшебная шляпа внимательно изучает оригинал'), 2600);
-        const paperStage = setTimeout(() => setCopyStage('paper', 'Готовим волшебную бумагу', 'Чистые листы уже ждут свою копию'), 3800);
-        const quillStage = setTimeout(() => setCopyStage('quill', 'Повторяем всё волшебным пером', 'Переносим каждую строчку и деталь'), 7200);
+        const paperStage = setTimeout(() => setCopyStage('paper', 'Готовим волшебную бумагу', 'Чистые листы уже ждут свою копию'), 6500);
+        const quillStage = setTimeout(() => setCopyStage('quill', 'Повторяем всё волшебным пером', 'Переносим каждую строчку и деталь'), 10000);
 
         const [copyRes] = await Promise.all([
           fetch('/api/kiosk/copy/jobs/' + encodeURIComponent(jobId) + '/copy', { method: 'POST' }),
-          new Promise((resolve) => setTimeout(resolve, 2500)),
+          new Promise((resolve) => setTimeout(resolve, 6500)),
         ]);
         const copyData = await copyRes.json().catch(() => ({}));
         clearTimeout(inspectStage);
@@ -323,6 +325,7 @@
           setCopyStage('error', 'Упс, что-то пошло не так', 'Специалисты уже получили сообщение и устраняют проблему');
         } else {
           setCopyStage('ready', 'Ваша копия готова!', 'Заберите документ из лотка принтера');
+          KioskUI.startAutoReturn(document.getElementById('copy-magic'), 15);
           if (copyData.sheets != null) {
             const current = parseInt(String(prices.paper_remaining || '0'), 10);
             if (!Number.isNaN(current)) {
@@ -335,6 +338,7 @@
         document.getElementById('copy-progress').hidden = true;
         document.getElementById('copy-actions').hidden = false;
       } catch (e) {
+        if (window.KioskStages) window.KioskStages.reset();
         KioskPayment.closeWaiting();
         copyOverlay.hidden = true;
         document.body.classList.remove('loading-lock');

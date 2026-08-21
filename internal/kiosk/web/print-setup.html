@@ -473,6 +473,7 @@
         KioskPayment.closeWaiting();
 
         if (!payRes.ok) {
+          if (window.KioskStages) window.KioskStages.reset();
           if (payData.code === 'paper_insufficient') {
             if (payData.paper_remaining != null) {
               prices.paper_remaining = String(payData.paper_remaining);
@@ -498,14 +499,14 @@
         }, 2600);
         const quillStage = setTimeout(() => {
           setMagicStage('quill', 'Рисуем волшебным пером', 'Буквы и изображения уже появляются на страницах');
-        }, 5200);
+        }, 6500);
         const [printRes] = await Promise.all([
           fetch('/api/kiosk/print/jobs/' + encodeURIComponent(jobId) + '/print', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(settings()),
           }),
-          new Promise((resolve) => setTimeout(resolve, 2500)),
+          new Promise((resolve) => setTimeout(resolve, 6500)),
         ]);
         clearTimeout(paperStage);
         clearTimeout(quillStage);
@@ -537,6 +538,7 @@
         if (successModal.open) {
           showMagicFailure();
         } else {
+          if (window.KioskStages) window.KioskStages.reset();
           showError('Ошибка связи с сервером');
           busy = false;
           document.getElementById('pay-btn').disabled = false;

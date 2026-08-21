@@ -68,7 +68,7 @@
         <a class="home-print-head" href="/print/" draggable="false">
           <div>
           <h2>Распечатать</h2>
-            <p class="home-operation-price" id="home-price-print">Стоимость загружается…</p>
+            <p class="home-operation-price kiosk-skeleton-text" id="home-price-print" aria-label="Загружаем стоимость">Стоимость загружается…</p>
           </div>
         </a>
         <div class="home-print-sources">
@@ -95,7 +95,7 @@
       </span>
       <span class="home-row-text">
         <strong>Сделать копию</strong>
-        <span class="home-operation-price" id="home-price-copy">Стоимость загружается…</span>
+        <span class="home-operation-price kiosk-skeleton-text" id="home-price-copy" aria-label="Загружаем стоимость">Стоимость загружается…</span>
       </span>
     </a>
 
@@ -106,7 +106,7 @@
       </span>
       <span class="home-row-text">
         <strong>Отсканировать</strong>
-        <span class="home-operation-price" id="home-price-scan">Стоимость загружается…</span>
+        <span class="home-operation-price kiosk-skeleton-text" id="home-price-scan" aria-label="Загружаем стоимость">Стоимость загружается…</span>
       </span>
     </a>
 
@@ -189,7 +189,11 @@
 
     (async () => {
       const info = await loadInfo();
-      if (!info) return;
+      const priceElements = ['home-price-print', 'home-price-copy', 'home-price-scan'].map((id) => document.getElementById(id));
+      if (!info) {
+        priceElements.forEach((el) => { el.classList.remove('kiosk-skeleton-text'); el.textContent = 'Стоимость уточняется'; });
+        return;
+      }
       document.getElementById('price-bw').textContent = formatPrice(info.price_bw);
       document.getElementById('price-color').textContent = formatPrice(info.price_color);
       document.getElementById('price-copy').textContent = formatPrice(info.price_copy);
@@ -197,6 +201,7 @@
       document.getElementById('home-price-print').textContent = formatFromPrice(info.price_bw, true);
       document.getElementById('home-price-copy').textContent = formatFromPrice(info.price_copy, false);
       document.getElementById('home-price-scan').textContent = formatFromPrice(info.price_scan, false);
+      priceElements.forEach((el) => el.classList.remove('kiosk-skeleton-text'));
 
       const usb = info.source_usb !== false;
       const email = info.source_email === true;

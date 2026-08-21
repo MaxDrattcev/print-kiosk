@@ -1912,3 +1912,126 @@ body:has(.auth-page) {
   .history-summary { grid-template-columns:1fr 1fr; }
   .history-table { min-width:880px; }
 }
+
+/* Touch-first refinement for the specialist cabinet. */
+.admin-shell { grid-template-columns: 190px minmax(0,1fr); }
+.admin-nav { padding-inline: 10px; }
+.admin-nav-brand { min-height: 92px; padding-left: 61px; }
+.admin-nav-brand::before { width: 52px; height: 52px; }
+.admin-nav-item {
+  min-height: 60px;
+  padding-right: 10px;
+  padding-left: 36px;
+  border-radius: 19px;
+  font-size: 14px;
+}
+.admin-nav-item::before { left: 12px; }
+.admin-content { max-width: 1240px; }
+.admin-card { padding: 28px; }
+.admin-field input,
+.admin-field select { min-height: 68px; font-size: 18px; }
+.admin-field textarea { min-height: 118px; font-size: 18px; }
+.admin-btn,
+.paper-refilled-btn { min-height: 64px; font-size: 16px; }
+.admin-row { min-height: 72px; }
+.admin-toggle-ui { width: 68px; height: 40px; }
+.admin-toggle-ui::after { width: 32px; height: 32px; }
+.admin-toggle input:checked + .admin-toggle-ui::after { transform: translateX(28px); }
+
+.admin-field--readonly {
+  position: relative;
+  padding: 16px;
+  border: 1px solid rgba(81,119,183,.12);
+  border-radius: 21px;
+  background: linear-gradient(145deg,rgba(241,247,255,.92),rgba(247,244,255,.88));
+}
+.admin-field--readonly::before {
+  content: "Состояние системы";
+  width: fit-content;
+  padding: 5px 9px;
+  border-radius: 9px;
+  color: #4d6e9f;
+  background: #e7effb;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.admin-field--readonly input,
+.admin-field--readonly textarea {
+  border-color: transparent;
+  color: #536783;
+  background: rgba(255,255,255,.7);
+  box-shadow: none;
+}
+.admin-danger { border-color: rgba(205,63,81,.2); background: linear-gradient(145deg,#fffafa,#fff3f5); }
+.admin-danger .admin-btn.danger { box-shadow: none; }
+.admin-card[data-collapsible="1"] > h2 { margin: -8px -8px 8px; }
+.admin-card-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  width: 100%;
+  min-height: 62px;
+  padding: 8px;
+  border: 0;
+  color: var(--admin-ink);
+  background: transparent;
+  font: inherit;
+  font-size: 23px;
+  font-weight: 950;
+  text-align: left;
+}
+.admin-card-toggle i {
+  position: relative;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  border-radius: 14px;
+  background: #edf4ff;
+}
+.admin-card-toggle i::before,
+.admin-card-toggle i::after {
+  content: "";
+  position: absolute;
+  top: 20px;
+  left: 12px;
+  width: 18px;
+  height: 3px;
+  border-radius: 3px;
+  background: #4770aa;
+}
+.admin-card-toggle i::after { transform: rotate(90deg); transition: transform 180ms ease; }
+.admin-card-toggle[aria-expanded="true"] i::after { transform: rotate(0); }
+.admin-card-body[hidden] { display: none; }
+.admin-card-body { padding-top: 4px; }
+
+/* Specialist login: visible password control and stable placement around the OSK. */
+.auth-card { transform: translateY(-46px); transition: transform 220ms ease; }
+.auth-password-wrap { position: relative; display: block; }
+.auth-password-wrap input { width: 100%; padding-right: 82px; }
+.auth-password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 52px;
+  padding: 0;
+  border: 0;
+  border-radius: 16px;
+  color: #44658f;
+  background: #eaf2ff;
+  box-shadow: none;
+  transform: translateY(-50%);
+}
+.auth-password-toggle svg { width: 27px; height: 27px; }
+.auth-password-toggle[aria-pressed="true"] { color: #fff; background: linear-gradient(145deg,#2a7cff,#654de9); }
+.auth-card button[type="submit"]:disabled { opacity: .72; }
+.osk-open .auth-card { transform: translateY(-105px); }
+
+@media (orientation: portrait) and (max-width: 760px) {
+  .admin-shell { grid-template-columns: 1fr; }
+}

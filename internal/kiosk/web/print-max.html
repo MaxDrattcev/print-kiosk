@@ -39,7 +39,7 @@
       </div>
       <h1>Отправьте документ в MAX</h1>
       <p>Откройте бота MAX и отправьте файл сообщением:</p>
-      <p class="scan-price delivery-address delivery-address--max" id="bot-link">…</p>
+      <p class="scan-price delivery-address delivery-address--max kiosk-skeleton-text" id="bot-link" aria-label="Загружаем имя бота">Загружаем бота</p>
       <ol class="scan-steps">
         <li>Прикрепите файл в чат с ботом (PDF, Word, Excel, фото)</li>
         <li>Максимальный размер файла: <strong id="max-size">—</strong></li>
@@ -74,12 +74,16 @@
         const data = await res.json().catch(() => ({}));
         document.getElementById('max-size').textContent = (data.max_file_size_mb || '20') + ' МБ';
         if (!data.enabled) {
+          document.getElementById('bot-link').classList.remove('kiosk-skeleton-text');
+          document.getElementById('bot-link').textContent = 'MAX временно недоступен';
           showError('Печать через MAX временно недоступна');
           return;
         }
         document.getElementById('bot-link').textContent = data.bot_link || ('@' + (data.bot_username || ''));
+        document.getElementById('bot-link').classList.remove('kiosk-skeleton-text');
         sentBtn.disabled = false;
       } catch (e) {
+        document.getElementById('bot-link').classList.remove('kiosk-skeleton-text');
         showError('Ошибка связи с сервером');
       }
     })();

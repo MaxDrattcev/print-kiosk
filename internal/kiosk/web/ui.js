@@ -39,6 +39,100 @@
   const TECHNICAL =
     /connection refused|econnrefused|econnreset|etimedout|enotfound|status code 5\d\d|\b500\b|\b502\b|\b503\b|scanner error|i\/o timeout|eof|sql:|http:|panic|nil pointer|websocket|tls:|json:|libreoffice|failed to|traceback|exception|stack|powershell|start-process|categoryinfo|exit status|could not be opened|empty/i;
 
+  const FLOW_STAGES = {
+    print: ["Документ", "Настройки", "Оплата", "Печать"],
+    copy: ["Оригинал", "Настройки", "Оплата", "Копирование"],
+    scan: ["Оригинал", "Оплата", "Получение", "Готово"],
+  };
+
+  let stageState = null;
+  const standaloneTimers = new WeakMap();
+
+  function routeStage() {
+    const path = location.pathname.replace(/\/+$/, "") || "/";
+    if (path === "/" || path.startsWith("/admin")) return null;
+    if (path.startsWith("/print")) {
+      return { flow: "print", current: path === "/print/setup" ? 2 : 1 };
+    }
+    if (path.startsWith("/copy")) {
+      return { flow: "copy", current: path === "/copy/setup" ? 2 : 1 };
+    }
+    if (path.startsWith("/scan")) {
+      const delivery = /\/scan\/(name|delivery|email|max|usb)$/.test(path);
+      return { flow: "scan", current: delivery ? 3 : 1 };
+    }
+    return null;
+  }
+
+  function renderStages(current) {
+    if (!stageState || !stageState.element) return;
+    const safeCurrent = Math.max(1, Math.min(4, Number(current) || 1));
+    stageState.current = safeCurrent;
+    stageState.element.dataset.current = String(safeCurrent);
+    stageState.element.querySelectorAll("li").forEach((item, index) => {
+      const step = index + 1;
+      item.classList.toggle("is-complete", step < safeCurrent);
+      item.classList.toggle("is-current", step === safeCurrent);
+      item.setAttribute("aria-current", step === safeCurrent ? "step" : "false");
+    });
+  }
+
+  function initStages() {
+    const initial = routeStage();
+    if (!initial) return;
+    const anchor = document.querySelector(".screen > .top-nav") || document.querySelector(".screen > .app-header");
+    if (!anchor || document.querySelector(".kiosk-progress")) return;
+    const labels = FLOW_STAGES[initial.flow];
+    const progress = document.createElement("nav");
+    progress.className = "kiosk-progress kiosk-progress--" + initial.flow;
+    progress.setAttribute("aria-label", "Этапы операции");
+    const list = document.createElement("ol");
+    labels.forEach((label, index) => {
+      const item = document.createElement("li");
+      const marker = document.createElement("span");
+      marker.className = "kiosk-progress-marker";
+      marker.textContent = String(index + 1);
+      const text = document.createElement("strong");
+      text.textContent = label;
+      item.append(marker, text);
+      list.appendChild(item);
+    });
+    progress.appendChild(list);
+    anchor.insertAdjacentElement("afterend", progress);
+    stageState = { flow: initial.flow, current: initial.current, routeCurrent: initial.current, element: progress };
+    renderStages(initial.current);
+  }
+
+  function setStage(current) {
+    renderStages(current);
+  }
+
+  function resetStage() {
+    if (stageState) renderStages(stageState.routeCurrent);
+  }
+
+  function paymentStage() {
+    if (!stageState) return;
+    renderStages(stageState.flow === "scan" ? 2 : 3);
+  }
+
+  function normalizeStateComponents() {
+    document.querySelectorAll(".loading-overlay").forEach((overlay) => {
+      overlay.classList.add("kiosk-state-layer", "kiosk-state-layer--loading");
+      overlay.setAttribute("role", "status");
+      overlay.setAttribute("aria-live", "polite");
+      overlay.setAttribute("aria-busy", "true");
+      const card = overlay.firstElementChild;
+      if (card) card.classList.add("kiosk-state-card");
+    });
+    document.querySelectorAll("#success-modal").forEach((dialog) => {
+      dialog.classList.add("kiosk-state-dialog", "kiosk-state-dialog--success");
+    });
+    document.querySelectorAll("#error-modal").forEach((dialog) => {
+      dialog.classList.add("kiosk-state-dialog", "kiosk-state-dialog--error");
+    });
+  }
+
   function isTechnical(msg) {
     const raw = String(msg || "").trim();
     if (!raw) return true;
@@ -64,9 +158,10 @@
 
   function bindSuccessCountdown(dialog, options) {
     if (!dialog || dialog.dataset.kioskBound === "1") return;
+    if (dialog.querySelector(".print-magic-countdown")) return;
     dialog.dataset.kioskBound = "1";
     const opts = options || {};
-    const seconds = opts.seconds || 20;
+    const seconds = opts.seconds || 15;
     const homeBtn = dialog.querySelector(opts.homeSelector || "#success-home");
     const moreBtn = dialog.querySelector(opts.moreSelector || "#success-more");
     let timer = null;
@@ -91,10 +186,6 @@
       }
     }
 
-    function moreVisible() {
-      return moreBtn && !moreBtn.hidden;
-    }
-
     function homeVisible() {
       return homeBtn && !homeBtn.hidden;
     }
@@ -102,7 +193,7 @@
     function start() {
       stop();
       const el = countdownEl();
-      if (moreVisible() || !homeVisible()) {
+      if (!homeVisible()) {
         el.hidden = true;
         return;
       }
@@ -136,6 +227,33 @@
     if (dialog.open) start();
   }
 
+  function startAutoReturn(container, seconds) {
+    if (!container) return;
+    const previous = standaloneTimers.get(container);
+    if (previous) clearInterval(previous);
+    let left = Math.max(1, Number(seconds) || 15);
+    let el = container.querySelector("[data-success-countdown]");
+    if (!el) {
+      el = document.createElement("p");
+      el.className = "success-countdown";
+      el.setAttribute("data-success-countdown", "1");
+      container.appendChild(el);
+    }
+    const render = () => { el.textContent = "Возврат в главное меню через " + left + " секунд"; };
+    render();
+    const timer = setInterval(() => {
+      left -= 1;
+      if (left <= 0) {
+        clearInterval(timer);
+        standaloneTimers.delete(container);
+        location.href = "/";
+        return;
+      }
+      render();
+    }, 1000);
+    standaloneTimers.set(container, timer);
+  }
+
   function bindErrorDialog(dialog) {
     if (!dialog) return;
     const retryBtn = dialog.querySelector("#error-retry");
@@ -156,8 +274,14 @@
   }
 
   function init() {
+    initStages();
+    normalizeStateComponents();
     document.querySelectorAll("#success-modal").forEach((dialog) => {
       bindSuccessCountdown(dialog);
+      const observer = new MutationObserver(() => {
+        if (dialog.open) setStage(4);
+      });
+      observer.observe(dialog, { attributes: true, attributeFilter: ["open"] });
     });
     document.querySelectorAll("#error-modal").forEach((dialog) => {
       bindErrorDialog(dialog);
@@ -167,6 +291,11 @@
         btn.textContent = "Вернуться в главное меню";
       }
     });
+    document.addEventListener("pointerdown", (event) => {
+      if (!event.target.closest("a,button")) return;
+      document.body.classList.add("kiosk-interacting");
+      window.setTimeout(() => document.body.classList.remove("kiosk-interacting"), 420);
+    }, { passive: true });
   }
 
   if (document.readyState === "loading") {
@@ -180,5 +309,12 @@
     setError: setError,
     bindSuccessCountdown: bindSuccessCountdown,
     showErrorDialog: showErrorDialog,
+    startAutoReturn: startAutoReturn,
+  };
+  window.KioskStages = {
+    set: setStage,
+    reset: resetStage,
+    payment: paymentStage,
+    flow: function () { return stageState ? stageState.flow : ""; },
   };
 })();

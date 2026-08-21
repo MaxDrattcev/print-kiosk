@@ -70,6 +70,11 @@
         </div>
       </div>
 
+      <div class="price-card price-card--skeleton copy-price-card" id="copy-price-card" aria-live="polite">
+        <div class="price-card-label">Стоимость одной копии</div>
+        <div class="price-card-value price-card-value--bar" id="copy-price-line"></div>
+      </div>
+
       <p class="error" id="error" hidden></p>
       <button type="button" class="cta-btn cta-btn--green" id="ready-btn">Продолжить →</button>
     </section>
@@ -89,6 +94,27 @@
   <script>
     const errorEl = document.getElementById('error');
     const readyBtn = document.getElementById('ready-btn');
+    const copyPriceCard = document.getElementById('copy-price-card');
+    const copyPriceLine = document.getElementById('copy-price-line');
+
+    function money(value) {
+      const amount = Number(value);
+      return Number.isFinite(amount) ? amount.toLocaleString('ru-RU', { maximumFractionDigits: 2 }) + ' ₽' : 'Цена уточняется';
+    }
+
+    async function loadCopyPrice() {
+      try {
+        const res = await fetch('/api/kiosk/info');
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error('price unavailable');
+        copyPriceLine.textContent = money(data.price_copy);
+      } catch (_) {
+        copyPriceLine.textContent = 'Цена уточняется';
+      } finally {
+        copyPriceCard.classList.remove('price-card--skeleton');
+        copyPriceLine.classList.remove('price-card-value--bar');
+      }
+    }
 
     function showError(msg) {
       KioskUI.showErrorDialog(document.getElementById('error-modal'), msg);
@@ -112,6 +138,8 @@
         readyBtn.disabled = false;
       }
     });
+
+    loadCopyPrice();
   </script>
   <script src="/static/idle.js"></script>
 </body>

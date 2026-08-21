@@ -3457,20 +3457,24 @@ body.kiosk-mode {
 }
 
 .preview-mini {
-  margin: 0 auto 20px;
-  width: 100%;
-  max-width: 420px;
-  height: 220px;
-  border-radius: 18px;
+  margin: 0 auto 28px;
+  width: min(100%, 560px);
+  height: auto;
+  aspect-ratio: 210 / 297;
+  padding: 12px;
+  border-radius: 24px;
   overflow: hidden;
-  background: #e9eef7;
+  background: linear-gradient(145deg, #edf3fc, #e5ecf8);
   border: 1px solid var(--card-border);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.9), 0 16px 38px rgba(42,67,116,.1);
 }
 
 .preview-mini iframe {
+  display: block;
   width: 100%;
   height: 100%;
   border: 0;
+  border-radius: 14px;
   background: #fff;
 }
 
@@ -5851,7 +5855,7 @@ body.kiosk-user:not(.kiosk-home) .prepare-screen .step-icon img {
   filter: drop-shadow(0 14px 18px rgba(52,43,151,.18));
 }
 
-body.kiosk-user:not(.kiosk-home) .prepare-screen .step.purple .scan-step-place-corrected {
+body.kiosk-user:not(.kiosk-home) .prepare-screen .step.purple :is(.scan-step-place-corrected, .scan-step-close-corrected) {
   filter: hue-rotate(125deg) saturate(1.08) drop-shadow(0 14px 18px rgba(52,43,151,.18));
 }
 
@@ -5893,17 +5897,21 @@ body.home-printus .home-hero-art img { right: -44px; }
 
 /* Keep the benefits anchored above the Print card while rotating hero copy changes length. */
 body.home-printus .home-hero-copy {
+  position: relative;
   align-self: stretch;
   display: flex;
   flex-direction: column;
   min-width: 0;
-  padding: clamp(16px, 2vh, 28px) 0 clamp(24px, 2.8vh, 40px) 18px;
+  padding: clamp(10px, 1.4vh, 20px) 0 220px 18px;
 }
 
 body.home-printus .home-hero-copy .home-pills {
-  margin-top: auto;
-  margin-bottom: 0;
-  transform: translateY(14px);
+  position: absolute;
+  right: 0;
+  bottom: 6px;
+  left: 18px;
+  margin: 0;
+  transform: none;
 }
 
 /* Unified visual rhythm for headings on all inner kiosk screens. */
@@ -6006,4 +6014,320 @@ body.kiosk-user:not(.kiosk-home) .source-privacy-note span {
   body.kiosk-user:not(.kiosk-home) .page-head .page-subtitle { font-size: clamp(22px, 2.5vw, 28px); }
   body.kiosk-user:not(.kiosk-home) .source-pick .source-card { min-height: 190px; }
   body.kiosk-user:not(.kiosk-home) .source-privacy-note { min-height: 56px; margin-block: 12px; }
+}
+
+/* Shared four-step progress for print, copy and scan flows. */
+body.kiosk-user:not(.kiosk-home) .kiosk-progress {
+  --stage-accent: #2677f5;
+  --stage-glow: rgba(38,119,245,.22);
+  flex: 0 0 auto;
+  width: min(840px, calc(100% - 80px));
+  margin: 2px auto 16px;
+  padding: 13px 20px 12px;
+  border: 1px solid rgba(255,255,255,.9);
+  border-radius: 27px;
+  background: rgba(255,255,255,.68);
+  box-shadow: 0 13px 35px rgba(32,70,137,.07), inset 0 1px 0 #fff;
+  backdrop-filter: blur(18px);
+}
+
+body.kiosk-user:not(.kiosk-home) .kiosk-progress--copy {
+  --stage-accent: #14b96d;
+  --stage-glow: rgba(20,185,109,.2);
+}
+
+body.kiosk-user:not(.kiosk-home) .kiosk-progress--scan {
+  --stage-accent: #7954ed;
+  --stage-glow: rgba(121,84,237,.2);
+}
+
+body.kiosk-user:not(.kiosk-home) .kiosk-progress ol {
+  display: grid;
+  grid-template-columns: repeat(4,minmax(0,1fr));
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+body.kiosk-user:not(.kiosk-home) .kiosk-progress li {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 7px;
+  min-width: 0;
+  color: #8997af;
+  font-size: 13px;
+  line-height: 1.1;
+  font-weight: 850;
+  text-align: center;
+}
+
+body.kiosk-user:not(.kiosk-home) .kiosk-progress li:not(:first-child)::before {
+  content: "";
+  position: absolute;
+  top: 17px;
+  right: 50%;
+  width: 100%;
+  height: 4px;
+  border-radius: 9px;
+  background: #dfe7f4;
+  transform: translateY(-50%);
+}
+
+body.kiosk-user:not(.kiosk-home) .kiosk-progress li.is-complete::before,
+body.kiosk-user:not(.kiosk-home) .kiosk-progress li.is-current::before {
+  background: linear-gradient(90deg,var(--stage-accent),color-mix(in srgb,var(--stage-accent),#fff 28%));
+}
+
+body.kiosk-user:not(.kiosk-home) .kiosk-progress-marker {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 4px solid #e3eaf5;
+  border-radius: 50%;
+  color: #8593ac;
+  background: #fff;
+  box-shadow: 0 5px 12px rgba(37,70,127,.08);
+  font-size: 13px;
+  font-weight: 950;
+}
+
+body.kiosk-user:not(.kiosk-home) .kiosk-progress li.is-complete,
+body.kiosk-user:not(.kiosk-home) .kiosk-progress li.is-current { color: var(--stage-accent); }
+
+body.kiosk-user:not(.kiosk-home) .kiosk-progress li.is-complete .kiosk-progress-marker,
+body.kiosk-user:not(.kiosk-home) .kiosk-progress li.is-current .kiosk-progress-marker {
+  border-color: var(--stage-accent);
+  color: #fff;
+  background: var(--stage-accent);
+}
+
+body.kiosk-user:not(.kiosk-home) .kiosk-progress li.is-complete .kiosk-progress-marker {
+  font-size: 0;
+}
+
+body.kiosk-user:not(.kiosk-home) .kiosk-progress li.is-complete .kiosk-progress-marker::after {
+  content: "✓";
+  font-size: 17px;
+}
+
+body.kiosk-user:not(.kiosk-home) .kiosk-progress li.is-current .kiosk-progress-marker {
+  box-shadow: 0 0 0 7px var(--stage-glow), 0 8px 20px var(--stage-glow);
+  animation: kiosk-stage-breathe 2.5s ease-in-out infinite;
+}
+
+@keyframes kiosk-stage-breathe {
+  50% { box-shadow: 0 0 0 10px transparent,0 9px 23px var(--stage-glow); }
+}
+
+/* One surface language for loading, success and error states. */
+body.kiosk-user:not(.kiosk-home) .kiosk-state-layer {
+  background:
+    radial-gradient(circle at 20% 12%,rgba(42,176,255,.17),transparent 31%),
+    radial-gradient(circle at 84% 18%,rgba(122,82,240,.18),transparent 34%),
+    rgba(238,245,255,.9);
+  backdrop-filter: blur(20px);
+}
+
+body.kiosk-user:not(.kiosk-home) .kiosk-state-layer .loading-card,
+body.kiosk-user:not(.kiosk-home) .kiosk-state-card.prepare-magic-card,
+body.kiosk-user:not(.kiosk-home) .kiosk-state-card.print-magic {
+  border: 1px solid rgba(255,255,255,.94);
+  border-radius: 42px;
+  background-color: rgba(255,255,255,.94);
+  box-shadow: 0 28px 80px rgba(31,69,139,.17),inset 0 2px 0 #fff;
+}
+
+body.kiosk-user:not(.kiosk-home) .kiosk-state-layer .loading-card {
+  width: min(720px,calc(100% - 80px));
+  min-height: 430px;
+  padding: 54px 48px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+body.kiosk-user:not(.kiosk-home) .kiosk-state-layer .loading-card h2,
+body.kiosk-user:not(.kiosk-home) .kiosk-state-card > h2 {
+  color: var(--flow-ink);
+  font-size: clamp(40px,4.5vw,54px);
+  line-height: 1.06;
+  font-weight: 950;
+  letter-spacing: -.045em;
+  text-align: center;
+}
+
+body.kiosk-user:not(.kiosk-home) .kiosk-state-layer .loading-card p,
+body.kiosk-user:not(.kiosk-home) .kiosk-state-card > p:not(.print-magic-kicker) {
+  font-size: clamp(22px,2.5vw,29px);
+  line-height: 1.35;
+  font-weight: 700;
+  text-align: center;
+}
+
+body.kiosk-user:not(.kiosk-home) .kiosk-state-dialog::backdrop {
+  background: rgba(19,35,70,.38);
+  backdrop-filter: blur(16px);
+}
+
+body.kiosk-user:not(.kiosk-home) .kiosk-state-dialog > :is(.modal-card,.print-magic) {
+  border: 1px solid rgba(255,255,255,.94);
+  border-radius: 42px;
+  box-shadow: 0 30px 90px rgba(23,54,116,.2),inset 0 2px 0 #fff;
+}
+
+body.kiosk-user:not(.kiosk-home) .kiosk-state-dialog :is(.primary-btn,.cta-btn,.secondary-btn) {
+  min-height: 84px;
+  border-radius: 25px;
+  font-size: clamp(22px,2.4vw,28px);
+  font-weight: 900;
+}
+
+body.kiosk-user .payment-secure {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+}
+
+body.kiosk-user .payment-secure svg {
+  width: 24px;
+  height: 24px;
+  color: #3979e8;
+}
+
+/* Consistent dimensional treatment for utility, success and error icons. */
+body.kiosk-user:not(.kiosk-home) :is(.prompt-icon,.action-visual,.flow-icon,.error-icon) {
+  border: 1px solid rgba(255,255,255,.92);
+  box-shadow: 0 18px 42px rgba(32,73,148,.15),inset 0 2px 0 rgba(255,255,255,.68);
+  filter: saturate(1.04);
+}
+
+body.kiosk-user:not(.kiosk-home) .success-icon {
+  overflow: visible;
+  border-radius: 38px;
+  background: radial-gradient(circle at 34% 24%,#9cf5bd 0 8%,transparent 9%),linear-gradient(145deg,#42df89,#08a95f);
+  box-shadow: 0 20px 44px rgba(12,170,94,.25),inset 0 2px 0 rgba(255,255,255,.55);
+}
+
+body.kiosk-user:not(.kiosk-home) .success-icon::after {
+  content: "✦";
+  position: absolute;
+  top: -18px;
+  right: -16px;
+  color: #5eea9b;
+  font-size: 34px;
+  filter: drop-shadow(0 5px 9px rgba(22,183,104,.28));
+}
+
+body.kiosk-user:not(.kiosk-home) .error-icon {
+  position: relative;
+  border-radius: 38px;
+  color: #fff;
+  background: radial-gradient(circle at 34% 24%,#ffb9bf 0 8%,transparent 9%),linear-gradient(145deg,#ff7180,#db3449);
+  box-shadow: 0 20px 44px rgba(208,45,66,.23),inset 0 2px 0 rgba(255,255,255,.48);
+  text-shadow: 0 3px 0 rgba(136,20,39,.18);
+}
+
+body.kiosk-user:not(.kiosk-home) .prompt-icon:is(.prompt-icon--usb,.prompt-icon--mail,.prompt-icon--max),
+body.kiosk-user:not(.kiosk-home) :is(#usb-link,#email-link,#max-link) .action-icon {
+  filter: drop-shadow(0 15px 22px rgba(39,76,151,.18)) saturate(1.06);
+}
+
+@media (max-height: 1100px) {
+  body.kiosk-user:not(.kiosk-home) .kiosk-progress { margin-bottom: 8px; padding-block: 8px; }
+  body.kiosk-user:not(.kiosk-home) .kiosk-progress-marker { width: 29px; height: 29px; }
+  body.kiosk-user:not(.kiosk-home) .kiosk-progress li:not(:first-child)::before { top: 14px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body.kiosk-user:not(.kiosk-home) .kiosk-progress li.is-current .kiosk-progress-marker { animation: none; }
+}
+
+/* Stable placeholders: reserve final text dimensions without layout jumps. */
+.kiosk-skeleton-text {
+  position: relative;
+  display: inline-block !important;
+  min-width: 280px;
+  min-height: 1.15em;
+  overflow: hidden;
+  border-radius: .35em;
+  color: transparent !important;
+  text-shadow: none !important;
+  background: linear-gradient(100deg,#e4ebf6 18%,#f8fbff 42%,#e4ebf6 66%);
+  background-size: 240% 100%;
+  animation: kiosk-skeleton 1.55s ease-in-out infinite;
+}
+body.home-printus .kiosk-skeleton-text { width: min(360px,100%); }
+body.kiosk-user:not(.kiosk-home) .delivery-address.kiosk-skeleton-text { width: min(720px,100%); min-height: 72px; }
+
+body.kiosk-user .price-card--skeleton .price-card-value--bar,
+body.kiosk-user .preview-loading {
+  background-image: linear-gradient(100deg,#e3ebf6 18%,#f9fbff 42%,#e3ebf6 66%);
+  background-size: 240% 100%;
+  animation: kiosk-skeleton 1.55s ease-in-out infinite;
+}
+
+@keyframes kiosk-skeleton { to { background-position: -220% 0; } }
+
+/* The marketing headline owns the moment; decorative motion pauses during its change. */
+body.home-printus.home-copy-changing .home-icon-magic i,
+body.home-printus.home-copy-changing .home-hero-art img {
+  animation-play-state: paused;
+}
+body.home-printus.home-copy-changing .home-icon-magic { opacity: .5; transition: opacity 180ms ease; }
+body.kiosk-interacting :is(.home-icon-magic i,.home-hero-art img,.print-magic-art *,[class*="magic-"]) {
+  animation-play-state: paused !important;
+}
+
+/* Copy price uses the same compact summary component as scanning. */
+body.kiosk-user:not(.kiosk-home) .copy-price-card {
+  min-height: 108px;
+  margin-top: 24px;
+  padding: 22px 32px;
+}
+
+/* Consistent conclusion block for every operation. */
+body.kiosk-user:not(.kiosk-home) .kiosk-state-dialog :is(.print-magic-actions,.delivery-magic .print-magic-actions) {
+  display: grid;
+  grid-template-columns: repeat(2,minmax(0,1fr));
+  gap: 16px;
+  width: 100%;
+  margin-top: 30px;
+}
+body.kiosk-user:not(.kiosk-home) .kiosk-state-dialog :is(.print-magic-actions,.delivery-magic .print-magic-actions) > * {
+  width: 100%;
+  margin: 0;
+}
+body.kiosk-user:not(.kiosk-home) .success-countdown,
+body.kiosk-user:not(.kiosk-home) .modal-card p.success-countdown,
+body.kiosk-user:not(.kiosk-home) .print-magic p.success-countdown {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  max-width: 100%;
+  min-height: 48px;
+  margin: 25px auto 0;
+  padding: 10px 18px;
+  border: 1px solid rgba(75,112,176,.12);
+  border-radius: 16px;
+  color: #637798;
+  background: rgba(239,245,255,.9);
+  font-size: 17px;
+  font-weight: 800;
+}
+
+@media (max-height: 1500px) {
+  body.kiosk-user:not(.kiosk-home) .copy-price-card { min-height: 88px; margin-top: 16px; padding-block: 16px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kiosk-skeleton-text,
+  body.kiosk-user .price-card--skeleton .price-card-value--bar,
+  body.kiosk-user .preview-loading { animation: none; }
 }

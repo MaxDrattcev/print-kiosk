@@ -86,7 +86,8 @@
       nameInput.value = name;
       if (job.preview_url) {
         document.getElementById('preview').hidden = false;
-        document.getElementById('preview-frame').src = job.preview_url;
+        document.getElementById('preview-frame').src = job.preview_url +
+          '#page=1&zoom=page-fit&view=Fit&toolbar=0&navpanes=0';
       }
       nameInput.focus();
     }

@@ -59,6 +59,32 @@
 
   KioskKeyboard.bind(document);
 
+  document.querySelectorAll(".admin-field input[readonly], .admin-field textarea[readonly]").forEach((field) => {
+    field.closest(".admin-field")?.classList.add("admin-field--readonly");
+  });
+
+  document.querySelectorAll(".admin-panel:not(#panel-overview) .admin-card:not(.admin-danger)").forEach((card) => {
+    const heading = card.querySelector(":scope > h2");
+    if (!heading || card.dataset.collapsible === "1") return;
+    card.dataset.collapsible = "1";
+    const body = document.createElement("div");
+    body.className = "admin-card-body";
+    while (heading.nextSibling) body.appendChild(heading.nextSibling);
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "admin-card-toggle";
+    button.setAttribute("aria-expanded", "true");
+    button.innerHTML = '<span>' + escapeHtml(heading.textContent.trim()) + '</span><i aria-hidden="true"></i>';
+    heading.textContent = "";
+    heading.appendChild(button);
+    card.appendChild(body);
+    button.addEventListener("click", () => {
+      const expanded = button.getAttribute("aria-expanded") === "true";
+      button.setAttribute("aria-expanded", expanded ? "false" : "true");
+      body.hidden = expanded;
+    });
+  });
+
   function statusHTML(kind, label) {
     return '<span class="admin-status ' + kind + '"><i></i> ' + escapeHtml(label) + "</span>";
   }
