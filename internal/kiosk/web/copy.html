@@ -61,7 +61,7 @@
         <div class="step green">
           <div class="step-num">3</div>
           <div class="step-icon" aria-hidden="true">
-            <img src="/static/img/copy-step-close.png" alt="">
+            <img class="instruction-step-close" src="/static/img/copy-step-close.png" alt="">
           </div>
           <div>
             <div class="step-title">Закройте крышку</div>
@@ -97,9 +97,14 @@
     const copyPriceCard = document.getElementById('copy-price-card');
     const copyPriceLine = document.getElementById('copy-price-line');
 
-    function money(value) {
-      const amount = Number(value);
-      return Number.isFinite(amount) ? amount.toLocaleString('ru-RU', { maximumFractionDigits: 2 }) + ' ₽' : 'Цена уточняется';
+    function fromPrice(value) {
+      const amount = Number(String(value == null ? '' : value).replace(',', '.'));
+      if (!Number.isFinite(amount)) return 'Цена уточняется';
+      const formatted = amount.toLocaleString('ru-RU', { maximumFractionDigits: 2 });
+      const whole = Number.isInteger(amount);
+      const abs = Math.abs(Math.trunc(amount));
+      const rubles = whole && abs % 10 === 1 && abs % 100 !== 11 ? 'рубля' : 'рублей';
+      return 'от ' + formatted + ' ' + rubles;
     }
 
     async function loadCopyPrice() {
@@ -107,7 +112,7 @@
         const res = await fetch('/api/kiosk/info');
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error('price unavailable');
-        copyPriceLine.textContent = money(data.price_copy);
+        copyPriceLine.textContent = fromPrice(data.price_copy);
       } catch (_) {
         copyPriceLine.textContent = 'Цена уточняется';
       } finally {

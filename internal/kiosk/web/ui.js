@@ -204,7 +204,8 @@
         left -= 1;
         if (left <= 0) {
           stop();
-          location.href = "/";
+          const autoHome = new CustomEvent("kiosk:auto-home", { cancelable: true });
+          if (dialog.dispatchEvent(autoHome)) location.href = "/";
           return;
         }
         el.textContent = "Возврат в главное меню через " + left + " секунд";

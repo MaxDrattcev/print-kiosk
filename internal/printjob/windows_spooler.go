@@ -141,6 +141,12 @@ func monitorWindowsPrint(printer, filePath string, submit func() error) error {
 					return nil
 				}
 				state := normalizeWindowsJobStatus(job.Status)
+				if windowsPaperOut(state) {
+					return fmt.Errorf("%w: задание Windows %d, состояние %s", ErrPaperOut, trackedID, state)
+				}
+				if windowsPaperJam(state) {
+					return fmt.Errorf("%w: задание Windows %d, состояние %s", ErrPaperJam, trackedID, state)
+				}
 				if windowsJobFailed(state) {
 					return fmt.Errorf("задание Windows %d: состояние %s", trackedID, state)
 				}
@@ -187,6 +193,24 @@ func findWindowsJob(jobs []windowsSpoolJob, id int) (windowsSpoolJob, bool) {
 
 func normalizeWindowsJobStatus(status string) string {
 	return strings.ToLower(strings.Join(strings.Fields(strings.TrimSpace(status)), " "))
+}
+
+func windowsPaperOut(status string) bool {
+	for _, marker := range []string{"paperout", "paper out", "out of paper", "no paper"} {
+		if strings.Contains(status, marker) {
+			return true
+		}
+	}
+	return false
+}
+
+func windowsPaperJam(status string) bool {
+	for _, marker := range []string{"paperjam", "paper jam", "jammed"} {
+		if strings.Contains(status, marker) {
+			return true
+		}
+	}
+	return false
 }
 
 func windowsJobFailed(status string) bool {

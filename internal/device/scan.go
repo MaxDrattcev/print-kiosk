@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"fmt"
 	"image"
+	"image/color"
+	"image/draw"
 	_ "image/gif"
 	_ "image/jpeg"
 	"image/png"
@@ -165,34 +167,29 @@ func scanUnix(destPDF string, opt ScanOptions) error {
 }
 
 func writePlaceholderPDF(path string) error {
-	const pdf = `%PDF-1.4
-1 0 obj<< /Type /Catalog /Pages 2 0 R >>endobj
-2 0 obj<< /Type /Pages /Kids [3 0 R] /Count 1 >>endobj
-3 0 obj<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 4 0 R /Resources<< /Font<< /F1 5 0 R >> >> >>endobj
-4 0 obj<< /Length 120 >>stream
-BT
-/F1 28 Tf
-72 720 Td
-(PrintStart scan) Tj
-0 -40 Td
-/F1 16 Tf
-(Document scanned successfully) Tj
-ET
-endstream
-endobj
-5 0 obj<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>endobj
-xref
-0 6
-0000000000 65535 f 
-0000000009 00000 n 
-0000000058 00000 n 
-0000000115 00000 n 
-0000000266 00000 n 
-0000000438 00000 n 
-trailer<< /Size 6 /Root 1 0 R >>
-startxref
-517
-%%EOF
-`
-	return os.WriteFile(path, []byte(pdf), 0o644)
+	pngPath := strings.TrimSuffix(path, filepath.Ext(path)) + "-placeholder.png"
+	img := image.NewRGBA(image.Rect(0, 0, 1240, 1754))
+	draw.Draw(img, img.Bounds(), image.NewUniform(color.White), image.Point{}, draw.Src)
+	ink := image.NewUniform(color.RGBA{R: 48, G: 76, B: 130, A: 255})
+	for i := 0; i < 9; i++ {
+		y := 260 + i*105
+		width := 850
+		if i == 0 {
+			width = 620
+		}
+		draw.Draw(img, image.Rect(180, y, 180+width, y+24), ink, image.Point{}, draw.Src)
+	}
+	f, err := os.Create(pngPath)
+	if err != nil {
+		return err
+	}
+	if err := png.Encode(f, img); err != nil {
+		_ = f.Close()
+		return err
+	}
+	if err := f.Close(); err != nil {
+		return err
+	}
+	defer os.Remove(pngPath)
+	return ImageToA4PDF(pngPath, path)
 }

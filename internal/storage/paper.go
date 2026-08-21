@@ -51,6 +51,18 @@ func (r *SettingsRepo) RefundPaper(sheets int) (int, error) {
 	})
 }
 
+// SetPaperRemaining replaces the stored paper count. It is used when the
+// printer itself reports an empty tray, which is more authoritative than the
+// calculated software balance.
+func (r *SettingsRepo) SetPaperRemaining(sheets int) (int, error) {
+	if sheets < 0 {
+		sheets = 0
+	}
+	return r.withPaperLock(func(int) (int, error) {
+		return sheets, nil
+	})
+}
+
 func (r *SettingsRepo) withPaperLock(nextFn func(current int) (int, error)) (int, error) {
 	ctx := context.Background()
 	conn, err := r.db.Conn(ctx)

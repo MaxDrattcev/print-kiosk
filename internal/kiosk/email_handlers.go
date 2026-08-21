@@ -139,11 +139,12 @@ func (h *Handler) PrepareEmailPrint(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{
 		"job": gin.H{
-			"id":           job.ID,
-			"file_name":    job.FileName,
-			"pages":        job.Pages,
-			"preview_kind": job.PreviewKind,
-			"preview_url":  "/api/kiosk/print/jobs/" + job.ID + "/preview",
+			"id":                  job.ID,
+			"file_name":           job.FileName,
+			"pages":               job.Pages,
+			"preview_kind":        job.PreviewKind,
+			"natural_orientation": job.NaturalOrientation,
+			"preview_url":         "/api/kiosk/print/jobs/" + job.ID + "/preview",
 		},
 		"prices": prices,
 	})

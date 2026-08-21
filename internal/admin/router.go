@@ -48,6 +48,7 @@ func RegisterRoutes(r *gin.Engine, cfg *config.Config, settings *storage.Setting
 			auth.POST("/history/deliver/max/:sid/complete", h.CompleteHistoryReportMAX)
 			auth.GET("/settings", h.GetSettings)
 			auth.PUT("/settings", h.UpdateSettings)
+			auth.POST("/printer/unblock", h.UnblockPrinter)
 			auth.POST("/email/test", h.TestEmail)
 			auth.POST("/max/test", h.TestMAX)
 			auth.POST("/browser/minimize", func(c *gin.Context) {

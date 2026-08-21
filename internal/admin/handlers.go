@@ -150,6 +150,18 @@ func (h *Handler) UpdateSettings(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"ok": true})
 }
 
+func (h *Handler) UnblockPrinter(c *gin.Context) {
+	if err := h.settings.SetMany(map[string]string{
+		storage.SettingPrinterFaultBlocked: "false",
+		storage.SettingPrinterFaultReason:  "",
+	}); err != nil {
+		slog.Error("admin printer unblock", "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось снять блокировку принтера"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"ok": true})
+}
+
 func (h *Handler) Overview(c *gin.Context) {
 	values, err := h.settings.GetAll()
 	if err != nil {
@@ -277,6 +289,19 @@ func (h *Handler) Overview(c *gin.Context) {
 		} else {
 			copyDev["label"] = "Проверьте сканер и принтер"
 		}
+	}
+	printerBlocked := storage.SettingEnabled(values, storage.SettingPrinterFaultBlocked, false)
+	printerBlockReason := strings.TrimSpace(values[storage.SettingPrinterFaultReason])
+	if printerBlockReason == "" {
+		printerBlockReason = "Неисправность принтера"
+	}
+	printer["blocked"] = printerBlocked
+	printer["block_reason"] = printerBlockReason
+	if printerBlocked {
+		printer["status"] = "err"
+		printer["label"] = "Заблокирован: " + printerBlockReason
+		copyDev["status"] = "err"
+		copyDev["label"] = "Печать заблокирована до осмотра специалистом"
 	}
 
 	_, loErr := libreoffice.Find(h.cfg.Paths.LibreOffice)
@@ -444,7 +469,7 @@ func validateSetting(key, value string) error {
 	value = strings.TrimSpace(value)
 
 	switch key {
-	case storage.SettingPriceBW, storage.SettingPriceColor, storage.SettingPriceCopy, storage.SettingPriceScan:
+	case storage.SettingPriceBW, storage.SettingPriceColor, storage.SettingPriceCopy, storage.SettingPriceCopyColor, storage.SettingPriceScan:
 		if _, err := strconv.ParseFloat(value, 64); err != nil {
 			return errInvalid(key, "ожидается число")
 		}
@@ -460,6 +485,7 @@ func validateSetting(key, value string) error {
 	case storage.SettingTelegramCartridgeAlerts, storage.SettingPaymentEnabled,
 		storage.SettingPaymentQREnabled,
 		storage.SettingTestDeviceMode, storage.SettingTestPaymentMode,
+		storage.SettingPrinterFaultBlocked,
 		storage.SettingMaxEnabled, storage.SettingMaxInkAlerts,
 		storage.SettingServicePrintEnabled, storage.SettingServiceCopyEnabled,
 		storage.SettingServiceScanEnabled, storage.SettingSourceUSBEnabled,

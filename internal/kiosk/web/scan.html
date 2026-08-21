@@ -25,7 +25,7 @@
     </header>
 
     <header class="top top-nav">
-      <a class="back-btn" href="/">
+      <a class="back-btn" id="back-btn" href="/">
         <span aria-hidden="true">‹</span>
         Назад
       </a>
@@ -41,7 +41,7 @@
         <div class="step purple">
           <div class="step-num">1</div>
           <div class="step-icon" aria-hidden="true">
-            <img src="/static/img/scanner-step-open.png" alt="">
+            <img class="scan-step-violet" src="/static/img/copy-step-open.png" alt="">
           </div>
           <div>
             <div class="step-title">Откройте крышку</div>
@@ -51,7 +51,7 @@
         <div class="step purple">
           <div class="step-num">2</div>
           <div class="step-icon" aria-hidden="true">
-            <img class="scan-step-place-corrected" src="/static/img/copy-step-place.png" alt="">
+            <img class="scan-step-violet" src="/static/img/copy-step-place.png" alt="">
           </div>
           <div>
             <div class="step-title">Положите документ</div>
@@ -61,7 +61,7 @@
         <div class="step purple">
           <div class="step-num">3</div>
           <div class="step-icon" aria-hidden="true">
-            <img class="scan-step-close-corrected" src="/static/img/copy-step-close.png" alt="">
+            <img class="scan-step-violet instruction-step-close" src="/static/img/copy-step-close.png" alt="">
           </div>
           <div>
             <div class="step-title">Закройте крышку</div>
@@ -110,7 +110,11 @@
   <script src="/static/ui.js"></script>
   <script src="/static/payment.js"></script>
   <script>
-    let jobId = null;
+    const params = new URLSearchParams(location.search);
+    let jobId = params.get('job');
+    const replaceIndexRaw = params.get('replace');
+    const replaceIndex = replaceIndexRaw == null ? null : Number(replaceIndexRaw);
+    const continuingSession = Boolean(jobId);
     let price = 0;
     let busy = false;
 
@@ -137,8 +141,10 @@
       KioskUI.setError(errorEl, msg);
     }
 
-    async function createJob() {
-      const res = await fetch('/api/kiosk/scan/jobs', { method: 'POST' });
+    async function loadSession() {
+      const res = continuingSession
+        ? await fetch('/api/kiosk/scan/jobs/' + encodeURIComponent(jobId))
+        : await fetch('/api/kiosk/scan/jobs', { method: 'POST' });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Не удалось начать сканирование');
       const n = Number(data.price);
@@ -147,16 +153,109 @@
       price = n;
       priceCard.classList.remove('price-card--skeleton');
       priceLine.classList.remove('price-card-value--bar');
-      priceLine.textContent = money(price);
+      if (continuingSession) {
+        document.getElementById('back-btn').href = '/scan/name/?job=' + encodeURIComponent(jobId);
+        document.querySelector('.page-subtitle').textContent = replaceIndex == null
+          ? 'Замените оригинал на следующий лист'
+          : 'Положите страницу, которую хотите отсканировать заново';
+        document.querySelector('.price-card-label').textContent = replaceIndex == null
+          ? 'Доплата за новый лист'
+          : 'Пересканирование страницы';
+        priceLine.textContent = replaceIndex == null ? money(price) + ' в конце' : 'Бесплатно';
+        readyBtn.textContent = replaceIndex == null ? 'Отсканировать следующий лист →' : 'Пересканировать страницу →';
+      } else {
+        priceLine.textContent = money(price);
+      }
       KioskPayment.setAmount(money(price));
       readyBtn.disabled = false;
     }
 
-    readyBtn.addEventListener('click', async () => {
+    readyBtn.addEventListener('click', () => {
       if (busy || !jobId) return;
       errorEl.hidden = true;
-      KioskPayment.open(money(price));
+      if (continuingSession) {
+        startScan(false);
+      } else {
+        KioskPayment.open(money(price));
+      }
     });
+
+    async function startScan(showPaidStage) {
+      if (busy) return;
+      busy = true;
+      readyBtn.disabled = true;
+      scanOverlay.hidden = false;
+      document.body.classList.add('loading-lock');
+      const scanMagic = document.getElementById('scan-magic');
+      const scanTitle = document.getElementById('scan-magic-title');
+      const scanText = document.getElementById('scan-magic-text');
+      const progress = document.getElementById('scan-progress');
+      progress.hidden = false;
+
+      if (showPaidStage) {
+        scanMagic.dataset.stage = 'paid';
+        scanTitle.textContent = 'Оплата прошла успешно';
+        scanText.textContent = 'Всё получилось — начинаем магию сканирования';
+      } else {
+        scanMagic.dataset.stage = 'scan';
+        scanTitle.textContent = replaceIndex == null ? 'Пробуждаем сканер для нового листа' : 'Пересканируем страницу аккуратнее';
+        scanText.textContent = 'Световой луч готовится прочитать документ';
+      }
+
+      const firstStageDelay = showPaidStage ? 2600 : 0;
+      const scanStartStage = setTimeout(() => {
+        scanTitle.textContent = 'Пробуждаем сканер';
+        scanText.textContent = 'Световой луч готовится прочитать документ';
+        scanMagic.dataset.stage = 'scan';
+      }, firstStageDelay);
+      const scanLineStage = setTimeout(() => {
+        scanTitle.textContent = 'Ловим каждую строчку';
+        scanText.textContent = 'Свет проходит по документу и замечает все детали';
+        scanMagic.dataset.stage = 'lines';
+      }, showPaidStage ? 6500 : 3900);
+      const scanFileStage = setTimeout(() => {
+        scanTitle.textContent = 'Собираем цифровой свиток';
+        scanText.textContent = 'Добавляем страницу в общий PDF';
+        scanMagic.dataset.stage = 'file';
+      }, showPaidStage ? 10000 : 7400);
+
+      try {
+        const requestBody = replaceIndex == null ? {} : { replace_index: replaceIndex };
+        const [scanRes] = await Promise.all([
+          fetch('/api/kiosk/scan/jobs/' + encodeURIComponent(jobId) + '/scan', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(requestBody),
+          }),
+          new Promise((resolve) => setTimeout(resolve, 6500)),
+        ]);
+        const scanData = await scanRes.json().catch(() => ({}));
+        clearTimeout(scanStartStage);
+        clearTimeout(scanLineStage);
+        clearTimeout(scanFileStage);
+        if (!scanRes.ok) throw new Error(scanData.error || 'Не удалось отсканировать документ');
+
+        scanMagic.dataset.stage = 'ready';
+        scanTitle.textContent = replaceIndex == null ? 'Страница добавлена!' : 'Страница пересканирована!';
+        scanText.textContent = 'Проверьте результат перед продолжением';
+        progress.hidden = true;
+        const selected = replaceIndex == null
+          ? Math.max(0, Number(scanData.job && scanData.job.page_count || 1) - 1)
+          : replaceIndex;
+        setTimeout(() => {
+          location.href = '/scan/name/?job=' + encodeURIComponent(jobId) + '&selected=' + encodeURIComponent(selected);
+        }, 1200);
+      } catch (e) {
+        clearTimeout(scanStartStage);
+        clearTimeout(scanLineStage);
+        clearTimeout(scanFileStage);
+        scanOverlay.hidden = true;
+        document.body.classList.remove('loading-lock');
+        showError(e.message || 'Ошибка связи с сервером');
+        busy = false;
+        readyBtn.disabled = false;
+      }
+    }
 
     document.getElementById('pay-terminal-btn').addEventListener('click', async () => {
       if (busy || !jobId) return;
@@ -180,54 +279,8 @@
           return;
         }
 
-        scanOverlay.hidden = false;
-        document.body.classList.add('loading-lock');
-        const scanMagic = document.getElementById('scan-magic');
-        const scanTitle = document.getElementById('scan-magic-title');
-        const scanText = document.getElementById('scan-magic-text');
-        scanMagic.dataset.stage = 'paid';
-        scanTitle.textContent = 'Оплата прошла успешно';
-        scanText.textContent = 'Всё получилось — начинаем магию сканирования';
-        document.getElementById('scan-progress').hidden = false;
-        const scanStartStage = setTimeout(() => {
-          scanTitle.textContent = 'Пробуждаем сканер';
-          scanText.textContent = 'Световой луч готовится прочитать документ';
-          scanMagic.dataset.stage = 'scan';
-        }, 2600);
-        const scanLineStage = setTimeout(() => {
-          scanTitle.textContent = 'Ловим каждую строчку';
-          scanText.textContent = 'Свет проходит по документу и замечает все детали';
-          scanMagic.dataset.stage = 'lines';
-        }, 6500);
-        const scanFileStage = setTimeout(() => {
-          scanTitle.textContent = 'Собираем цифровой свиток';
-          scanText.textContent = 'Превращаем изображение в аккуратный PDF';
-          scanMagic.dataset.stage = 'file';
-        }, 10000);
-
-        const [scanRes] = await Promise.all([
-          fetch('/api/kiosk/scan/jobs/' + encodeURIComponent(jobId) + '/scan', { method: 'POST' }),
-          new Promise((resolve) => setTimeout(resolve, 6500)),
-        ]);
-        const scanData = await scanRes.json().catch(() => ({}));
-        clearTimeout(scanStartStage);
-        clearTimeout(scanLineStage);
-        clearTimeout(scanFileStage);
-
-        if (!scanRes.ok) {
-          scanOverlay.hidden = true;
-          document.body.classList.remove('loading-lock');
-          showError(scanData.error || 'Не удалось отсканировать документ');
-          busy = false;
-          readyBtn.disabled = false;
-          return;
-        }
-
-        scanMagic.dataset.stage = 'ready';
-        scanTitle.textContent = 'Скан готов!';
-        scanText.textContent = 'Документ превратился в цифровой файл';
-        document.getElementById('scan-progress').hidden = true;
-        setTimeout(() => { location.href = '/scan/name/?job=' + encodeURIComponent(jobId); }, 1200);
+        busy = false;
+        await startScan(true);
       } catch (e) {
         if (window.KioskStages) window.KioskStages.reset();
         KioskPayment.closeWaiting();
@@ -239,7 +292,7 @@
       }
     });
 
-    createJob().catch((e) => {
+    loadSession().catch((e) => {
       showPriceError(e.message || 'Не удалось загрузить стоимость сканирования');
     });
   </script>

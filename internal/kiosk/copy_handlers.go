@@ -12,6 +12,7 @@ import (
 
 	"print-kiosk/internal/copyjob"
 	"print-kiosk/internal/ophistory"
+	"print-kiosk/internal/printjob"
 	"print-kiosk/internal/storage"
 )
 
@@ -55,6 +56,7 @@ func (h *Handler) GetCopyJob(c *gin.Context) {
 
 type copyQuoteRequest struct {
 	Color  bool `json:"color"`
+	Duplex bool `json:"duplex"`
 	Copies int  `json:"copies"`
 }
 
@@ -73,7 +75,7 @@ func (h *Handler) QuoteCopyJob(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "не удалось загрузить цены"})
 		return
 	}
-	quote, err := copyjob.QuotePrice(copyjob.Options{Color: in.Color, Copies: in.Copies}, priceBW, priceColor)
+	quote, err := copyjob.QuotePrice(copyjob.Options{Color: in.Color, Duplex: in.Duplex, Copies: in.Copies}, priceBW, priceColor)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -83,6 +85,7 @@ func (h *Handler) QuoteCopyJob(c *gin.Context) {
 
 type copyPayRequest struct {
 	Color  bool   `json:"color"`
+	Duplex bool   `json:"duplex"`
 	Copies int    `json:"copies"`
 	Method string `json:"method"`
 }
@@ -103,19 +106,20 @@ func (h *Handler) PayCopyJob(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "не удалось загрузить цены"})
 		return
 	}
-	quote, err := copyjob.QuotePrice(copyjob.Options{Color: in.Color, Copies: in.Copies}, priceBW, priceColor)
+	quote, err := copyjob.QuotePrice(copyjob.Options{Color: in.Color, Duplex: in.Duplex, Copies: in.Copies}, priceBW, priceColor)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	sheetsNeeded := in.Copies
-	if sheetsNeeded < 1 {
-		sheetsNeeded = 1
-	}
+	sheetsNeeded := quote.Sheets
 	if err := h.ensurePaper(sheetsNeeded); err != nil {
+		code := "paper_insufficient"
+		if errors.Is(err, errPrinterFaultBlocked) {
+			code = "printer_blocked"
+		}
 		c.JSON(http.StatusConflict, gin.H{
 			"error":           err.Error(),
-			"code":            "paper_insufficient",
+			"code":            code,
 			"sheets_required": sheetsNeeded,
 			"paper_remaining": h.paperRemaining(),
 		})
@@ -131,7 +135,7 @@ func (h *Handler) PayCopyJob(c *gin.Context) {
 		return
 	}
 
-	job, err := h.copies.MarkPaid(c.Param("id"), copyjob.Options{Color: in.Color, Copies: in.Copies})
+	job, err := h.copies.MarkPaid(c.Param("id"), copyjob.Options{Color: in.Color, Duplex: quote.Duplex, Copies: in.Copies})
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -152,10 +156,7 @@ func (h *Handler) ExecuteCopyJob(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "заказ не найден"})
 		return
 	}
-	sheetsNeeded := job.Copies
-	if sheetsNeeded < 1 {
-		sheetsNeeded = 1
-	}
+	sheetsNeeded := printjob.PaperSheets(1, job.Copies, job.Duplex)
 	deviceTest := h.testDeviceMode()
 	priceBW, priceColor, _, _ := h.copyPrices()
 	unitPrice := priceBW
@@ -166,21 +167,21 @@ func (h *Handler) ExecuteCopyJob(c *gin.Context) {
 	if h.testPaymentMode() {
 		paidAmount = 0
 	}
-	if !deviceTest {
-		if _, err := h.settings.ConsumePaper(sheetsNeeded); err != nil {
-			h.recordOperation(c.Request.Context(), ophistory.Entry{Operation: "copy", JobID: job.ID, Pages: job.Copies, Amount: paidAmount, Success: false, ErrorText: err.Error()})
-			if errors.Is(err, storage.ErrInsufficientPaper) {
-				c.JSON(http.StatusConflict, gin.H{
-					"error":           "В принтере недостаточно бумаги для печати",
-					"code":            "paper_insufficient",
-					"sheets_required": sheetsNeeded,
-					"paper_remaining": h.paperRemaining(),
-				})
-				return
-			}
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "не удалось обновить счётчик бумаги"})
+	jobID := job.ID
+	requestedCopies := job.Copies
+	if _, err := h.settings.ConsumePaper(sheetsNeeded); err != nil {
+		h.recordOperation(c.Request.Context(), ophistory.Entry{Operation: "copy", JobID: job.ID, Pages: job.Copies, Amount: paidAmount, Success: false, ErrorText: err.Error()})
+		if errors.Is(err, storage.ErrInsufficientPaper) {
+			c.JSON(http.StatusConflict, gin.H{
+				"error":           "В принтере недостаточно бумаги для печати",
+				"code":            "paper_insufficient",
+				"sheets_required": sheetsNeeded,
+				"paper_remaining": h.paperRemaining(),
+			})
 			return
 		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "не удалось обновить счётчик бумаги"})
+		return
 	}
 	var sheets int
 	var err error
@@ -191,11 +192,34 @@ func (h *Handler) ExecuteCopyJob(c *gin.Context) {
 		job, sheets, err = h.copies.Execute(c.Param("id"))
 	}
 	if err != nil {
-		if !deviceTest {
+		paperOut := printjob.IsPaperOut(err)
+		paperJam := printjob.IsPaperJam(err)
+		if paperOut {
+			h.markPaperEmpty(jobID)
+		} else {
 			_, _ = h.settings.RefundPaper(sheetsNeeded)
 		}
+		if paperJam {
+			h.markPrinterFault(jobID, "Замятие бумаги")
+		}
 		h.notifyErr(err)
-		h.recordOperation(c.Request.Context(), ophistory.Entry{Operation: "copy", JobID: job.ID, Pages: job.Copies, Amount: paidAmount, Success: false, ErrorText: err.Error()})
+		h.recordOperation(c.Request.Context(), ophistory.Entry{Operation: "copy", JobID: jobID, Pages: requestedCopies, Amount: paidAmount, Success: false, ErrorText: err.Error()})
+		if paperOut {
+			c.JSON(http.StatusServiceUnavailable, gin.H{
+				"error":           "Извините, в принтере закончилась бумага. Мы уже сообщили специалисту — он скоро всё исправит.",
+				"code":            "paper_empty",
+				"paper_remaining": 0,
+			})
+			return
+		}
+		if paperJam {
+			c.JSON(http.StatusServiceUnavailable, gin.H{
+				"error":  errPrinterFaultBlocked.Error(),
+				"code":   "printer_blocked",
+				"reason": "Замятие бумаги",
+			})
+			return
+		}
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
@@ -213,7 +237,7 @@ func (h *Handler) ExecuteCopyJob(c *gin.Context) {
 		}
 	}
 	h.recordOperation(c.Request.Context(), ophistory.Entry{Operation: "copy", JobID: job.ID, Pages: job.Copies, Sheets: sheets, Amount: paidAmount, Success: true})
-	if h.max != nil && !deviceTest {
+	if h.max != nil {
 		h.max.CheckPaperAlert(context.Background())
 	}
 	c.JSON(http.StatusOK, gin.H{
@@ -233,8 +257,7 @@ func (h *Handler) copyPrices() (bw, color float64, paper string, err error) {
 	if err != nil {
 		return 0, 0, "", err
 	}
-	// Color copies use the color print price when available.
-	color, err = strconv.ParseFloat(values[storage.SettingPriceColor], 64)
+	color, err = strconv.ParseFloat(values[storage.SettingPriceCopyColor], 64)
 	if err != nil {
 		color = bw
 		err = nil
@@ -249,6 +272,7 @@ func copyJobJSON(job *copyjob.Job) gin.H {
 		"status": job.Status,
 		"paid":   job.Paid,
 		"color":  job.Color,
+		"duplex": job.Duplex,
 		"copies": job.Copies,
 	}
 }

@@ -9,7 +9,7 @@
 <body class="kiosk-user kiosk-home home-printus">
   <div class="app home-app">
     <header class="home-top">
-      <div class="home-brand">
+      <button class="home-brand home-specialist-trigger" id="specialist-trigger" type="button" aria-label="PRINTUS">
         <div class="home-logo" aria-hidden="true">
           <span class="home-atlas home-atlas--hat"></span>
         </div>
@@ -17,14 +17,7 @@
           <div class="home-logo-name">PRINTUS</div>
           <div class="home-logo-tag">Магия цветной печати</div>
         </div>
-      </div>
-      <a class="home-service" href="/admin/" draggable="false">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
-          <circle cx="12" cy="8" r="4"/>
-          <path d="M4 21v-2a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v2"/>
-        </svg>
-        Вход для специалиста
-      </a>
+      </button>
     </header>
 
     <section class="home-hero">
@@ -141,7 +134,8 @@
       <div class="price-rows">
         <div><span>Чёрно-белая печать</span><strong id="price-bw">—</strong></div>
         <div><span>Цветная печать</span><strong id="price-color">—</strong></div>
-        <div><span>Копирование</span><strong id="price-copy">—</strong></div>
+        <div><span>Чёрно-белая копия</span><strong id="price-copy">—</strong></div>
+        <div><span>Цветная копия</span><strong id="price-copy-color">—</strong></div>
         <div><span>Сканирование</span><strong id="price-scan">—</strong></div>
       </div>
       <button value="close">Закрыть</button>
@@ -155,6 +149,16 @@
       <p class="support-contact" id="support-text">—</p>
       <button value="close">Закрыть</button>
     </form>
+  </dialog>
+
+  <dialog class="modal kiosk-sheet" id="paper-empty-modal">
+    <div class="modal-card home-paper-empty-card">
+      <div class="home-paper-empty-icon" aria-hidden="true">!</div>
+      <h2 id="printer-unavailable-title">Бумага закончилась</h2>
+      <p id="printer-unavailable-text">Извините, сейчас печать и копирование временно недоступны. Мы уже сообщили специалисту — он скоро пополнит бумагу.</p>
+      <p class="home-paper-empty-note">Сканирование по-прежнему доступно.</p>
+      <button type="button" id="paper-empty-close">Понятно</button>
+    </div>
   </dialog>
 
   <script src="/static/ui.js"></script>
@@ -197,8 +201,9 @@
       document.getElementById('price-bw').textContent = formatPrice(info.price_bw);
       document.getElementById('price-color').textContent = formatPrice(info.price_color);
       document.getElementById('price-copy').textContent = formatPrice(info.price_copy);
+      document.getElementById('price-copy-color').textContent = formatPrice(info.price_copy_color);
       document.getElementById('price-scan').textContent = formatPrice(info.price_scan);
-      document.getElementById('home-price-print').textContent = formatFromPrice(info.price_bw, true);
+      document.getElementById('home-price-print').textContent = formatFromPrice(info.price_bw, false);
       document.getElementById('home-price-copy').textContent = formatFromPrice(info.price_copy, false);
       document.getElementById('home-price-scan').textContent = formatFromPrice(info.price_scan, false);
       priceElements.forEach((el) => el.classList.remove('kiosk-skeleton-text'));
@@ -213,6 +218,30 @@
       setShown('card-copy', info.service_copy !== false);
       setShown('card-scan', info.service_scan !== false);
 
+      const paperRemaining = Number.parseInt(String(info.paper_remaining == null ? '' : info.paper_remaining), 10);
+      const paperEmpty = Number.isFinite(paperRemaining) && paperRemaining <= 0;
+      const printerBlocked = info.printer_blocked === true;
+      if (paperEmpty || printerBlocked) {
+        const paperModal = document.getElementById('paper-empty-modal');
+        if (printerBlocked && !paperEmpty) {
+          document.getElementById('printer-unavailable-title').hidden = true;
+          document.getElementById('printer-unavailable-text').textContent =
+            'Извините, печать и копирование временно недоступны из-за замятия бумаги. Мы уже сообщили специалисту — он скоро всё исправит.';
+        }
+        const unavailable = [document.getElementById('card-print'), document.getElementById('card-copy')];
+        unavailable.forEach((element) => {
+          if (!element || element.hidden) return;
+          element.classList.add('is-paper-empty');
+          element.setAttribute('aria-disabled', 'true');
+        });
+        document.querySelectorAll('#card-print a, #card-copy').forEach((link) => {
+          link.addEventListener('click', (event) => {
+            event.preventDefault();
+            if (!paperModal.open) paperModal.showModal();
+          });
+        });
+      }
+
       const support = String(info.support_text || 'Обратитесь к администратору')
         .replace(/^\s*тел(?:ефон)?\.?\s*:?\s*/i, '');
       const textEl = document.getElementById('support-text');
@@ -225,6 +254,28 @@
     document.getElementById('support-btn').addEventListener('click', () => {
       document.getElementById('support-modal').showModal();
     });
+    document.getElementById('paper-empty-close').addEventListener('click', () => {
+      document.getElementById('paper-empty-modal').close();
+    });
+
+    (() => {
+      const trigger = document.getElementById('specialist-trigger');
+      const requiredTaps = 5;
+      const tapWindowMs = 3000;
+      let taps = 0;
+      let resetTimer = null;
+
+      trigger.addEventListener('click', () => {
+        taps += 1;
+        clearTimeout(resetTimer);
+        if (taps >= requiredTaps) {
+          taps = 0;
+          location.href = '/admin/';
+          return;
+        }
+        resetTimer = setTimeout(() => { taps = 0; }, tapWindowMs);
+      });
+    })();
 
     function blockFileHandoff(e) {
       e.preventDefault();

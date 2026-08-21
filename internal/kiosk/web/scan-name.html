@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-  <title>Имя файла — PrintStart</title>
+  <title>Проверка скана — PrintStart</title>
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body class="kiosk-user">
   <div class="screen">
     <header class="app-header app-header--inner">
-      <a class="brand" href="/">
+      <a class="brand" id="home-link" href="/">
         <div class="brand-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
             <path d="M6 9V3h12v6"/>
@@ -24,94 +24,281 @@
       </a>
     </header>
     <header class="top top-nav">
-      <a class="back-btn" href="/scan/">
+      <a class="back-btn" id="back-btn" href="/scan/">
         <span aria-hidden="true">‹</span>
         Назад
       </a>
     </header>
 
-    <section class="hero compact">
-      <h1>Как назвать файл?</h1>
-      <p>Введите имя для отсканированного документа</p>
+    <section class="hero compact scan-review-head">
+      <h1>Проверьте документ</h1>
+      <p id="page-summary">Загружаем отсканированные страницы…</p>
     </section>
 
-    <div class="name-form">
-      <div class="preview-mini" id="preview" hidden>
-        <iframe id="preview-frame" title="Превью скана"></iframe>
+    <main class="scan-review" id="scan-review" hidden>
+      <section class="scan-review-preview">
+        <div class="scan-review-page-number" id="selected-label">Страница 1</div>
+        <iframe id="preview-frame" title="Предпросмотр выбранной страницы"></iframe>
+      </section>
+
+      <section class="scan-review-thumbnails" aria-label="Страницы документа">
+        <div class="scan-review-strip" id="page-strip"></div>
+      </section>
+
+      <div class="scan-review-page-actions">
+        <a class="primary-btn scan-add-btn" id="add-page" href="#">＋ Отсканировать ещё один лист</a>
+        <a class="secondary-btn" id="rescan-page" href="#">↻ Пересканировать</a>
+        <button type="button" class="secondary-btn scan-delete-btn" id="delete-page">Удалить страницу</button>
       </div>
-      <label for="file-name">Имя файла</label>
-      <input id="file-name" type="text" inputmode="none" autocomplete="off" maxlength="76">
-      <p class="hint">Расширение .pdf добавится автоматически. Используйте экранную клавиатуру.</p>
-      <p class="error" id="error" hidden></p>
-      <button type="button" class="primary-btn" id="continue-btn">Продолжить</button>
-    </div>
+
+      <section class="name-form scan-review-name">
+        <label for="file-name">Название общего PDF</label>
+        <input id="file-name" type="text" inputmode="none" autocomplete="off" maxlength="76">
+        <p class="hint">Все страницы будут объединены в один PDF. Расширение добавится автоматически.</p>
+        <div class="scan-review-total">
+          <span id="total-pages">Страниц: —</span>
+          <strong id="payment-summary">Проверяем оплату…</strong>
+        </div>
+        <p class="error" id="error" hidden></p>
+        <button type="button" class="primary-btn" id="continue-btn">Документ готов →</button>
+      </section>
+    </main>
+
+    <section class="prompt-card" id="empty-state" hidden>
+      <h1>В документе пока нет страниц</h1>
+      <p>Положите лист на стекло и добавьте его в PDF</p>
+      <a class="primary-btn" id="empty-add-page" href="#">Отсканировать лист</a>
+    </section>
   </div>
 
+  <dialog class="modal kiosk-sheet" id="delete-modal">
+    <div class="modal-card">
+      <h2>Удалить выбранную страницу?</h2>
+      <p>Остальные страницы останутся в документе. При необходимости лист можно отсканировать снова.</p>
+      <div class="scan-confirm-actions">
+        <button type="button" class="danger-btn" id="delete-confirm">Удалить</button>
+        <button type="button" class="secondary-btn" id="delete-cancel">Отмена</button>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog class="modal kiosk-sheet" id="leave-scan-modal">
+    <div class="modal-card scan-leave-card">
+      <div class="scan-leave-icon" aria-hidden="true">!</div>
+      <h2>Документ ещё не сохранён</h2>
+      <p>Если выйти сейчас, вы можете потерять отсканированные страницы. Сначала сохраните PDF на флешку или отправьте его себе.</p>
+      <div class="scan-confirm-actions">
+        <button type="button" class="primary-btn" id="leave-scan-cancel">Остаться и сохранить</button>
+        <button type="button" class="danger-btn" id="leave-scan-confirm">Выйти без сохранения</button>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog class="modal flow-modal kiosk-sheet" id="paid-modal">
+    <div class="print-magic device-magic scan-magic" data-stage="paid">
+      <div class="print-magic-glow" aria-hidden="true"></div>
+      <div class="print-magic-art" aria-hidden="true"><div class="print-magic-paid"><span></span></div></div>
+      <p class="print-magic-kicker">Все страницы оплачены</p>
+      <h2>Оплата прошла успешно</h2>
+      <p>Собираем страницы в один волшебный PDF</p>
+    </div>
+  </dialog>
+
   <script src="/static/keyboard.js"></script>
+  <script src="/static/ui.js"></script>
+  <script src="/static/payment.js"></script>
   <script>
     KioskKeyboard.bind(document);
 
     const params = new URLSearchParams(location.search);
     const jobId = params.get('job');
+    const requestedSelected = Number(params.get('selected'));
     const nameInput = document.getElementById('file-name');
     const errorEl = document.getElementById('error');
     const continueBtn = document.getElementById('continue-btn');
+    const review = document.getElementById('scan-review');
+    const emptyState = document.getElementById('empty-state');
+    const deleteModal = document.getElementById('delete-modal');
+    const leaveScanModal = document.getElementById('leave-scan-modal');
+    const paidModal = document.getElementById('paid-modal');
+    let job = null;
+    let selectedIndex = Number.isInteger(requestedSelected) && requestedSelected >= 0 ? requestedSelected : 0;
+    let busy = false;
+    let pendingExitURL = '/';
+
+    function money(n) {
+      return Number(n).toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) + ' ₽';
+    }
+
+    function pagesLabel(n) {
+      const n10 = n % 10;
+      const n100 = n % 100;
+      if (n10 === 1 && n100 !== 11) return n + ' страница';
+      if (n10 >= 2 && n10 <= 4 && (n100 < 12 || n100 > 14)) return n + ' страницы';
+      return n + ' страниц';
+    }
 
     function showError(msg) {
-      errorEl.textContent = msg || '';
-      errorEl.hidden = !msg;
+      KioskUI.setError(errorEl, msg);
+    }
+
+    function pageURL(index) {
+      return '/api/kiosk/scan/jobs/' + encodeURIComponent(jobId) + '/pages/' + index +
+        '/preview#page=1&zoom=page-fit&view=Fit&toolbar=0&navpanes=0';
+    }
+
+    function render() {
+      const pages = Array.isArray(job.pages) ? job.pages : [];
+      const hasPages = pages.length > 0;
+      review.hidden = !hasPages;
+      emptyState.hidden = hasPages;
+      const addURL = '/scan/?job=' + encodeURIComponent(jobId);
+      document.getElementById('add-page').href = addURL;
+      document.getElementById('empty-add-page').href = addURL;
+      document.getElementById('back-btn').href = hasPages ? '/' : '/scan/';
+      if (!hasPages) {
+        document.getElementById('page-summary').textContent = 'Добавьте первый лист';
+        return;
+      }
+      selectedIndex = Math.max(0, Math.min(selectedIndex, pages.length - 1));
+      document.getElementById('add-page').hidden = pages.length >= Number(job.max_pages || 30);
+      document.getElementById('page-summary').textContent = pagesLabel(pages.length) + ' в одном PDF';
+      document.getElementById('selected-label').textContent = 'Страница ' + (selectedIndex + 1) + ' из ' + pages.length;
+      document.getElementById('preview-frame').src = pageURL(selectedIndex);
+      document.getElementById('rescan-page').href = '/scan/?job=' + encodeURIComponent(jobId) + '&replace=' + selectedIndex;
+      document.getElementById('total-pages').textContent = 'В документе: ' + pagesLabel(pages.length);
+
+      const unpaid = Math.max(0, Number(job.unpaid_pages || 0));
+      const extra = unpaid * Number(job.price || 0);
+      document.getElementById('payment-summary').textContent = unpaid > 0
+        ? 'К доплате за ' + pagesLabel(unpaid) + ': ' + money(extra)
+        : 'Все страницы оплачены';
+      continueBtn.textContent = unpaid > 0 ? 'Доплатить ' + money(extra) + ' и получить PDF →' : 'Получить PDF →';
+
+      document.getElementById('page-strip').replaceChildren(...pages.map((page, index) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'scan-page-thumb' + (index === selectedIndex ? ' is-selected' : '');
+        button.setAttribute('aria-label', 'Показать страницу ' + (index + 1));
+        button.innerHTML = '<span class="scan-page-thumb-number">' + (index + 1) + '</span>' +
+          '<iframe tabindex="-1" title=""></iframe>';
+        button.querySelector('iframe').src = pageURL(index);
+        button.addEventListener('click', () => { selectedIndex = index; render(); });
+        return button;
+      }));
     }
 
     async function loadJob() {
-      if (!jobId) {
-        showError('Заказ не найден');
-        continueBtn.disabled = true;
-        return;
-      }
+      if (!jobId) throw new Error('Заказ не найден');
       const res = await fetch('/api/kiosk/scan/jobs/' + encodeURIComponent(jobId));
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        showError(data.error || 'Заказ не найден');
-        continueBtn.disabled = true;
-        return;
-      }
-      const job = data.job;
-      if (job.status !== 'scanned' && job.status !== 'named') {
-        showError('Сначала выполните сканирование');
-        continueBtn.disabled = true;
-        return;
-      }
+      if (!res.ok) throw new Error(data.error || 'Заказ не найден');
+      job = data.job;
       let name = job.file_name || '';
       if (name.toLowerCase().endsWith('.pdf')) name = name.slice(0, -4);
       nameInput.value = name;
-      if (job.preview_url) {
-        document.getElementById('preview').hidden = false;
-        document.getElementById('preview-frame').src = job.preview_url +
-          '#page=1&zoom=page-fit&view=Fit&toolbar=0&navpanes=0';
-      }
-      nameInput.focus();
+      render();
     }
 
-    continueBtn.addEventListener('click', async () => {
-      showError('');
+    async function saveNameAndContinue() {
+      const name = nameInput.value.trim();
+      if (!name) {
+        showError('Введите название документа');
+        nameInput.focus();
+        return;
+      }
       continueBtn.disabled = true;
       const res = await fetch('/api/kiosk/scan/jobs/' + encodeURIComponent(jobId) + '/name', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: nameInput.value }),
+        body: JSON.stringify({ name: name }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        showError(data.error || 'Не удалось сохранить имя');
+        showError(data.error || 'Не удалось сохранить название');
         continueBtn.disabled = false;
         return;
       }
       location.href = '/scan/delivery/?job=' + encodeURIComponent(jobId);
+    }
+
+    continueBtn.addEventListener('click', () => {
+      if (busy || !job || !job.page_count) return;
+      showError('');
+      if (Number(job.unpaid_pages || 0) > 0) {
+        KioskPayment.open(money(Number(job.unpaid_pages) * Number(job.price || 0)));
+      } else {
+        saveNameAndContinue();
+      }
     });
 
-    loadJob();
+    document.getElementById('pay-terminal-btn').addEventListener('click', async () => {
+      if (busy) return;
+      busy = true;
+      continueBtn.disabled = true;
+      KioskPayment.showWaiting();
+      try {
+        const res = await fetch('/api/kiosk/scan/jobs/' + encodeURIComponent(jobId) + '/pay', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ method: 'terminal' }),
+        });
+        const data = await res.json().catch(() => ({}));
+        KioskPayment.closeWaiting();
+        if (!res.ok) throw new Error(data.error || 'Не удалось выполнить доплату');
+        job = data.job;
+        paidModal.showModal();
+        setTimeout(() => {
+          paidModal.close();
+          saveNameAndContinue();
+        }, 2600);
+      } catch (e) {
+        KioskPayment.closeWaiting();
+        showError(e.message || 'Ошибка связи с сервером');
+        busy = false;
+        continueBtn.disabled = false;
+      }
+    });
+
+    document.getElementById('delete-page').addEventListener('click', () => deleteModal.showModal());
+    document.getElementById('delete-cancel').addEventListener('click', () => deleteModal.close());
+    document.getElementById('delete-confirm').addEventListener('click', async () => {
+      if (busy) return;
+      busy = true;
+      const res = await fetch('/api/kiosk/scan/jobs/' + encodeURIComponent(jobId) + '/pages/' + selectedIndex, { method: 'DELETE' });
+      const data = await res.json().catch(() => ({}));
+      busy = false;
+      deleteModal.close();
+      if (!res.ok) {
+        showError(data.error || 'Не удалось удалить страницу');
+        return;
+      }
+      job = data.job;
+      selectedIndex = Math.min(selectedIndex, Math.max(0, Number(job.page_count || 0) - 1));
+      render();
+    });
+
+    function protectUnsavedExit(event) {
+      const hasScannedPages = job && Number(job.page_count || 0) > 0;
+      if (!hasScannedPages) return;
+      event.preventDefault();
+      pendingExitURL = event.currentTarget.href || '/';
+      if (!leaveScanModal.open) leaveScanModal.showModal();
+    }
+
+    document.getElementById('back-btn').addEventListener('click', protectUnsavedExit);
+    document.getElementById('home-link').addEventListener('click', protectUnsavedExit);
+    document.getElementById('leave-scan-cancel').addEventListener('click', () => leaveScanModal.close());
+    document.getElementById('leave-scan-confirm').addEventListener('click', () => {
+      location.href = pendingExitURL;
+    });
+
+    loadJob().catch((e) => {
+      document.getElementById('page-summary').textContent = e.message || 'Не удалось открыть документ';
+      showError(e.message || 'Не удалось открыть документ');
+      continueBtn.disabled = true;
+    });
   </script>
-  <script src="/static/ui.js"></script>
   <script src="/static/idle.js"></script>
 </body>
 </html>

@@ -56,6 +56,20 @@ func (h *Handler) PreviewScanJob(c *gin.Context) {
 	c.File(path)
 }
 
+func (h *Handler) PreviewScanPage(c *gin.Context) {
+	index, err := strconv.Atoi(c.Param("index"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "неверный номер страницы"})
+		return
+	}
+	path, err := h.scans.PagePreviewPath(c.Param("id"), index)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+	c.File(path)
+}
+
 type scanPayRequest struct {
 	Method string `json:"method"`
 }
@@ -70,7 +84,13 @@ func (h *Handler) PayScanJob(c *gin.Context) {
 	var in scanPayRequest
 	_ = c.ShouldBindJSON(&in)
 
-	if err := h.processPayment(c.Request.Context(), in.Method, existingJob.PricePerScan, existingJob.ID); err != nil {
+	reservation, err := h.scans.ReservePayment(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if err := h.processPayment(c.Request.Context(), in.Method, reservation.Amount, existingJob.ID); err != nil {
+		h.scans.CancelPayment(c.Param("id"))
 		if errors.Is(err, errPaymentQR) {
 			c.JSON(http.StatusNotImplemented, gin.H{"error": err.Error()})
 			return
@@ -79,55 +99,82 @@ func (h *Handler) PayScanJob(c *gin.Context) {
 		return
 	}
 
-	job, err := h.scans.MarkPaid(c.Param("id"))
+	job, err := h.scans.CommitPayment(c.Param("id"), reservation.Pages)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	paidAmount := reservation.Amount
+	if h.testPaymentMode() {
+		paidAmount = 0
+	}
+	if h.stats != nil && paidAmount > 0 {
+		if err := h.stats.AddRevenue(paidAmount); err != nil {
+			slog.Error("scan payment statistics update failed", "job_id", job.ID, "error", err)
+		}
+	}
+	h.recordOperation(c.Request.Context(), ophistory.Entry{Operation: "scan", JobID: job.ID, Pages: reservation.Pages, Amount: paidAmount, Success: true})
 	c.JSON(http.StatusOK, gin.H{
-		"ok":      true,
-		"paid":    true,
-		"method":  "terminal",
-		"message": "Оплата прошла успешно",
-		"job":     scanJobJSON(job),
+		"ok":         true,
+		"paid":       true,
+		"method":     "terminal",
+		"message":    "Оплата прошла успешно",
+		"paid_pages": reservation.Pages,
+		"amount":     reservation.Amount,
+		"job":        scanJobJSON(job),
 	})
 }
 
+type scanExecuteRequest struct {
+	ReplaceIndex *int `json:"replace_index"`
+}
+
 func (h *Handler) ExecuteScanJob(c *gin.Context) {
-	original, _ := h.scans.Get(c.Param("id"))
-	paidAmount := 0.0
-	if original != nil && !h.testPaymentMode() {
-		paidAmount = original.PricePerScan
+	var in scanExecuteRequest
+	_ = c.ShouldBindJSON(&in)
+	replaceIndex := -1
+	if in.ReplaceIndex != nil {
+		replaceIndex = *in.ReplaceIndex
 	}
 	var job *scanjob.Job
 	var err error
 	if h.testDeviceMode() {
 		time.Sleep(10 * time.Second)
-		job, err = h.scans.ScanTest(c.Param("id"))
+		job, err = h.scans.ScanPage(c.Param("id"), replaceIndex, true)
 	} else {
-		job, err = h.scans.Scan(c.Param("id"))
+		job, err = h.scans.ScanPage(c.Param("id"), replaceIndex, false)
 	}
 	if err != nil {
 		h.notifyErr(err)
-		h.recordOperation(c.Request.Context(), ophistory.Entry{Operation: "scan", JobID: c.Param("id"), Amount: paidAmount, Success: false, ErrorText: err.Error()})
+		h.recordOperation(c.Request.Context(), ophistory.Entry{Operation: "scan", JobID: c.Param("id"), Success: false, ErrorText: err.Error()})
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 	if h.stats != nil {
-		revenue := job.PricePerScan
-		if h.testPaymentMode() {
-			revenue = 0
-		}
-		if err := h.stats.AddScan(revenue); err != nil {
+		if err := h.stats.AddScan(0); err != nil {
 			slog.Error("scan statistics update failed", "job_id", job.ID, "error", err)
 		}
 	}
-	h.recordOperation(c.Request.Context(), ophistory.Entry{Operation: "scan", JobID: job.ID, Pages: 1, Amount: paidAmount, Success: true})
+	h.recordOperation(c.Request.Context(), ophistory.Entry{Operation: "scan", JobID: job.ID, Pages: 1, Success: true})
 	c.JSON(http.StatusOK, gin.H{
 		"ok":      true,
 		"message": "Документ отсканирован",
 		"job":     scanJobJSON(job),
 	})
+}
+
+func (h *Handler) DeleteScanPage(c *gin.Context) {
+	index, err := strconv.Atoi(c.Param("index"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "неверный номер страницы"})
+		return
+	}
+	job, err := h.scans.DeletePage(c.Param("id"), index)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"ok": true, "job": scanJobJSON(job)})
 }
 
 type scanNameRequest struct {
@@ -271,12 +318,27 @@ func scanJobJSON(job *scanjob.Job) gin.H {
 	if job.ScanPath != "" {
 		preview = "/api/kiosk/scan/jobs/" + job.ID + "/preview"
 	}
+	pages := make([]gin.H, 0, len(job.Pages))
+	for index, page := range job.Pages {
+		pages = append(pages, gin.H{
+			"id":          page.ID,
+			"index":       index,
+			"preview_url": "/api/kiosk/scan/jobs/" + job.ID + "/pages/" + strconv.Itoa(index) + "/preview",
+		})
+	}
 	return gin.H{
 		"id":            job.ID,
 		"status":        job.Status,
 		"paid":          job.Paid,
 		"file_name":     job.FileName,
 		"price":         job.PricePerScan,
+		"pages":         pages,
+		"page_count":    len(job.Pages),
+		"paid_pages":    job.PaidPages,
+		"unpaid_pages":  max(0, len(job.Pages)-job.PaidPages),
+		"paid_amount":   job.PaidAmount,
+		"fully_paid":    len(job.Pages) > 0 && job.PaidPages >= len(job.Pages),
+		"max_pages":     scanjob.MaxPages,
 		"preview_url":   preview,
 		"saved_path":    job.SavedPath,
 		"sent_to_email": job.SentToEmail,

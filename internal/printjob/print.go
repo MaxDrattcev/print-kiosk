@@ -1,6 +1,7 @@
 package printjob
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -11,11 +12,55 @@ import (
 	"strings"
 )
 
+var (
+	ErrPaperOut = errors.New("printer is out of paper")
+	ErrPaperJam = errors.New("printer has a paper jam")
+)
+
+// IsPaperOut reports whether a printer error explicitly indicates that the
+// device has run out of paper. The text fallback also covers errors returned
+// directly by printer utilities and drivers outside the Windows spooler.
+func IsPaperOut(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, ErrPaperOut) {
+		return true
+	}
+	message := strings.ToLower(err.Error())
+	for _, marker := range []string{"paperout", "paper out", "out of paper", "no paper", "нет бумаги", "закончилась бумага"} {
+		if strings.Contains(message, marker) {
+			return true
+		}
+	}
+	return false
+}
+
+// IsPaperJam reports whether a printer error explicitly indicates a paper
+// jam. A jam blocks the device but does not change the stored paper balance.
+func IsPaperJam(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, ErrPaperJam) {
+		return true
+	}
+	message := strings.ToLower(err.Error())
+	for _, marker := range []string{"paperjam", "paper jam", "jammed", "замятие", "замята бумага"} {
+		if strings.Contains(message, marker) {
+			return true
+		}
+	}
+	return false
+}
+
 type PrintOptions struct {
 	Color       bool
 	Duplex      bool
 	Copies      int
 	Orientation string
+	PageRange   string
+	Scale       string
 }
 
 func (s *Service) Print(job *Job, opt PrintOptions) error {
@@ -72,8 +117,17 @@ func printLP(bin, filePath string, opt PrintOptions) error {
 	} else if opt.Orientation == "portrait" {
 		args = append(args, "-o", "orientation-requested=3")
 	}
+	if strings.TrimSpace(opt.PageRange) != "" {
+		args = append(args, "-P", opt.PageRange)
+	}
+	if opt.Scale == "actual" {
+		args = append(args, "-o", "scaling=100")
+	} else {
+		args = append(args, "-o", "fit-to-page")
+	}
 	if opt.Duplex {
-		args = append(args, "-o", "sides=two-sided-long-edge", "-o", "CNDuplex=DuplexFront")
+		sides, canon := duplexBinding(opt.Orientation)
+		args = append(args, "-o", "sides="+sides, "-o", "CNDuplex="+canon)
 	} else {
 		args = append(args, "-o", "sides=one-sided", "-o", "CNDuplex=None")
 	}
@@ -92,8 +146,17 @@ func printLPR(bin, filePath string, opt PrintOptions) error {
 	if opt.Orientation == "landscape" {
 		args = append(args, "-o", "landscape")
 	}
+	if strings.TrimSpace(opt.PageRange) != "" {
+		args = append(args, "-o", "page-ranges="+opt.PageRange)
+	}
+	if opt.Scale == "actual" {
+		args = append(args, "-o", "scaling=100")
+	} else {
+		args = append(args, "-o", "fit-to-page")
+	}
 	if opt.Duplex {
-		args = append(args, "-o", "sides=two-sided-long-edge")
+		sides, _ := duplexBinding(opt.Orientation)
+		args = append(args, "-o", "sides="+sides)
 	} else {
 		args = append(args, "-o", "sides=one-sided")
 	}
@@ -136,14 +199,22 @@ func (s *Service) printWindows(filePath string, opt PrintOptions) error {
 
 func printSumatra(bin, filePath, printer string, opt PrintOptions) error {
 	// fit — вписать страницу в лист. noscale даёт «только уголок», если PDF не A4.
-	settings := []string{"fit", "paper=A4"}
+	scale := "fit"
+	if opt.Scale == "actual" {
+		scale = "noscale"
+	}
+	settings := []string{scale, "paper=A4"}
+	if strings.TrimSpace(opt.PageRange) != "" {
+		settings = append(settings, opt.PageRange)
+	}
 	if opt.Orientation == "landscape" {
 		settings = append(settings, "landscape")
 	} else if opt.Orientation == "portrait" {
 		settings = append(settings, "portrait")
 	}
 	if opt.Duplex {
-		settings = append(settings, "duplex")
+		_, _, sumatra := duplexBindingSettings(opt.Orientation)
+		settings = append(settings, sumatra)
 	} else {
 		settings = append(settings, "simplex")
 	}
@@ -171,6 +242,21 @@ func printSumatra(bin, filePath, printer string, opt PrintOptions) error {
 	}
 	slog.Info("printed via SumatraPDF", "file", filePath, "printer", printer, "copies", opt.Copies)
 	return nil
+}
+
+// duplexBindingSettings implements book-style duplex printing: portrait
+// sheets turn over their long edge, while landscape sheets turn over their
+// short edge so the reverse side remains upright.
+func duplexBindingSettings(orientation string) (cups, canon, sumatra string) {
+	if normalizeOrientation(orientation) == "landscape" {
+		return "two-sided-short-edge", "DuplexTop", "duplexshort"
+	}
+	return "two-sided-long-edge", "DuplexFront", "duplexlong"
+}
+
+func duplexBinding(orientation string) (cups, canon string) {
+	cups, canon, _ = duplexBindingSettings(orientation)
+	return cups, canon
 }
 
 func printWindowsShell(filePath, printer string, opt PrintOptions) error {

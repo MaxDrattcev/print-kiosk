@@ -37,6 +37,8 @@ type Handler struct {
 	history  *ophistory.Repo
 }
 
+var errPrinterFaultBlocked = errors.New("Извините, принтер временно недоступен. Мы уже сообщили специалисту — он скоро всё исправит.")
+
 func NewHandler(
 	cfg *config.Config,
 	settings *storage.SettingsRepo,
@@ -78,19 +80,23 @@ func (h *Handler) Info(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"price_bw":            values[storage.SettingPriceBW],
-		"price_color":         values[storage.SettingPriceColor],
-		"price_copy":          values[storage.SettingPriceCopy],
-		"price_scan":          values[storage.SettingPriceScan],
-		"support_text":        values[storage.SettingSupportText],
-		"service_print":       storage.SettingEnabled(values, storage.SettingServicePrintEnabled, true),
-		"service_copy":        storage.SettingEnabled(values, storage.SettingServiceCopyEnabled, true),
-		"service_scan":        storage.SettingEnabled(values, storage.SettingServiceScanEnabled, true),
-		"source_usb":          storage.SettingEnabled(values, storage.SettingSourceUSBEnabled, true),
-		"source_email":        emailOn,
-		"source_max":          storage.MaxKioskReady(values),
-		"payment_qr":          false,
-		"session_timeout_sec": timeoutSec,
+		"price_bw":             values[storage.SettingPriceBW],
+		"price_color":          values[storage.SettingPriceColor],
+		"price_copy":           values[storage.SettingPriceCopy],
+		"price_copy_color":     values[storage.SettingPriceCopyColor],
+		"price_scan":           values[storage.SettingPriceScan],
+		"support_text":         values[storage.SettingSupportText],
+		"service_print":        storage.SettingEnabled(values, storage.SettingServicePrintEnabled, true),
+		"service_copy":         storage.SettingEnabled(values, storage.SettingServiceCopyEnabled, true),
+		"service_scan":         storage.SettingEnabled(values, storage.SettingServiceScanEnabled, true),
+		"source_usb":           storage.SettingEnabled(values, storage.SettingSourceUSBEnabled, true),
+		"source_email":         emailOn,
+		"source_max":           storage.MaxKioskReady(values),
+		"payment_qr":           false,
+		"session_timeout_sec":  timeoutSec,
+		"paper_remaining":      values[storage.SettingPaperRemaining],
+		"printer_blocked":      storage.SettingEnabled(values, storage.SettingPrinterFaultBlocked, false),
+		"printer_block_reason": values[storage.SettingPrinterFaultReason],
 	})
 }
 
@@ -180,11 +186,12 @@ func (h *Handler) PreparePrint(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"job": gin.H{
-			"id":           job.ID,
-			"file_name":    job.FileName,
-			"pages":        job.Pages,
-			"preview_kind": job.PreviewKind,
-			"preview_url":  "/api/kiosk/print/jobs/" + job.ID + "/preview",
+			"id":                  job.ID,
+			"file_name":           job.FileName,
+			"pages":               job.Pages,
+			"preview_kind":        job.PreviewKind,
+			"natural_orientation": job.NaturalOrientation,
+			"preview_url":         "/api/kiosk/print/jobs/" + job.ID + "/preview",
 		},
 		"prices": prices,
 	})
@@ -203,11 +210,12 @@ func (h *Handler) GetPrintJob(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{
 		"job": gin.H{
-			"id":           job.ID,
-			"file_name":    job.FileName,
-			"pages":        job.Pages,
-			"preview_kind": job.PreviewKind,
-			"preview_url":  "/api/kiosk/print/jobs/" + job.ID + "/preview",
+			"id":                  job.ID,
+			"file_name":           job.FileName,
+			"pages":               job.Pages,
+			"preview_kind":        job.PreviewKind,
+			"natural_orientation": job.NaturalOrientation,
+			"preview_url":         "/api/kiosk/print/jobs/" + job.ID + "/preview",
 		},
 		"prices": prices,
 	})
@@ -281,9 +289,13 @@ func (h *Handler) PayPrintJob(c *gin.Context) {
 		return
 	}
 	if err := h.ensurePaper(quote.Sheets); err != nil {
+		code := "paper_insufficient"
+		if errors.Is(err, errPrinterFaultBlocked) {
+			code = "printer_blocked"
+		}
 		c.JSON(http.StatusConflict, gin.H{
 			"error":           err.Error(),
-			"code":            "paper_insufficient",
+			"code":            code,
 			"sheets_required": quote.Sheets,
 			"paper_remaining": h.paperRemaining(),
 		})
@@ -334,12 +346,14 @@ func (h *Handler) ExecutePrintJob(c *gin.Context) {
 		in.Copies = 1
 	}
 
-	sheets := printjob.PaperSheets(job.Pages, in.Copies, in.Duplex)
-	pages := job.Pages * in.Copies
-	if pages < 1 {
-		pages = job.Pages
-	}
 	bw, colorPrice, _ := h.priceValues()
+	quote, err := h.jobs.Quote(job, in, bw, colorPrice)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	sheets := quote.Sheets
+	pages := quote.Pages * in.Copies
 	price := bw
 	if in.Color {
 		price = colorPrice
@@ -350,21 +364,19 @@ func (h *Handler) ExecutePrintJob(c *gin.Context) {
 		paidAmount = 0
 	}
 	deviceTest := h.testDeviceMode()
-	if !deviceTest {
-		if _, err := h.settings.ConsumePaper(sheets); err != nil {
-			h.recordOperation(c.Request.Context(), ophistory.Entry{Operation: "print", JobID: job.ID, Pages: pages, Amount: paidAmount, Success: false, ErrorText: err.Error()})
-			if errors.Is(err, storage.ErrInsufficientPaper) {
-				c.JSON(http.StatusConflict, gin.H{
-					"error":           "В принтере недостаточно бумаги для печати",
-					"code":            "paper_insufficient",
-					"sheets_required": sheets,
-					"paper_remaining": h.paperRemaining(),
-				})
-				return
-			}
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "не удалось обновить счётчик бумаги"})
+	if _, err := h.settings.ConsumePaper(sheets); err != nil {
+		h.recordOperation(c.Request.Context(), ophistory.Entry{Operation: "print", JobID: job.ID, Pages: pages, Amount: paidAmount, Success: false, ErrorText: err.Error()})
+		if errors.Is(err, storage.ErrInsufficientPaper) {
+			c.JSON(http.StatusConflict, gin.H{
+				"error":           "В принтере недостаточно бумаги для печати",
+				"code":            "paper_insufficient",
+				"sheets_required": sheets,
+				"paper_remaining": h.paperRemaining(),
+			})
 			return
 		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "не удалось обновить счётчик бумаги"})
+		return
 	}
 
 	var printErr error
@@ -375,17 +387,43 @@ func (h *Handler) ExecutePrintJob(c *gin.Context) {
 		if err := h.jobs.ApplyImageOrientation(job, in.Orientation); err != nil {
 			printErr = fmt.Errorf("подготовка ориентации изображения: %w", err)
 		} else {
-			printErr = h.jobs.Print(job, printjob.PrintOptions{Color: in.Color, Duplex: in.Duplex, Copies: in.Copies, Orientation: in.Orientation})
+			printErr = h.jobs.Print(job, printjob.PrintOptions{
+				Color: in.Color, Duplex: in.Duplex, Copies: in.Copies,
+				Orientation: in.Orientation, PageRange: quote.PageRange, Scale: quote.Scale,
+			})
 		}
 	}
 	if printErr != nil {
-		if !deviceTest {
+		paperOut := printjob.IsPaperOut(printErr)
+		paperJam := printjob.IsPaperJam(printErr)
+		if paperOut {
+			h.markPaperEmpty(job.ID)
+		} else {
 			_, _ = h.settings.RefundPaper(sheets)
+		}
+		if paperJam {
+			h.markPrinterFault(job.ID, "Замятие бумаги")
 		}
 		technicalErr := fmt.Errorf("печать задания %s на принтере %q: %w", job.ID, h.cfg.Printer.Name, printErr)
 		slog.Error("print job failed", "job_id", job.ID, "printer", h.cfg.Printer.Name, "error", printErr)
 		h.notifyErr(technicalErr)
 		h.recordOperation(c.Request.Context(), ophistory.Entry{Operation: "print", JobID: job.ID, Pages: pages, Amount: paidAmount, Success: false, ErrorText: technicalErr.Error()})
+		if paperOut {
+			c.JSON(http.StatusServiceUnavailable, gin.H{
+				"error":           "Извините, в принтере закончилась бумага. Мы уже сообщили специалисту — он скоро всё исправит.",
+				"code":            "paper_empty",
+				"paper_remaining": 0,
+			})
+			return
+		}
+		if paperJam {
+			c.JSON(http.StatusServiceUnavailable, gin.H{
+				"error":  errPrinterFaultBlocked.Error(),
+				"code":   "printer_blocked",
+				"reason": "Замятие бумаги",
+			})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "не удалось отправить на печать: " + printErr.Error()})
 		return
 	}
@@ -398,7 +436,7 @@ func (h *Handler) ExecutePrintJob(c *gin.Context) {
 			slog.Error("print statistics update failed", "job_id", job.ID, "error", err)
 		}
 	}
-	if h.max != nil && !deviceTest {
+	if h.max != nil {
 		h.max.CheckPaperAlert(context.Background())
 	}
 	h.recordOperation(c.Request.Context(), ophistory.Entry{Operation: "print", JobID: job.ID, Pages: pages, Sheets: sheets, Amount: paidAmount, Success: true})
@@ -409,10 +447,37 @@ func (h *Handler) ExecutePrintJob(c *gin.Context) {
 		"ok":      true,
 		"message": "Печать документа завершена",
 		"sheets":  sheets,
-		"pages":   job.Pages,
+		"pages":   quote.Pages,
 		"duplex":  in.Duplex,
 		"copies":  in.Copies,
 	})
+}
+
+func (h *Handler) markPaperEmpty(jobID string) {
+	if _, err := h.settings.SetPaperRemaining(0); err != nil {
+		slog.Error("failed to mark printer paper as empty", "job_id", jobID, "error", err)
+		return
+	}
+	slog.Warn("printer reported paper out; paper balance set to zero", "job_id", jobID)
+}
+
+func (h *Handler) markPrinterFault(jobID, reason string) {
+	if err := h.settings.SetMany(map[string]string{
+		storage.SettingPrinterFaultBlocked: "true",
+		storage.SettingPrinterFaultReason:  reason,
+	}); err != nil {
+		slog.Error("failed to block printer after device fault", "job_id", jobID, "reason", reason, "error", err)
+		return
+	}
+	slog.Warn("printer blocked after device fault", "job_id", jobID, "reason", reason)
+}
+
+func (h *Handler) printerFaultBlocked() bool {
+	values, err := h.settings.GetAll()
+	if err != nil {
+		return false
+	}
+	return storage.SettingEnabled(values, storage.SettingPrinterFaultBlocked, false)
 }
 
 func (h *Handler) paperRemaining() int {
@@ -424,6 +489,9 @@ func (h *Handler) paperRemaining() int {
 }
 
 func (h *Handler) ensurePaper(sheets int) error {
+	if h.printerFaultBlocked() {
+		return errPrinterFaultBlocked
+	}
 	if sheets <= 0 {
 		return nil
 	}

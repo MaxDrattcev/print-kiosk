@@ -24,11 +24,13 @@ const (
 
 type Options struct {
 	Color  bool `json:"color"`
+	Duplex bool `json:"duplex"`
 	Copies int  `json:"copies"`
 }
 
 type Quote struct {
 	Color        bool    `json:"color"`
+	Duplex       bool    `json:"duplex"`
 	Copies       int     `json:"copies"`
 	PricePerCopy float64 `json:"price_per_copy"`
 	Total        float64 `json:"total"`
@@ -40,6 +42,7 @@ type Job struct {
 	Status    Status    `json:"status"`
 	Paid      bool      `json:"paid"`
 	Color     bool      `json:"color"`
+	Duplex    bool      `json:"duplex"`
 	Copies    int       `json:"copies"`
 	CreatedAt time.Time `json:"-"`
 }
@@ -95,12 +98,14 @@ func QuotePrice(opt Options, priceBW, priceColor float64) (Quote, error) {
 	if opt.Color {
 		price = priceColor
 	}
+	effectiveDuplex := opt.Duplex && opt.Copies > 1
 	return Quote{
 		Color:        opt.Color,
+		Duplex:       effectiveDuplex,
 		Copies:       opt.Copies,
 		PricePerCopy: price,
 		Total:        price * float64(opt.Copies),
-		Sheets:       opt.Copies,
+		Sheets:       printjob.PaperSheets(1, opt.Copies, effectiveDuplex),
 	}, nil
 }
 
@@ -115,6 +120,7 @@ func (s *Service) MarkPaid(id string, opt Options) (*Job, error) {
 		opt.Copies = 1
 	}
 	job.Color = opt.Color
+	job.Duplex = opt.Duplex && opt.Copies > 1
 	job.Copies = opt.Copies
 	job.Paid = true
 	job.Status = StatusPaid
@@ -134,6 +140,7 @@ func (s *Service) Execute(id string) (*Job, int, error) {
 		return nil, 0, fmt.Errorf("сначала оплатите копирование")
 	}
 	color := job.Color
+	duplex := job.Duplex
 	copies := job.Copies
 	s.mu.Unlock()
 
@@ -154,6 +161,7 @@ func (s *Service) Execute(id string) (*Job, int, error) {
 	}
 	if err := s.printer.PrintFile(pdfPath, printjob.PrintOptions{
 		Color:  color,
+		Duplex: duplex,
 		Copies: copies,
 	}); err != nil {
 		return nil, 0, fmt.Errorf("не удалось отправить на печать: %w", err)
@@ -163,7 +171,7 @@ func (s *Service) Execute(id string) (*Job, int, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	job.Status = StatusDone
-	return job, copies, nil
+	return job, printjob.PaperSheets(1, copies, duplex), nil
 }
 
 func (s *Service) CompleteTest(id string) (*Job, int, error) {
@@ -177,7 +185,7 @@ func (s *Service) CompleteTest(id string) (*Job, int, error) {
 		return nil, 0, fmt.Errorf("сначала оплатите копирование")
 	}
 	job.Status = StatusDone
-	return job, job.Copies, nil
+	return job, printjob.PaperSheets(1, job.Copies, job.Duplex), nil
 }
 
 func (s *Service) Delete(id string) {

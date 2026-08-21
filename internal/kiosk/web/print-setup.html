@@ -59,15 +59,30 @@
         <h1>Настройки печати</h1>
         <p class="paper-remaining" id="paper-remaining-line">Остаток бумаги: <strong id="paper-remaining">—</strong></p>
 
-        <div class="option-group">
-          <span class="option-label">Стороны</span>
+        <div class="option-group print-pages-group">
+          <span class="option-label">Какие страницы печатать</span>
+          <div class="segmented print-pages-mode">
+            <label><input type="radio" name="pages-mode" value="all" checked><span>Все страницы</span></label>
+            <label><input type="radio" name="pages-mode" value="custom"><span>Выбрать страницы</span></label>
+          </div>
+          <div class="page-range-wrap" id="page-range-wrap" hidden>
+            <label for="page-range">Номера или диапазоны</label>
+            <input id="page-range" type="text" inputmode="none" autocomplete="off" placeholder="Например: 1-3, 6, 9-12">
+            <p>Можно указать отдельные страницы и несколько диапазонов</p>
+            <p class="page-range-error" id="page-range-error" hidden></p>
+          </div>
+        </div>
+
+        <div class="option-group print-option-card" id="duplex-group">
+          <span class="option-label">Стороны печати</span>
           <div class="segmented">
             <label><input type="radio" name="duplex" value="false" checked><span>Односторонняя</span></label>
             <label><input type="radio" name="duplex" value="true"><span>Двухсторонняя</span></label>
           </div>
+          <p class="duplex-note" id="duplex-note" hidden>Для одной страницы доступна только односторонняя печать</p>
         </div>
 
-        <div class="option-group">
+        <div class="option-group print-option-card">
           <span class="option-label">Цветность</span>
           <div class="segmented">
             <label><input type="radio" name="color" value="false" checked><span>Чёрно-белая</span></label>
@@ -75,7 +90,7 @@
           </div>
         </div>
 
-        <div class="option-group" id="orientation-group">
+        <div class="option-group print-option-card" id="orientation-group">
           <span class="option-label">Расположение страниц</span>
           <div class="segmented orientation-segmented">
             <label><input type="radio" name="orientation" value="portrait" checked><span><i class="orientation-icon portrait" aria-hidden="true"></i>Вертикально</span></label>
@@ -84,7 +99,31 @@
           <p class="orientation-note" id="orientation-note">Выбранное расположение применяется ко всем страницам файла</p>
         </div>
 
-        <div class="option-group">
+        <div class="option-group print-option-card scale-option-group">
+          <span class="option-label">Размер на листе</span>
+          <div class="segmented scale-segmented">
+            <label><input type="radio" name="scale" value="fit" checked><span><strong>Вписать целиком</strong><small>Ничего не обрежется</small></span></label>
+            <label><input type="radio" name="scale" value="actual"><span><strong>Размер 100%</strong><small>Края могут обрезаться</small></span></label>
+          </div>
+          <div class="scale-demo" id="scale-demo" data-scale="fit">
+            <div class="scale-demo-stack" aria-hidden="true">
+              <div class="scale-demo-paper">
+                <div class="scale-demo-printable"></div>
+                <div class="scale-demo-content"><i></i><i></i><i></i><i></i><i></i></div>
+                <span class="scale-demo-crop scale-demo-crop--left"></span>
+                <span class="scale-demo-crop scale-demo-crop--right"></span>
+              </div>
+              <span class="scale-demo-mode">ВСЯ СТРАНИЦА</span>
+            </div>
+            <div class="scale-demo-copy">
+              <strong id="scale-demo-title">Вся страница поместится на листе</strong>
+              <p id="scale-demo-text">Документ уменьшится только при необходимости, содержимое останется целиком.</p>
+              <span id="scale-demo-pages">Настройка применяется ко всем страницам</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="option-group print-option-card copies-option-group">
           <span class="option-label">Количество копий</span>
           <div class="copies-row">
             <button type="button" class="round-btn" id="copies-minus">−</button>
@@ -145,6 +184,18 @@
     </div>
   </dialog>
 
+  <dialog class="modal flow-modal kiosk-sheet usb-reminder-modal" id="usb-reminder-modal">
+    <div class="modal-card usb-reminder-card">
+      <div class="usb-reminder-icon" aria-hidden="true"></div>
+      <p class="usb-reminder-kicker">Последний важный шаг</p>
+      <h2>Не забудьте флешку</h2>
+      <p>Заберите USB-флешку из разъёма терминала.</p>
+      <button type="button" class="primary-btn" id="usb-reminder-done">Я забрал флешку</button>
+      <p class="usb-reminder-countdown">Возврат на главный экран через <strong>15</strong> сек.</p>
+    </div>
+  </dialog>
+
+  <script src="/static/keyboard.js"></script>
   <script src="/static/ui.js"></script>
   <script src="/static/payment.js"></script>
   <script>
@@ -162,6 +213,10 @@
     let prices = { bw: 0, color: 0 };
     let busy = false;
     let lastSheets = 0;
+    let quoteValid = false;
+    let quoteTimer = null;
+
+    KioskKeyboard.bind(document.getElementById('page-range-wrap'));
 
     function usbBrowseHref() {
       if (!usbPath) return '/print/usb/browse/';
@@ -194,6 +249,38 @@
     const successKicker = document.getElementById('success-kicker');
     const successCountdown = document.getElementById('success-countdown');
     let successTimer = null;
+    let usbReminderTimer = null;
+    let printCompleted = false;
+
+    const usbReminderModal = document.getElementById('usb-reminder-modal');
+
+    function goHomeAfterUSBReminder() {
+      clearInterval(usbReminderTimer);
+      location.href = '/';
+    }
+
+    function showUSBReminder() {
+      clearInterval(successTimer);
+      if (successModal.open) successModal.close();
+      if (!usbReminderModal.open) usbReminderModal.showModal();
+      clearInterval(usbReminderTimer);
+      let left = 15;
+      const number = usbReminderModal.querySelector('.usb-reminder-countdown strong');
+      number.textContent = left;
+      usbReminderTimer = setInterval(() => {
+        left -= 1;
+        number.textContent = Math.max(0, left);
+        if (left <= 0) goHomeAfterUSBReminder();
+      }, 1000);
+    }
+
+    function finishSession() {
+      if (printCompleted && fromSource === 'usb') {
+        showUSBReminder();
+        return;
+      }
+      location.href = '/';
+    }
 
     function paperLeft() {
       const n = parseInt(String(prices.paper_remaining || '0'), 10);
@@ -259,7 +346,7 @@
         number.textContent = Math.max(0, left);
         if (left <= 0) {
           clearInterval(successTimer);
-          location.href = '/';
+          finishSession();
         }
       }, 1000);
     }
@@ -288,12 +375,28 @@
       const duplexEl = document.querySelector('input[name="duplex"]:checked');
       const colorEl = document.querySelector('input[name="color"]:checked');
       const orientationEl = document.querySelector('input[name="orientation"]:checked');
+      const scaleEl = document.querySelector('input[name="scale"]:checked');
+      const pagesModeEl = document.querySelector('input[name="pages-mode"]:checked');
       return {
         duplex: duplexEl ? duplexEl.value === 'true' : false,
         color: colorEl ? colorEl.value === 'true' : false,
         copies: Math.max(1, Math.min(100, parseInt(document.getElementById('copies').value, 10) || 1)),
         orientation: orientationEl ? orientationEl.value : 'portrait',
+        page_range: pagesModeEl && pagesModeEl.value === 'custom'
+          ? document.getElementById('page-range').value.trim()
+          : '',
+        scale: scaleEl ? scaleEl.value : 'fit',
       };
+    }
+
+    function updateDuplexAvailability(pageCount) {
+      const onePage = Number(pageCount) <= 1;
+      const simplex = document.querySelector('input[name="duplex"][value="false"]');
+      const duplex = document.querySelector('input[name="duplex"][value="true"]');
+      duplex.disabled = onePage;
+      document.getElementById('duplex-note').hidden = !onePage;
+      document.getElementById('duplex-group').classList.toggle('duplex-unavailable', onePage);
+      if (onePage && duplex.checked) simplex.checked = true;
     }
 
     function renderPreview() {
@@ -311,7 +414,8 @@
         previewFrame.classList.remove('image-preview');
         previewFrame.classList.add('document-preview');
         const iframe = document.createElement('iframe');
-        iframe.src = job.preview_url + '#page=1&zoom=page-width&toolbar=0&navpanes=0';
+        const actualScale = document.querySelector('input[name="scale"]:checked')?.value === 'actual';
+        iframe.src = job.preview_url + '#page=1&zoom=' + (actualScale ? '100' : 'page-width') + '&toolbar=0&navpanes=0';
         iframe.title = job.file_name;
         iframe.scrolling = 'yes';
         previewFrame.appendChild(iframe);
@@ -323,8 +427,10 @@
       if (!job) return;
       const selected = document.querySelector('input[name="orientation"]:checked');
       const landscape = selected && selected.value === 'landscape';
+      const actualScale = document.querySelector('input[name="scale"]:checked')?.value === 'actual';
       previewFrame.classList.toggle('preview-landscape', landscape);
       previewFrame.classList.toggle('preview-portrait', !landscape);
+      previewFrame.classList.toggle('preview-scale-actual', actualScale);
       previewFrame.setAttribute('aria-label', landscape
         ? 'Предпросмотр всех страниц на горизонтальных листах'
         : 'Предпросмотр всех страниц на вертикальных листах');
@@ -338,11 +444,34 @@
       document.getElementById('orientation-visual-text').textContent = landscape
         ? 'Все страницы документа будут напечатаны горизонтально'
         : 'Все страницы документа будут напечатаны вертикально';
+      const scaleDemo = document.getElementById('scale-demo');
+      scaleDemo.dataset.scale = actualScale ? 'actual' : 'fit';
+      scaleDemo.querySelector('.scale-demo-mode').textContent = actualScale
+        ? 'КРАЯ ЗА ЛИСТОМ'
+        : 'ВСЯ СТРАНИЦА';
+      document.getElementById('scale-demo-title').textContent = actualScale
+        ? 'Содержимое печатается в размере 100%'
+        : 'Вся страница поместится на листе';
+      document.getElementById('scale-demo-text').textContent = actualScale
+        ? 'Документ не уменьшается. Части у краёв могут выйти за печатную область.'
+        : 'Документ уменьшится только при необходимости, содержимое останется целиком.';
+      document.getElementById('scale-demo-pages').textContent = job.pages > 1
+        ? 'Применится ко всем ' + job.pages + ' страницам документа'
+        : 'Применится к этой странице';
     }
 
     async function refreshQuote() {
       if (!jobId) return;
       const body = settings();
+      const customPages = document.querySelector('input[name="pages-mode"]:checked')?.value === 'custom';
+      if (customPages && !body.page_range) {
+        quoteValid = false;
+        document.getElementById('pay-btn').disabled = true;
+        const pageError = document.getElementById('page-range-error');
+        pageError.textContent = 'Укажите хотя бы одну страницу';
+        pageError.hidden = false;
+        return;
+      }
       document.getElementById('copies').value = body.copies;
       const res = await fetch('/api/kiosk/print/jobs/' + encodeURIComponent(jobId) + '/quote', {
         method: 'POST',
@@ -351,9 +480,21 @@
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        showError(data.error || 'Не удалось рассчитать цену');
+        quoteValid = false;
+        document.getElementById('pay-btn').disabled = true;
+        const pageError = document.getElementById('page-range-error');
+        if (body.page_range || document.querySelector('input[name="pages-mode"]:checked')?.value === 'custom') {
+          pageError.textContent = data.error || 'Проверьте выбранные страницы';
+          pageError.hidden = false;
+        } else {
+          showError(data.error || 'Не удалось рассчитать цену');
+        }
         return;
       }
+      quoteValid = true;
+      document.getElementById('pay-btn').disabled = false;
+      document.getElementById('page-range-error').hidden = true;
+      updateDuplexAvailability(data.pages);
       document.getElementById('sum-pages').textContent = data.pages + ' × ' + data.copies + ' = ' + (data.pages * data.copies);
       lastSheets = Number(data.sheets != null ? data.sheets : data.pages * data.copies) || 0;
       document.getElementById('sum-sheets').textContent = sheetsLabel(lastSheets);
@@ -405,8 +546,15 @@
       }
       job = data.job;
       prices = data.prices || prices;
+      const naturalOrientation = job.natural_orientation === 'landscape' ? 'landscape' : 'portrait';
+      const naturalOrientationInput = document.querySelector('input[name="orientation"][value="' + naturalOrientation + '"]');
+      if (naturalOrientationInput) naturalOrientationInput.checked = true;
       document.getElementById('file-name').textContent = job.file_name;
       document.getElementById('page-count').textContent = job.pages + ' стр.';
+      updateDuplexAvailability(job.pages);
+      if (job.pages <= 1) {
+        document.querySelector('input[name="pages-mode"][value="custom"]').disabled = true;
+      }
       document.getElementById('preview-scroll-hint').hidden = job.preview_kind === 'image' || job.pages < 2;
       orientationVisual.hidden = job.preview_kind === 'image';
       if (job.preview_kind !== 'image') {
@@ -426,11 +574,30 @@
       await refreshQuote();
     }
 
-    document.querySelectorAll('input[name="duplex"], input[name="color"], input[name="orientation"]').forEach((el) => {
+    document.querySelectorAll('input[name="duplex"], input[name="color"], input[name="orientation"], input[name="scale"]').forEach((el) => {
       el.addEventListener('change', () => {
-        if (el.name === 'orientation') updatePreviewOrientation();
+        if (el.name === 'scale') renderPreview();
+        else if (el.name === 'orientation') updatePreviewOrientation();
         refreshQuote();
       });
+    });
+    document.querySelectorAll('input[name="pages-mode"]').forEach((el) => {
+      el.addEventListener('change', () => {
+        const custom = el.value === 'custom' && el.checked;
+        document.getElementById('page-range-wrap').hidden = !custom;
+        if (custom) document.getElementById('page-range').focus();
+        refreshQuote();
+      });
+    });
+    document.getElementById('page-range').addEventListener('input', () => {
+      clearTimeout(quoteTimer);
+      quoteTimer = setTimeout(refreshQuote, 350);
+    });
+    document.getElementById('page-range').addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter') return;
+      event.preventDefault();
+      KioskKeyboard.hide();
+      refreshQuote();
     });
     document.getElementById('copies').addEventListener('change', refreshQuote);
     document.getElementById('copies').addEventListener('input', refreshQuote);
@@ -446,7 +613,7 @@
     });
 
     document.getElementById('pay-btn').addEventListener('click', () => {
-      if (busy) return;
+      if (busy || !quoteValid) return;
       errorEl.hidden = true;
       if (!ensureEnoughPaper()) return;
       KioskPayment.open(document.getElementById('sum-total').textContent);
@@ -524,6 +691,7 @@
             }
           }
           const hasMoreFiles = await finishEmailPrintSuccess();
+          printCompleted = true;
           setMagicStage('ready', 'Ваш документ готов!', 'Заберите его из лотка принтера', 'Магия завершена');
           magicProgress.hidden = true;
           successMoreBtn.hidden = !hasMoreFiles;
@@ -565,8 +733,9 @@
 
     successHomeBtn.addEventListener('click', () => {
       clearInterval(successTimer);
-      location.href = '/';
+      finishSession();
     });
+    document.getElementById('usb-reminder-done').addEventListener('click', goHomeAfterUSBReminder);
 
     loadJob();
   </script>

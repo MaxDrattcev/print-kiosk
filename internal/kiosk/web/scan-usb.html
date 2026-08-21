@@ -72,6 +72,17 @@
     </div>
   </dialog>
 
+  <dialog class="modal flow-modal kiosk-sheet usb-reminder-modal" id="usb-reminder-modal">
+    <div class="modal-card usb-reminder-card">
+      <div class="usb-reminder-icon" aria-hidden="true"></div>
+      <p class="usb-reminder-kicker">Последний важный шаг</p>
+      <h2>Не забудьте флешку</h2>
+      <p>Документ сохранён. Заберите USB-флешку из разъёма терминала.</p>
+      <button type="button" class="primary-btn" id="usb-reminder-done">Я забрал флешку</button>
+      <p class="usb-reminder-countdown">Возврат на главный экран через <strong>15</strong> сек.</p>
+    </div>
+  </dialog>
+
   <div class="loading-overlay" id="loading-overlay" hidden>
     <div class="loading-card">
       <div class="spinner" aria-hidden="true"></div>
@@ -91,6 +102,32 @@
     const driveList = document.getElementById('drive-list');
     const successModal = document.getElementById('success-modal');
     const loadingOverlay = document.getElementById('loading-overlay');
+    const usbReminderModal = document.getElementById('usb-reminder-modal');
+    let usbReminderTimer = null;
+
+    function goHomeAfterUSBReminder() {
+      clearInterval(usbReminderTimer);
+      location.href = '/';
+    }
+
+    function showUSBReminder() {
+      if (successModal.open) successModal.close();
+      if (!usbReminderModal.open) usbReminderModal.showModal();
+      clearInterval(usbReminderTimer);
+      let left = 15;
+      const number = usbReminderModal.querySelector('.usb-reminder-countdown strong');
+      number.textContent = left;
+      usbReminderTimer = setInterval(() => {
+        left -= 1;
+        number.textContent = Math.max(0, left);
+        if (left <= 0) goHomeAfterUSBReminder();
+      }, 1000);
+    }
+
+    successModal.addEventListener('kiosk:auto-home', (event) => {
+      event.preventDefault();
+      showUSBReminder();
+    });
 
     function showError(msg) {
       errorEl.textContent = msg || '';
@@ -193,11 +230,12 @@
     });
 
     document.getElementById('success-home').addEventListener('click', () => {
-      location.href = '/';
+      showUSBReminder();
     });
     document.getElementById('success-more').addEventListener('click', () => {
       location.href = '/scan/';
     });
+    document.getElementById('usb-reminder-done').addEventListener('click', goHomeAfterUSBReminder);
 
     loadJob();
   </script>

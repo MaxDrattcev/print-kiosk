@@ -27,6 +27,7 @@
     price_bw: "5",
     price_color: "15",
     price_copy: "10",
+    price_copy_color: "15",
     price_scan: "10",
     paper_remaining: "500",
     paper_alert_threshold: "50",
@@ -430,6 +431,10 @@
         testMode.checked = data.printer.dry_run === true;
         testMode.closest(".admin-row")?.classList.toggle("is-config-locked", data.printer.config_dry_run === true);
       }
+      const faultPanel = document.getElementById("printer-fault-panel");
+      const faultReason = document.getElementById("printer-fault-reason");
+      if (faultPanel) faultPanel.hidden = data.printer.blocked !== true;
+      if (faultReason) faultReason.textContent = data.printer.block_reason || "Неисправность принтера";
     }
     setVal("sumatra-status", data.sumatra_found ? "Найден" : "Не найден");
     setVal("libreoffice-status", data.libreoffice_found ? "Найден" : "Не найден");
@@ -805,6 +810,37 @@
     updatePaperStatus(PAPER_CAPACITY);
     successEl.textContent = "Бумага загружена: остаток " + PAPER_CAPACITY + " листов";
     successEl.hidden = false;
+  });
+
+  document.getElementById("printer-unblock-btn").addEventListener("click", () => {
+    document.getElementById("printer-unblock-modal").showModal();
+  });
+  document.getElementById("printer-unblock-cancel").addEventListener("click", () => {
+    document.getElementById("printer-unblock-modal").close();
+  });
+  document.getElementById("printer-unblock-confirm").addEventListener("click", async () => {
+    const modal = document.getElementById("printer-unblock-modal");
+    const button = document.getElementById("printer-unblock-confirm");
+    const errorEl = document.getElementById("error");
+    const successEl = document.getElementById("success");
+    button.disabled = true;
+    const res = await fetch("/api/admin/printer/unblock", {
+      method: "POST",
+      credentials: "same-origin",
+    });
+    const data = await res.json().catch(() => ({}));
+    button.disabled = false;
+    if (!res.ok) {
+      modal.close();
+      errorEl.textContent = userError(data, "Не удалось снять блокировку принтера", res.status);
+      errorEl.hidden = false;
+      return;
+    }
+    modal.close();
+    document.getElementById("printer-fault-panel").hidden = true;
+    successEl.textContent = "Блокировка принтера снята";
+    successEl.hidden = false;
+    await loadOverview();
   });
 
   document.getElementById("settings-form").addEventListener("submit", async (e) => {

@@ -6,7 +6,7 @@
   <title>Настройки копирования — PrintStart</title>
   <link rel="stylesheet" href="/static/style.css">
 </head>
-<body class="kiosk-user">
+<body class="kiosk-user copy-setup-page">
   <div class="screen">
     <header class="app-header app-header--inner">
       <a class="brand" href="/">
@@ -44,6 +44,15 @@
           <label><input type="radio" name="color" value="false" checked><span>Чёрно-белая</span></label>
           <label><input type="radio" name="color" value="true"><span>Цветная</span></label>
         </div>
+      </div>
+
+      <div class="option-group" id="copy-duplex-group">
+        <span class="option-label">Стороны печати</span>
+        <div class="segmented">
+          <label><input type="radio" name="duplex" value="false" checked><span>Односторонняя</span></label>
+          <label><input type="radio" name="duplex" value="true" disabled><span>Двухсторонняя</span></label>
+        </div>
+        <p class="duplex-note" id="copy-duplex-note">Для одной копии доступна только односторонняя печать</p>
       </div>
 
       <div class="option-group">
@@ -173,7 +182,8 @@
     }
 
     function ensureEnoughPaper() {
-      lastSheets = Math.max(1, parseInt(document.getElementById('copies').value, 10) || 1);
+      const current = settings();
+      lastSheets = current.duplex ? Math.ceil(current.copies / 2) : current.copies;
       if (lastSheets > paperLeft()) {
         showPaperModal(lastSheets, paperLeft());
         return false;
@@ -202,12 +212,25 @@
     function settings() {
       return {
         color: document.querySelector('input[name="color"]:checked').value === 'true',
+        duplex: document.querySelector('input[name="duplex"]:checked').value === 'true',
         copies: Math.max(1, Math.min(100, parseInt(document.getElementById('copies').value, 10) || 1)),
       };
     }
 
+    function updateDuplexAvailability() {
+      const copies = Math.max(1, parseInt(document.getElementById('copies').value, 10) || 1);
+      const oneCopy = copies <= 1;
+      const simplex = document.querySelector('input[name="duplex"][value="false"]');
+      const duplex = document.querySelector('input[name="duplex"][value="true"]');
+      duplex.disabled = oneCopy;
+      document.getElementById('copy-duplex-note').hidden = !oneCopy;
+      document.getElementById('copy-duplex-group').classList.toggle('duplex-unavailable', oneCopy);
+      if (oneCopy && duplex.checked) simplex.checked = true;
+    }
+
     async function refreshQuote() {
       if (!jobId) return;
+      updateDuplexAvailability();
       const body = settings();
       document.getElementById('copies').value = body.copies;
       const res = await fetch('/api/kiosk/copy/jobs/' + encodeURIComponent(jobId) + '/quote', {
@@ -221,6 +244,7 @@
         return;
       }
       lastTotal = data.total;
+      lastSheets = Number(data.sheets) || 1;
       document.getElementById('sum-copies').textContent = String(data.copies);
       document.getElementById('sum-page-price').textContent = money(data.price_per_copy);
       document.getElementById('sum-total').textContent = money(data.total);
@@ -245,7 +269,7 @@
       await refreshQuote();
     }
 
-    document.querySelectorAll('input[name="color"]').forEach((el) => {
+    document.querySelectorAll('input[name="color"], input[name="duplex"]').forEach((el) => {
       el.addEventListener('change', refreshQuote);
     });
     document.getElementById('copies').addEventListener('change', refreshQuote);
@@ -253,11 +277,13 @@
     document.getElementById('copies-minus').addEventListener('click', () => {
       const input = document.getElementById('copies');
       input.value = Math.max(1, (parseInt(input.value, 10) || 1) - 1);
+      updateDuplexAvailability();
       refreshQuote();
     });
     document.getElementById('copies-plus').addEventListener('click', () => {
       const input = document.getElementById('copies');
       input.value = Math.min(100, (parseInt(input.value, 10) || 1) + 1);
+      updateDuplexAvailability();
       refreshQuote();
     });
 

@@ -83,6 +83,10 @@ func (r *Repo) AddPrint(revenue float64, pages int, color bool, sheets int) erro
 
 func (r *Repo) AddScan(revenue float64) error { return r.add(revenue, 0, 0, 1, 0, 0, 0) }
 
+// AddRevenue records a payment that is not tied to a newly completed device
+// operation, for example the final surcharge for extra scan pages.
+func (r *Repo) AddRevenue(revenue float64) error { return r.add(revenue, 0, 0, 0, 0, 0, 0) }
+
 func (r *Repo) AddCopy(revenue float64, copies, sheets int, color bool) error {
 	bw, col := copies, 0
 	if color {

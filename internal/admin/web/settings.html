@@ -116,7 +116,11 @@
               </div>
               <label class="admin-field">Чёрно-белая копия
                 <input type="number" step="0.01" min="0" name="price_copy" required>
-                <span class="admin-help">₽ за копию. Цветная копия использует цену цветной печати.</span>
+                <span class="admin-help">₽ за одну чёрно-белую копию</span>
+              </label>
+              <label class="admin-field">Цветная копия
+                <input type="number" step="0.01" min="0" name="price_copy_color" required>
+                <span class="admin-help">₽ за одну цветную копию</span>
               </label>
             </div>
             <div class="admin-card" style="margin-top:12px">
@@ -187,6 +191,13 @@
               <label class="admin-field">Режим
                 <input type="text" id="printer-mode" readonly>
               </label>
+              <div class="printer-fault-panel" id="printer-fault-panel" hidden>
+                <div>
+                  <strong>Печать заблокирована</strong>
+                  <p id="printer-fault-reason">Замятие бумаги</p>
+                </div>
+                <button type="button" id="printer-unblock-btn">Снять блокировку</button>
+              </div>
               <label class="admin-field">SumatraPDF
                 <input type="text" id="sumatra-status" readonly>
               </label>
@@ -379,6 +390,17 @@
       <div class="unsaved-actions">
         <button type="button" class="unsaved-save paper-confirm-yes" id="paper-confirm-yes">Да, бумага загружена</button>
         <button type="button" class="unsaved-cancel" id="paper-confirm-no">Отмена</button>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog class="unsaved-modal" id="printer-unblock-modal">
+    <div class="unsaved-card">
+      <h2>Снять блокировку принтера?</h2>
+      <p>Сначала убедитесь, что замятая бумага извлечена, крышки закрыты и принтер готов продолжить работу.</p>
+      <div class="unsaved-actions">
+        <button type="button" class="unsaved-save" id="printer-unblock-confirm">Да, принтер исправен</button>
+        <button type="button" class="unsaved-cancel" id="printer-unblock-cancel">Отмена</button>
       </div>
     </div>
   </dialog>

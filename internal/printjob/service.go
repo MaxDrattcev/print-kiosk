@@ -2,18 +2,27 @@ package printjob
 
 import (
 	"fmt"
+	"image"
+	_ "image/gif"
+	_ "image/jpeg"
+	_ "image/png"
 	"io"
+	"log/slog"
 	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/pdfcpu/pdfcpu/pkg/api"
+	"github.com/pdfcpu/pdfcpu/pkg/pdfcpu/types"
+	_ "golang.org/x/image/bmp"
+	_ "golang.org/x/image/tiff"
 
 	"print-kiosk/internal/device"
 	"print-kiosk/internal/libreoffice"
@@ -28,11 +37,12 @@ const (
 )
 
 type Job struct {
-	ID          string      `json:"id"`
-	FileName    string      `json:"file_name"`
-	Pages       int         `json:"pages"`
-	PreviewKind PreviewKind `json:"preview_kind"`
-	CreatedAt   time.Time   `json:"created_at"`
+	ID                 string      `json:"id"`
+	FileName           string      `json:"file_name"`
+	Pages              int         `json:"pages"`
+	PreviewKind        PreviewKind `json:"preview_kind"`
+	NaturalOrientation string      `json:"natural_orientation"`
+	CreatedAt          time.Time   `json:"created_at"`
 
 	Dir         string `json:"-"`
 	SourcePath  string `json:"-"`
@@ -44,6 +54,8 @@ type Job struct {
 	Duplex      bool   `json:"-"`
 	Copies      int    `json:"-"`
 	Orientation string `json:"-"`
+	PageRange   string `json:"-"`
+	Scale       string `json:"-"`
 }
 
 type Service struct {
@@ -122,21 +134,76 @@ func (s *Service) PrepareFromLocal(sourcePath, displayName string) (*Job, error)
 		return nil, err
 	}
 
+	naturalOrientation, orientationErr := detectNaturalOrientation(localSource, previewPath, kind)
+	if orientationErr != nil {
+		slog.Warn("could not detect document orientation", "file", displayName, "error", orientationErr)
+		naturalOrientation = "portrait"
+	}
+
 	job := &Job{
-		ID:          id,
-		FileName:    displayName,
-		Pages:       pages,
-		PreviewKind: kind,
-		CreatedAt:   time.Now(),
-		Dir:         dir,
-		SourcePath:  localSource,
-		PreviewPath: previewPath,
+		ID:                 id,
+		FileName:           displayName,
+		Pages:              pages,
+		PreviewKind:        kind,
+		NaturalOrientation: naturalOrientation,
+		CreatedAt:          time.Now(),
+		Dir:                dir,
+		SourcePath:         localSource,
+		PreviewPath:        previewPath,
 	}
 
 	s.mu.Lock()
 	s.jobs[id] = job
 	s.mu.Unlock()
 	return job, nil
+}
+
+func detectNaturalOrientation(sourcePath, previewPath string, kind PreviewKind) (string, error) {
+	if kind == PreviewImage {
+		file, err := os.Open(sourcePath)
+		if err != nil {
+			return "", err
+		}
+		defer file.Close()
+		cfg, _, err := image.DecodeConfig(file)
+		if err != nil {
+			return "", err
+		}
+		if cfg.Width > cfg.Height {
+			return "landscape", nil
+		}
+		return "portrait", nil
+	}
+
+	dims, err := api.PageDimsFile(previewPath)
+	if err != nil {
+		return "", err
+	}
+	return orientationFromDimensions(dims), nil
+}
+
+func orientationFromDimensions(dims []types.Dim) string {
+	landscape, portrait := 0, 0
+	first := "portrait"
+	for i, dim := range dims {
+		orientation := "portrait"
+		if dim.Width > dim.Height {
+			orientation = "landscape"
+			landscape++
+		} else {
+			portrait++
+		}
+		if i == 0 {
+			first = orientation
+		}
+	}
+	if landscape == portrait {
+		return first
+	}
+	if landscape > portrait {
+		return "landscape"
+	}
+	return "portrait"
 }
 
 func (s *Service) Get(id string) (*Job, bool) {
@@ -172,6 +239,8 @@ type QuoteInput struct {
 	Duplex      bool   `json:"duplex"`
 	Copies      int    `json:"copies"`
 	Orientation string `json:"orientation,omitempty"`
+	PageRange   string `json:"page_range,omitempty"`
+	Scale       string `json:"scale,omitempty"`
 }
 
 type Quote struct {
@@ -182,6 +251,8 @@ type Quote struct {
 	Duplex       bool    `json:"duplex"`
 	PricePerPage float64 `json:"price_per_page"`
 	Total        float64 `json:"total"`
+	PageRange    string  `json:"page_range"`
+	Scale        string  `json:"scale"`
 }
 
 func (s *Service) Quote(job *Job, in QuoteInput, priceBW, priceColor float64) (*Quote, error) {
@@ -191,20 +262,106 @@ func (s *Service) Quote(job *Job, in QuoteInput, priceBW, priceColor float64) (*
 	if in.Copies > 100 {
 		return nil, fmt.Errorf("слишком много копий")
 	}
+	selectedPages, normalizedRange, err := ParsePageRange(in.PageRange, job.Pages)
+	if err != nil {
+		return nil, err
+	}
+	scale, err := normalizeScale(in.Scale)
+	if err != nil {
+		return nil, err
+	}
 	price := priceBW
 	if in.Color {
 		price = priceColor
 	}
-	total := float64(job.Pages) * price * float64(in.Copies)
+	pageCount := len(selectedPages)
+	// A one-page document cannot form a duplex sheet. Keep separate copies on
+	// separate sheets instead of placing two copies on opposite sides.
+	effectiveDuplex := in.Duplex && pageCount > 1
+	total := float64(pageCount) * price * float64(in.Copies)
 	return &Quote{
-		Pages:        job.Pages,
-		Sheets:       PaperSheets(job.Pages, in.Copies, in.Duplex),
+		Pages:        pageCount,
+		Sheets:       PaperSheets(pageCount, in.Copies, effectiveDuplex),
 		Copies:       in.Copies,
 		Color:        in.Color,
-		Duplex:       in.Duplex,
+		Duplex:       effectiveDuplex,
 		PricePerPage: price,
 		Total:        total,
+		PageRange:    normalizedRange,
+		Scale:        scale,
 	}, nil
+}
+
+// ParsePageRange validates a user range such as "1-3, 6, 9-12" and returns
+// unique page numbers in document order. An empty range means all pages.
+func ParsePageRange(value string, maxPages int) ([]int, string, error) {
+	if maxPages < 1 {
+		return nil, "", fmt.Errorf("в документе нет страниц")
+	}
+	value = strings.TrimSpace(strings.NewReplacer("–", "-", "—", "-", ";", ",").Replace(value))
+	if value == "" {
+		pages := make([]int, maxPages)
+		for i := range pages {
+			pages[i] = i + 1
+		}
+		return pages, "", nil
+	}
+
+	selected := make(map[int]struct{})
+	for _, part := range strings.FieldsFunc(value, func(r rune) bool { return r == ',' || r == ' ' }) {
+		bounds := strings.Split(part, "-")
+		if len(bounds) > 2 || strings.TrimSpace(bounds[0]) == "" {
+			return nil, "", fmt.Errorf("укажите страницы, например 1-3, 6")
+		}
+		start, err := strconv.Atoi(strings.TrimSpace(bounds[0]))
+		if err != nil {
+			return nil, "", fmt.Errorf("укажите страницы, например 1-3, 6")
+		}
+		end := start
+		if len(bounds) == 2 {
+			if strings.TrimSpace(bounds[1]) == "" {
+				return nil, "", fmt.Errorf("завершите диапазон страниц")
+			}
+			end, err = strconv.Atoi(strings.TrimSpace(bounds[1]))
+			if err != nil {
+				return nil, "", fmt.Errorf("укажите страницы, например 1-3, 6")
+			}
+		}
+		if start < 1 || end < start || end > maxPages {
+			return nil, "", fmt.Errorf("страницы должны быть от 1 до %d", maxPages)
+		}
+		for page := start; page <= end; page++ {
+			selected[page] = struct{}{}
+		}
+	}
+	if len(selected) == 0 {
+		return nil, "", fmt.Errorf("выберите хотя бы одну страницу")
+	}
+	pages := make([]int, 0, len(selected))
+	for page := 1; page <= maxPages; page++ {
+		if _, ok := selected[page]; ok {
+			pages = append(pages, page)
+		}
+	}
+	return pages, compactPageRange(pages), nil
+}
+
+func compactPageRange(pages []int) string {
+	parts := make([]string, 0, len(pages))
+	for i := 0; i < len(pages); {
+		start, end := pages[i], pages[i]
+		for i+1 < len(pages) && pages[i+1] == end+1 {
+			i++
+			end = pages[i]
+		}
+		if start == end {
+			parts = append(parts, strconv.Itoa(start))
+		} else {
+			parts = append(parts, strconv.Itoa(start)+"-"+strconv.Itoa(end))
+		}
+		i++
+	}
+	return strings.Join(parts, ",")
 }
 
 // PaperSheets returns physical sheets used.
@@ -236,9 +393,12 @@ func (s *Service) LockOptions(job *Job, in QuoteInput) {
 	}
 	job.Paid = true
 	job.Color = in.Color
-	job.Duplex = in.Duplex
+	selectedPages, _, _ := ParsePageRange(in.PageRange, job.Pages)
+	job.Duplex = in.Duplex && len(selectedPages) > 1
 	job.Copies = copies
 	job.Orientation = normalizeOrientation(in.Orientation)
+	_, job.PageRange, _ = ParsePageRange(in.PageRange, job.Pages)
+	job.Scale, _ = normalizeScale(in.Scale)
 }
 
 // LockedOptions returns paid print options when available.
@@ -251,6 +411,8 @@ func (s *Service) LockedOptions(job *Job) (QuoteInput, bool) {
 		Duplex:      job.Duplex,
 		Copies:      job.Copies,
 		Orientation: job.Orientation,
+		PageRange:   job.PageRange,
+		Scale:       job.Scale,
 	}, true
 }
 
@@ -259,6 +421,17 @@ func normalizeOrientation(value string) string {
 		return "landscape"
 	}
 	return "portrait"
+}
+
+func normalizeScale(value string) (string, error) {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "", "fit":
+		return "fit", nil
+	case "actual":
+		return "actual", nil
+	default:
+		return "", fmt.Errorf("неизвестный режим масштабирования")
+	}
 }
 
 func (s *Service) buildPreview(sourcePath, dir string) (string, PreviewKind, int, error) {

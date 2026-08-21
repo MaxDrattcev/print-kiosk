@@ -11,6 +11,7 @@ import (
 	"unicode"
 
 	"github.com/google/uuid"
+	"github.com/pdfcpu/pdfcpu/pkg/api"
 
 	"print-kiosk/internal/usb"
 )
@@ -27,15 +28,29 @@ const (
 )
 
 type Job struct {
-	ID           string  `json:"id"`
-	Status       Status  `json:"status"`
-	Paid         bool    `json:"paid"`
-	FileName     string  `json:"file_name"`
-	ScanPath     string  `json:"-"`
-	SavedPath    string  `json:"saved_path,omitempty"`
-	SentToEmail  string  `json:"sent_to_email,omitempty"`
-	PricePerScan float64 `json:"price"`
-	CreatedAt    time.Time
+	ID             string  `json:"id"`
+	Status         Status  `json:"status"`
+	Paid           bool    `json:"paid"`
+	FileName       string  `json:"file_name"`
+	ScanPath       string  `json:"-"`
+	SavedPath      string  `json:"saved_path,omitempty"`
+	SentToEmail    string  `json:"sent_to_email,omitempty"`
+	PricePerScan   float64 `json:"price"`
+	Pages          []Page  `json:"pages"`
+	PaidPages      int     `json:"paid_pages"`
+	PaidAmount     float64 `json:"paid_amount"`
+	paymentPending int
+	CreatedAt      time.Time
+}
+
+type Page struct {
+	ID   string `json:"id"`
+	Path string `json:"-"`
+}
+
+type PaymentReservation struct {
+	Pages  int
+	Amount float64
 }
 
 type Service struct {
@@ -81,6 +96,7 @@ func (s *Service) Create(price float64) (*Job, error) {
 }
 
 const fileNameCounterWindow = 10 * time.Minute
+const MaxPages = 30
 
 // nextDefaultFileName numbers scans within a ten-minute series. The next
 // series starts again at File_1, making the suggested name short and familiar.
@@ -102,26 +118,78 @@ func (s *Service) Get(id string) (*Job, bool) {
 }
 
 func (s *Service) MarkPaid(id string) (*Job, error) {
-	job, err := s.mustGet(id)
+	reservation, err := s.ReservePayment(id)
 	if err != nil {
 		return nil, err
 	}
+	return s.CommitPayment(id, reservation.Pages)
+}
+
+// ReservePayment atomically reserves only pages that have not been paid for.
+// An empty session always reserves the first page before the scanner starts.
+func (s *Service) ReservePayment(id string) (PaymentReservation, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	job.Paid = true
-	job.Status = StatusPaid
+	job, ok := s.jobs[id]
+	if !ok {
+		return PaymentReservation{}, fmt.Errorf("заказ не найден")
+	}
+	if job.paymentPending > 0 {
+		return PaymentReservation{}, fmt.Errorf("оплата уже выполняется")
+	}
+	target := len(job.Pages)
+	if target < 1 {
+		target = 1
+	}
+	missing := target - job.PaidPages
+	if missing <= 0 {
+		return PaymentReservation{}, fmt.Errorf("все страницы уже оплачены")
+	}
+	job.paymentPending = missing
+	return PaymentReservation{Pages: missing, Amount: float64(missing) * job.PricePerScan}, nil
+}
+
+func (s *Service) CommitPayment(id string, pages int) (*Job, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	job, ok := s.jobs[id]
+	if !ok {
+		return nil, fmt.Errorf("заказ не найден")
+	}
+	if pages < 1 || job.paymentPending != pages {
+		return nil, fmt.Errorf("платёжная сессия устарела")
+	}
+	job.paymentPending = 0
+	job.PaidPages += pages
+	job.PaidAmount += float64(pages) * job.PricePerScan
+	job.Paid = job.PaidPages > 0
+	if len(job.Pages) == 0 {
+		job.Status = StatusPaid
+	}
 	return job, nil
 }
 
+func (s *Service) CancelPayment(id string) {
+	s.mu.Lock()
+	if job, ok := s.jobs[id]; ok {
+		job.paymentPending = 0
+	}
+	s.mu.Unlock()
+}
+
 func (s *Service) Scan(id string) (*Job, error) {
-	return s.scan(id, s.dryRun)
+	return s.scan(id, -1, s.dryRun)
 }
 
 func (s *Service) ScanTest(id string) (*Job, error) {
-	return s.scan(id, true)
+	return s.scan(id, -1, true)
 }
 
-func (s *Service) scan(id string, dryRun bool) (*Job, error) {
+func (s *Service) ScanPage(id string, replaceIndex int, dryRun bool) (*Job, error) {
+	return s.scan(id, replaceIndex, dryRun)
+}
+
+func (s *Service) scan(id string, replaceIndex int, dryRun bool) (*Job, error) {
 	job, err := s.mustGet(id)
 	if err != nil {
 		return nil, err
@@ -129,18 +197,97 @@ func (s *Service) scan(id string, dryRun bool) (*Job, error) {
 	if !job.Paid {
 		return nil, fmt.Errorf("сначала оплатите сканирование")
 	}
+	if replaceIndex >= len(job.Pages) {
+		return nil, fmt.Errorf("страница не найдена")
+	}
+	if replaceIndex < 0 && len(job.Pages) >= MaxPages {
+		return nil, fmt.Errorf("в одном документе можно сохранить не более %d страниц", MaxPages)
+	}
 
 	dir := filepath.Join(s.jobsDir, id)
-	out := filepath.Join(dir, "scan.pdf")
+	pagesDir := filepath.Join(dir, "pages")
+	if err := os.MkdirAll(pagesDir, 0o755); err != nil {
+		return nil, err
+	}
+	pageID := uuid.NewString()
+	out := filepath.Join(pagesDir, pageID+".pdf")
 	if err := performScan(out, dryRun); err != nil {
 		return nil, err
 	}
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	job.ScanPath = out
+	oldPages := append([]Page(nil), job.Pages...)
+	newPage := Page{ID: pageID, Path: out}
+	var replacedPath string
+	if replaceIndex >= 0 {
+		replacedPath = job.Pages[replaceIndex].Path
+		job.Pages[replaceIndex] = newPage
+	} else {
+		job.Pages = append(job.Pages, newPage)
+	}
+	if err := s.rebuildPDF(job); err != nil {
+		job.Pages = oldPages
+		_ = os.Remove(out)
+		return nil, err
+	}
+	if replacedPath != "" {
+		_ = os.Remove(replacedPath)
+	}
 	job.Status = StatusScanned
 	return job, nil
+}
+
+func (s *Service) DeletePage(id string, index int) (*Job, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	job, ok := s.jobs[id]
+	if !ok {
+		return nil, fmt.Errorf("заказ не найден")
+	}
+	if index < 0 || index >= len(job.Pages) {
+		return nil, fmt.Errorf("страница не найдена")
+	}
+	removed := job.Pages[index]
+	oldPages := append([]Page(nil), job.Pages...)
+	job.Pages = append(job.Pages[:index:index], job.Pages[index+1:]...)
+	if err := s.rebuildPDF(job); err != nil {
+		job.Pages = oldPages
+		return nil, err
+	}
+	_ = os.Remove(removed.Path)
+	if len(job.Pages) == 0 {
+		job.Status = StatusPaid
+	} else {
+		job.Status = StatusScanned
+	}
+	return job, nil
+}
+
+func (s *Service) rebuildPDF(job *Job) error {
+	combined := filepath.Join(s.jobsDir, job.ID, "scan.pdf")
+	if len(job.Pages) == 0 {
+		_ = os.Remove(combined)
+		job.ScanPath = ""
+		return nil
+	}
+	inputs := make([]string, 0, len(job.Pages))
+	for _, page := range job.Pages {
+		inputs = append(inputs, page.Path)
+	}
+	tmp := filepath.Join(s.jobsDir, job.ID, "scan-"+uuid.NewString()+".pdf")
+	if err := api.MergeCreateFile(inputs, tmp, false, nil); err != nil {
+		_ = os.Remove(tmp)
+		return fmt.Errorf("собрать PDF: %w", err)
+	}
+	// Windows does not replace an existing destination with os.Rename.
+	_ = os.Remove(combined)
+	if err := os.Rename(tmp, combined); err != nil {
+		_ = os.Remove(tmp)
+		return fmt.Errorf("сохранить PDF: %w", err)
+	}
+	job.ScanPath = combined
+	return nil
 }
 
 func (s *Service) SetName(id, name string) (*Job, error) {
@@ -150,6 +297,9 @@ func (s *Service) SetName(id, name string) (*Job, error) {
 	}
 	if job.Status != StatusScanned && job.Status != StatusNamed {
 		return nil, fmt.Errorf("сначала выполните сканирование")
+	}
+	if job.PaidPages < len(job.Pages) {
+		return nil, fmt.Errorf("сначала оплатите дополнительные страницы")
 	}
 	clean, err := sanitizeFileName(name)
 	if err != nil {
@@ -244,6 +394,9 @@ func (s *Service) ReadyForDelivery(id string) (scanPath, fileName string, err er
 	if job.ScanPath == "" {
 		return "", "", fmt.Errorf("файл скана ещё не готов")
 	}
+	if job.PaidPages < len(job.Pages) {
+		return "", "", fmt.Errorf("сначала оплатите дополнительные страницы")
+	}
 	if strings.TrimSpace(job.FileName) == "" {
 		return "", "", fmt.Errorf("укажите имя файла")
 	}
@@ -259,6 +412,17 @@ func (s *Service) PreviewPath(id string) (string, error) {
 		return "", fmt.Errorf("превью ещё не готово")
 	}
 	return job.ScanPath, nil
+}
+
+func (s *Service) PagePreviewPath(id string, index int) (string, error) {
+	job, err := s.mustGet(id)
+	if err != nil {
+		return "", err
+	}
+	if index < 0 || index >= len(job.Pages) {
+		return "", fmt.Errorf("страница не найдена")
+	}
+	return job.Pages[index].Path, nil
 }
 
 func (s *Service) mustGet(id string) (*Job, error) {

@@ -5,9 +5,12 @@ const (
 	SettingPriceBW                   = "price_bw"
 	SettingPriceColor                = "price_color"
 	SettingPriceCopy                 = "price_copy"
+	SettingPriceCopyColor            = "price_copy_color"
 	SettingPriceScan                 = "price_scan"
 	SettingPaperRemaining            = "paper_remaining"
 	SettingPaperAlertThreshold       = "paper_alert_threshold"
+	SettingPrinterFaultBlocked       = "printer_fault_blocked"
+	SettingPrinterFaultReason        = "printer_fault_reason"
 	SettingTelegramHeartbeatInterval = "telegram_heartbeat_interval" // legacy, unused
 	SettingTelegramCartridgeAlerts   = "telegram_cartridge_alerts"   // legacy
 	SettingMaxEnabled                = "max_enabled"
