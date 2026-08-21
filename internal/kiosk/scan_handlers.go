@@ -2,14 +2,17 @@ package kiosk
 
 import (
 	"errors"
+	"log/slog"
 	"net/http"
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
 	"print-kiosk/internal/mailout"
+	"print-kiosk/internal/ophistory"
 	"print-kiosk/internal/scanjob"
 	"print-kiosk/internal/storage"
 )
@@ -58,7 +61,8 @@ type scanPayRequest struct {
 }
 
 func (h *Handler) PayScanJob(c *gin.Context) {
-	if _, ok := h.scans.Get(c.Param("id")); !ok {
+	existingJob, ok := h.scans.Get(c.Param("id"))
+	if !ok {
 		c.JSON(http.StatusNotFound, gin.H{"error": "заказ не найден"})
 		return
 	}
@@ -66,7 +70,7 @@ func (h *Handler) PayScanJob(c *gin.Context) {
 	var in scanPayRequest
 	_ = c.ShouldBindJSON(&in)
 
-	if err := simulatePayment(in.Method); err != nil {
+	if err := h.processPayment(c.Request.Context(), in.Method, existingJob.PricePerScan, existingJob.ID); err != nil {
 		if errors.Is(err, errPaymentQR) {
 			c.JSON(http.StatusNotImplemented, gin.H{"error": err.Error()})
 			return
@@ -80,9 +84,6 @@ func (h *Handler) PayScanJob(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	if h.stats != nil {
-		_ = h.stats.AddScan(job.PricePerScan)
-	}
 	c.JSON(http.StatusOK, gin.H{
 		"ok":      true,
 		"paid":    true,
@@ -93,12 +94,35 @@ func (h *Handler) PayScanJob(c *gin.Context) {
 }
 
 func (h *Handler) ExecuteScanJob(c *gin.Context) {
-	job, err := h.scans.Scan(c.Param("id"))
+	original, _ := h.scans.Get(c.Param("id"))
+	paidAmount := 0.0
+	if original != nil && !h.testPaymentMode() {
+		paidAmount = original.PricePerScan
+	}
+	var job *scanjob.Job
+	var err error
+	if h.testDeviceMode() {
+		time.Sleep(10 * time.Second)
+		job, err = h.scans.ScanTest(c.Param("id"))
+	} else {
+		job, err = h.scans.Scan(c.Param("id"))
+	}
 	if err != nil {
 		h.notifyErr(err)
+		h.recordOperation(c.Request.Context(), ophistory.Entry{Operation: "scan", JobID: c.Param("id"), Amount: paidAmount, Success: false, ErrorText: err.Error()})
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	if h.stats != nil {
+		revenue := job.PricePerScan
+		if h.testPaymentMode() {
+			revenue = 0
+		}
+		if err := h.stats.AddScan(revenue); err != nil {
+			slog.Error("scan statistics update failed", "job_id", job.ID, "error", err)
+		}
+	}
+	h.recordOperation(c.Request.Context(), ophistory.Entry{Operation: "scan", JobID: job.ID, Pages: 1, Amount: paidAmount, Success: true})
 	c.JSON(http.StatusOK, gin.H{
 		"ok":      true,
 		"message": "Документ отсканирован",

@@ -24,8 +24,26 @@ Print Kiosk — Windows deploy
    The start page opens fullscreen in Edge/Chrome (kiosk, no address bar).
    Exit the browser with Alt+F4.
 
-5) Kiosk: http://127.0.0.1:8080/
+5) Automatic startup with Windows 11:
+   - Run install-autostart.bat once under the Windows account used by the kiosk.
+   - It creates a shortcut in that account's Startup folder and starts the kiosk.
+   - After the next Windows sign-in, the server and fullscreen browser open automatically.
+   - To disable automatic startup, run uninstall-autostart.bat.
+
+6) Kiosk: http://127.0.0.1:8080/
    Admin: http://127.0.0.1:8080/admin/
+
+Touch gestures:
+   - The app launches Edge/Chrome with browser navigation swipes, pull-to-refresh,
+     elastic overscroll and pinch zoom disabled on public and specialist pages.
+   - Vertical scrolling inside the kiosk remains enabled (files, previews, settings).
+   - Only an authenticated specialist can use "Свернуть окно" in the cabinet.
+     On normal app shutdown the browser window opened by Print Kiosk is also closed.
+   - These protections apply to Chromium gestures. They do not change Windows registry.
+   - To also block Windows shell gestures (Task View, Start, notifications), configure
+     Windows 11 Assigned Access for Microsoft Edge and use a separate specialist account.
+     This is an operating-system policy and intentionally is not toggled by the app: a
+     crash or power loss must never leave the maintenance desktop permanently locked.
 
 CI: each push builds artifact "print-kiosk-windows-amd64"
 (Actions → latest run → Artifacts).

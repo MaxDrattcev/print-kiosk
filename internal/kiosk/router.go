@@ -1,7 +1,6 @@
 package kiosk
 
 import (
-	"database/sql"
 	"embed"
 	"fmt"
 	"io/fs"
@@ -16,6 +15,7 @@ import (
 	"print-kiosk/internal/copyjob"
 	"print-kiosk/internal/mailinbox"
 	"print-kiosk/internal/maxsvc"
+	"print-kiosk/internal/ophistory"
 	"print-kiosk/internal/printjob"
 	"print-kiosk/internal/scanjob"
 	"print-kiosk/internal/stats"
@@ -25,7 +25,7 @@ import (
 //go:embed web/*
 var webFS embed.FS
 
-func RegisterRoutes(r *gin.Engine, cfg *config.Config, settings *storage.SettingsRepo, db *sql.DB) (*maxsvc.Service, error) {
+func RegisterRoutes(r *gin.Engine, cfg *config.Config, settings *storage.SettingsRepo, st *stats.Repo, history *ophistory.Repo) (*maxsvc.Service, *printjob.Service, error) {
 	jobs, err := printjob.NewService(printjob.Options{
 		JobsDir:         cfg.Paths.PrintJobs,
 		LibreOfficePath: cfg.Paths.LibreOffice,
@@ -34,31 +34,30 @@ func RegisterRoutes(r *gin.Engine, cfg *config.Config, settings *storage.Setting
 		DryRun:          cfg.Printer.DryRun,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("print jobs: %w", err)
+		return nil, nil, fmt.Errorf("print jobs: %w", err)
 	}
 
 	scans, err := scanjob.NewService(cfg.ScanJobsDir(), cfg.Printer.DryRun)
 	if err != nil {
-		return nil, fmt.Errorf("scan jobs: %w", err)
+		return nil, nil, fmt.Errorf("scan jobs: %w", err)
 	}
 
 	copies, err := copyjob.NewService(filepath.Join(cfg.DataRoot(), "copy-jobs"), jobs, cfg.Printer.DryRun)
 	if err != nil {
-		return nil, fmt.Errorf("copy jobs: %w", err)
+		return nil, nil, fmt.Errorf("copy jobs: %w", err)
 	}
 
 	mail, err := mailinbox.NewService(cfg.EmailInboxDir())
 	if err != nil {
-		return nil, fmt.Errorf("email inbox: %w", err)
+		return nil, nil, fmt.Errorf("email inbox: %w", err)
 	}
 
-	st := stats.NewRepo(db)
 	maxSvc, err := maxsvc.New(settings, st, filepath.Join(cfg.DataRoot(), "max-inbox"))
 	if err != nil {
-		return nil, fmt.Errorf("max service: %w", err)
+		return nil, nil, fmt.Errorf("max service: %w", err)
 	}
 
-	h := NewHandler(cfg, settings, jobs, scans, copies, mail, maxSvc, st)
+	h := NewHandler(cfg, settings, jobs, scans, copies, mail, maxSvc, st, history)
 
 	r.GET("/api/kiosk/info", h.Info)
 	r.POST("/api/kiosk/session/end", h.EndSession)
@@ -107,7 +106,7 @@ func RegisterRoutes(r *gin.Engine, cfg *config.Config, settings *storage.Setting
 
 	static, err := fs.Sub(webFS, "web")
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	r.GET("/", func(c *gin.Context) {
@@ -179,7 +178,7 @@ func RegisterRoutes(r *gin.Engine, cfg *config.Config, settings *storage.Setting
 		serveFile(c, static, name)
 	})
 
-	return maxSvc, nil
+	return maxSvc, jobs, nil
 }
 
 func serveFile(c *gin.Context, static fs.FS, name string) {

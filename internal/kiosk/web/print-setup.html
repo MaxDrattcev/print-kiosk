@@ -6,7 +6,7 @@
   <title>Настройка печати</title>
   <link rel="stylesheet" href="/static/style.css">
 </head>
-<body class="kiosk-user">
+<body class="kiosk-user print-setup-page">
   <div class="screen setup-screen">
     <header class="app-header app-header--inner">
       <a class="brand" href="/">
@@ -22,7 +22,6 @@
           <div class="brand-subtitle">Сервис печати</div>
         </div>
       </a>
-      <a class="specialist-link" href="/admin/">Вход для специалиста</a>
     </header>
     <header class="top top-nav">
       <a class="back-btn" id="back-btn" href="/print/usb/browse/">
@@ -39,6 +38,18 @@
           <strong id="file-name">Документ</strong>
           <span id="page-count">—</span>
         </div>
+        <div class="orientation-visual" id="orientation-visual" hidden data-orientation="portrait">
+          <div class="orientation-visual-head">
+            <div>
+              <span class="orientation-visual-kicker">Так листы выйдут из принтера</span>
+              <strong id="orientation-visual-title">Вертикальные страницы</strong>
+            </div>
+            <span class="orientation-visual-badge" id="orientation-visual-badge">A4 · ВЕРТИКАЛЬНО</span>
+          </div>
+          <div class="orientation-sheets" id="orientation-sheets" aria-hidden="true"></div>
+          <p id="orientation-visual-text">Все страницы документа будут напечатаны вертикально</p>
+        </div>
+        <p class="preview-scroll-hint" id="preview-scroll-hint">Листайте документ вниз, чтобы посмотреть следующие страницы</p>
         <div class="preview-frame" id="preview-frame">
           <div class="preview-loading">Подготовка документа…</div>
         </div>
@@ -62,6 +73,15 @@
             <label><input type="radio" name="color" value="false" checked><span>Чёрно-белая</span></label>
             <label><input type="radio" name="color" value="true"><span>Цветная</span></label>
           </div>
+        </div>
+
+        <div class="option-group" id="orientation-group">
+          <span class="option-label">Расположение страниц</span>
+          <div class="segmented orientation-segmented">
+            <label><input type="radio" name="orientation" value="portrait" checked><span><i class="orientation-icon portrait" aria-hidden="true"></i>Вертикально</span></label>
+            <label><input type="radio" name="orientation" value="landscape"><span><i class="orientation-icon landscape" aria-hidden="true"></i>Горизонтально</span></label>
+          </div>
+          <p class="orientation-note" id="orientation-note">Выбранное расположение применяется ко всем страницам файла</p>
         </div>
 
         <div class="option-group">
@@ -94,12 +114,24 @@
   </dialog>
 
   <dialog class="modal flow-modal kiosk-sheet" id="success-modal">
-    <div class="modal-card flow-card success-state">
-      <div class="flow-icon success-icon" aria-hidden="true"></div>
-      <h2 id="success-title">Готово!</h2>
-      <p class="muted" id="success-text">Документ отправлен на печать</p>
-      <button type="button" class="primary-btn" id="success-more" hidden>Печатать ещё документы</button>
-      <button type="button" class="primary-btn" id="success-home" hidden>Вернуться в главное меню</button>
+    <div class="print-magic" id="print-magic" data-stage="paid">
+      <div class="print-magic-glow" aria-hidden="true"></div>
+      <div class="print-magic-art" aria-hidden="true">
+        <div class="print-magic-paid"><span></span></div>
+        <img class="print-magic-paper" src="/static/img/magic-paper.png" alt="">
+        <img class="print-magic-quill" src="/static/img/magic-quill.png" alt="">
+        <img class="print-magic-ready" src="/static/img/print-operation.png" alt="">
+        <div class="print-magic-oops"><span></span></div>
+      </div>
+      <p class="print-magic-kicker" id="success-kicker">Оплата прошла успешно</p>
+      <h2 id="success-title">Начинаем волшебство!</h2>
+      <p id="success-text">Готовим ваш документ к печати</p>
+      <div class="print-magic-progress" id="magic-progress" aria-hidden="true"><span></span><span></span><span></span></div>
+      <div class="print-magic-actions" id="magic-actions" hidden>
+        <button type="button" class="primary-btn" id="success-more">Распечатать ещё</button>
+        <button type="button" class="secondary-btn" id="success-home">Завершить печать</button>
+      </div>
+      <p class="print-magic-countdown" id="success-countdown" hidden>Возврат на главный экран через <strong>15</strong> сек.</p>
     </div>
   </dialog>
 
@@ -151,10 +183,17 @@
 
     const errorEl = document.getElementById('error');
     const previewFrame = document.getElementById('preview-frame');
+    const orientationVisual = document.getElementById('orientation-visual');
     const successModal = document.getElementById('success-modal');
     const paperModal = document.getElementById('paper-modal');
     const successMoreBtn = document.getElementById('success-more');
     const successHomeBtn = document.getElementById('success-home');
+    const magicFlow = document.getElementById('print-magic');
+    const magicActions = document.getElementById('magic-actions');
+    const magicProgress = document.getElementById('magic-progress');
+    const successKicker = document.getElementById('success-kicker');
+    const successCountdown = document.getElementById('success-countdown');
+    let successTimer = null;
 
     function paperLeft() {
       const n = parseInt(String(prices.paper_remaining || '0'), 10);
@@ -179,20 +218,17 @@
       return true;
     }
 
-    function showSuccessActions(showMore) {
-      successMoreBtn.hidden = !showMore;
-      successHomeBtn.className = showMore ? 'secondary-btn' : 'primary-btn';
-      successHomeBtn.hidden = false;
+    function setMagicStage(stage, title, text, kicker) {
+      magicFlow.dataset.stage = stage;
+      document.getElementById('success-title').textContent = title;
+      document.getElementById('success-text').textContent = text;
+      successKicker.textContent = kicker || 'Печатаем ваш документ';
     }
 
     async function finishEmailPrintSuccess() {
-      if (!isInbox) {
-        showSuccessActions(true);
-        return;
-      }
+      if (!isInbox) return true;
       if (!emailSessionId || !emailFileId) {
-        showSuccessActions(false);
-        return;
+        return false;
       }
       const printedURL = fromSource === 'max'
         ? '/api/kiosk/max/print/sessions/' + encodeURIComponent(emailSessionId) + '/printed'
@@ -205,17 +241,38 @@
         });
         const markData = await markRes.json().catch(() => ({}));
         const remaining = markRes.ok ? Number(markData.session && markData.session.remaining || 0) : 0;
-        if (remaining > 0) {
-          document.getElementById('success-text').textContent =
-            (document.getElementById('success-text').textContent || '') +
-            ' Ещё есть документы (' + remaining + ').';
-          showSuccessActions(true);
-          return;
-        }
+        if (remaining > 0) return true;
       } catch (e) {
         // fall through to home-only
       }
-      showSuccessActions(false);
+      return false;
+    }
+
+    function startSuccessCountdown() {
+      clearInterval(successTimer);
+      let left = 15;
+      const number = successCountdown.querySelector('strong');
+      number.textContent = left;
+      successCountdown.hidden = false;
+      successTimer = setInterval(() => {
+        left -= 1;
+        number.textContent = Math.max(0, left);
+        if (left <= 0) {
+          clearInterval(successTimer);
+          location.href = '/';
+        }
+      }, 1000);
+    }
+
+    function showMagicFailure() {
+      setMagicStage('error', 'Упс, что-то пошло не так',
+        'Специалисты уже получили сообщение и устраняют проблему',
+        'Не переживайте');
+      magicProgress.hidden = true;
+      successMoreBtn.hidden = true;
+      successHomeBtn.textContent = 'На главный экран';
+      magicActions.hidden = false;
+      startSuccessCountdown();
     }
 
     function showError(msg) {
@@ -230,10 +287,12 @@
     function settings() {
       const duplexEl = document.querySelector('input[name="duplex"]:checked');
       const colorEl = document.querySelector('input[name="color"]:checked');
+      const orientationEl = document.querySelector('input[name="orientation"]:checked');
       return {
         duplex: duplexEl ? duplexEl.value === 'true' : false,
         color: colorEl ? colorEl.value === 'true' : false,
         copies: Math.max(1, Math.min(100, parseInt(document.getElementById('copies').value, 10) || 1)),
+        orientation: orientationEl ? orientationEl.value : 'portrait',
       };
     }
 
@@ -241,16 +300,44 @@
       previewFrame.innerHTML = '';
       if (!job) return;
       if (job.preview_kind === 'image') {
+        previewFrame.classList.remove('document-preview');
+        previewFrame.classList.add('image-preview');
         const img = document.createElement('img');
         img.src = job.preview_url;
         img.alt = job.file_name;
         previewFrame.appendChild(img);
+        updatePreviewOrientation();
       } else {
+        previewFrame.classList.remove('image-preview');
+        previewFrame.classList.add('document-preview');
         const iframe = document.createElement('iframe');
-        iframe.src = job.preview_url;
+        iframe.src = job.preview_url + '#page=1&zoom=page-width&toolbar=0&navpanes=0';
         iframe.title = job.file_name;
+        iframe.scrolling = 'yes';
         previewFrame.appendChild(iframe);
+        updatePreviewOrientation();
       }
+    }
+
+    function updatePreviewOrientation() {
+      if (!job) return;
+      const selected = document.querySelector('input[name="orientation"]:checked');
+      const landscape = selected && selected.value === 'landscape';
+      previewFrame.classList.toggle('preview-landscape', landscape);
+      previewFrame.classList.toggle('preview-portrait', !landscape);
+      previewFrame.setAttribute('aria-label', landscape
+        ? 'Предпросмотр всех страниц на горизонтальных листах'
+        : 'Предпросмотр всех страниц на вертикальных листах');
+      orientationVisual.dataset.orientation = landscape ? 'landscape' : 'portrait';
+      document.getElementById('orientation-visual-title').textContent = landscape
+        ? 'Горизонтальные страницы'
+        : 'Вертикальные страницы';
+      document.getElementById('orientation-visual-badge').textContent = landscape
+        ? 'A4 · ГОРИЗОНТАЛЬНО'
+        : 'A4 · ВЕРТИКАЛЬНО';
+      document.getElementById('orientation-visual-text').textContent = landscape
+        ? 'Все страницы документа будут напечатаны горизонтально'
+        : 'Все страницы документа будут напечатаны вертикально';
     }
 
     async function refreshQuote() {
@@ -320,13 +407,30 @@
       prices = data.prices || prices;
       document.getElementById('file-name').textContent = job.file_name;
       document.getElementById('page-count').textContent = job.pages + ' стр.';
+      document.getElementById('preview-scroll-hint').hidden = job.preview_kind === 'image' || job.pages < 2;
+      orientationVisual.hidden = job.preview_kind === 'image';
+      if (job.preview_kind !== 'image') {
+        const shownPages = Math.min(3, Math.max(1, Number(job.pages) || 1));
+        const sheets = [];
+        for (let i = 1; i <= shownPages; i += 1) {
+          const pageNumber = i === 3 && job.pages > 3 ? job.pages : i;
+          const gap = i === 3 && job.pages > 3 ? '<span class="orientation-sheet-more">•••</span>' : '';
+          sheets.push('<div class="orientation-sheet">' + gap +
+            '<span class="orientation-sheet-number">' + pageNumber + '</span>' +
+            '<i></i><i></i><i></i><i></i><i></i></div>');
+        }
+        document.getElementById('orientation-sheets').innerHTML = sheets.join('');
+      }
       setPaperRemaining(prices.paper_remaining);
       renderPreview();
       await refreshQuote();
     }
 
-    document.querySelectorAll('input[name="duplex"], input[name="color"]').forEach((el) => {
-      el.addEventListener('change', refreshQuote);
+    document.querySelectorAll('input[name="duplex"], input[name="color"], input[name="orientation"]').forEach((el) => {
+      el.addEventListener('change', () => {
+        if (el.name === 'orientation') updatePreviewOrientation();
+        refreshQuote();
+      });
     });
     document.getElementById('copies').addEventListener('change', refreshQuote);
     document.getElementById('copies').addEventListener('input', refreshQuote);
@@ -383,30 +487,33 @@
           return;
         }
 
-        document.getElementById('success-title').textContent = 'Оплата прошла успешно';
-        document.getElementById('success-text').textContent = 'Отправляем документ на печать…';
-        successMoreBtn.hidden = true;
-        successHomeBtn.hidden = true;
+        magicActions.hidden = true;
+        successCountdown.hidden = true;
+        magicProgress.hidden = false;
+        setMagicStage('paid', 'Оплата прошла успешно', 'Секунда — и начнём печатать', 'Всё получилось');
         successModal.showModal();
 
-        const printRes = await fetch('/api/kiosk/print/jobs/' + encodeURIComponent(jobId) + '/print', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(settings()),
-        });
+        const paperStage = setTimeout(() => {
+          setMagicStage('paper', 'Берём волшебную бумагу', 'Подбираем чистые листы для вашего документа');
+        }, 2600);
+        const quillStage = setTimeout(() => {
+          setMagicStage('quill', 'Рисуем волшебным пером', 'Буквы и изображения уже появляются на страницах');
+        }, 5200);
+        const [printRes] = await Promise.all([
+          fetch('/api/kiosk/print/jobs/' + encodeURIComponent(jobId) + '/print', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(settings()),
+          }),
+          new Promise((resolve) => setTimeout(resolve, 2500)),
+        ]);
+        clearTimeout(paperStage);
+        clearTimeout(quillStage);
         const printData = await printRes.json().catch(() => ({}));
 
         if (!printRes.ok) {
-          document.getElementById('success-title').textContent = 'Оплата прошла успешно';
-          document.getElementById('success-text').textContent =
-            KioskUI.friendlyError(printData.error || 'Не удалось отправить на печать. Обратитесь к администратору.');
-          successMoreBtn.hidden = true;
-          successHomeBtn.className = 'primary-btn';
-          successHomeBtn.hidden = false;
+          showMagicFailure();
         } else {
-          document.getElementById('success-title').textContent = 'Готово!';
-          document.getElementById('success-text').textContent =
-            printData.message || 'Документ отправлен на печать';
           if (printData.sheets != null) {
             const current = parseInt(String(prices.paper_remaining || '0'), 10);
             if (!Number.isNaN(current)) {
@@ -415,17 +522,30 @@
               setPaperRemaining(next);
             }
           }
-          await finishEmailPrintSuccess();
+          const hasMoreFiles = await finishEmailPrintSuccess();
+          setMagicStage('ready', 'Ваш документ готов!', 'Заберите его из лотка принтера', 'Магия завершена');
+          magicProgress.hidden = true;
+          successMoreBtn.hidden = !hasMoreFiles;
+          successHomeBtn.textContent = isInbox && !hasMoreFiles
+            ? 'Выйти в главное меню'
+            : 'Завершить печать';
+          magicActions.hidden = false;
+          startSuccessCountdown();
         }
       } catch (e) {
         KioskPayment.closeWaiting();
-        showError('Ошибка связи с сервером');
-        busy = false;
-        document.getElementById('pay-btn').disabled = false;
+        if (successModal.open) {
+          showMagicFailure();
+        } else {
+          showError('Ошибка связи с сервером');
+          busy = false;
+          document.getElementById('pay-btn').disabled = false;
+        }
       }
     });
 
     successMoreBtn.addEventListener('click', () => {
+      clearInterval(successTimer);
       if (fromSource === 'max') {
         location.href = emailSessionId
           ? '/print/max/files/?session=' + encodeURIComponent(emailSessionId)
@@ -442,6 +562,7 @@
     });
 
     successHomeBtn.addEventListener('click', () => {
+      clearInterval(successTimer);
       location.href = '/';
     });
 

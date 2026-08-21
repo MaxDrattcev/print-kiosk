@@ -22,7 +22,6 @@
           <div class="brand-subtitle">Сервис печати</div>
         </div>
       </a>
-      <a class="specialist-link" href="/admin/">Вход для специалиста</a>
     </header>
     <header class="top top-nav">
       <a class="back-btn" id="back-btn" href="/scan/delivery/">
@@ -56,12 +55,20 @@
     </div>
   </div>
 
-  <dialog class="modal flow-modal kiosk-sheet" id="success-modal">
-    <div class="modal-card flow-card success-state">
-      <div class="flow-icon success-icon" aria-hidden="true"></div>
-      <h2>Готово!</h2>
-      <p class="muted" id="success-text">Документ отсканирован</p>
-      <button type="button" class="primary-btn" id="success-home">Вернуться в главное меню</button>
+  <dialog class="modal flow-modal kiosk-sheet delivery-success" id="success-modal">
+    <div class="print-magic delivery-magic delivery-magic--max">
+      <div class="print-magic-glow" aria-hidden="true"></div>
+      <div class="print-magic-art delivery-magic-art" aria-hidden="true">
+        <span class="delivery-magic-channel delivery-magic-channel--max"></span>
+      </div>
+      <p class="print-magic-kicker">Магическое послание доставлено</p>
+      <h2>Документ уже в MAX!</h2>
+      <p class="delivery-magic-text" id="success-text">Скан отправлен в MAX</p>
+      <p class="delivery-magic-note">Откройте чат с ботом — файл уже ждёт вас</p>
+      <div class="print-magic-actions">
+        <button type="button" class="primary-btn" id="success-more">Отсканировать ещё</button>
+        <button type="button" class="secondary-btn" id="success-home">Завершить</button>
+      </div>
     </div>
   </dialog>
 
@@ -84,6 +91,7 @@
       location.href = '/scan/delivery/?job=' + encodeURIComponent(jobId || '');
     });
     document.getElementById('success-home').addEventListener('click', () => { location.href = '/'; });
+    document.getElementById('success-more').addEventListener('click', () => { location.href = '/scan/'; });
 
     function showError(msg) {
       errorEl.textContent = msg || '';

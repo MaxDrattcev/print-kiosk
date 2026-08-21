@@ -21,6 +21,8 @@ const (
 	SettingEmailMaxFileSizeMB        = "email_max_file_size_mb"
 	SettingPaymentEnabled            = "payment_enabled"
 	SettingPaymentQREnabled          = "payment_qr_enabled"
+	SettingTestDeviceMode            = "test_device_mode"
+	SettingTestPaymentMode           = "test_payment_mode"
 	SettingSessionTimeoutSec         = "session_timeout_sec"
 	SettingSupportText               = "support_text"
 	SettingServicePrintEnabled       = "service_print_enabled"

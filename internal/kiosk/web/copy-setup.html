@@ -22,7 +22,6 @@
           <div class="brand-subtitle">Сервис печати</div>
         </div>
       </a>
-      <a class="specialist-link" href="/admin/">Вход для специалиста</a>
     </header>
     <header class="top top-nav">
       <a class="back-btn" href="/copy/">
@@ -85,11 +84,23 @@
   </dialog>
 
   <div class="loading-overlay" id="copy-overlay" hidden>
-    <div class="loading-card">
-      <div class="status-illustration scanner-icon" aria-hidden="true"></div>
-      <h2>Копируем документ</h2>
-      <p class="muted">Пожалуйста, не открывайте крышку</p>
-      <div class="progress-indeterminate" aria-hidden="true"></div>
+    <div class="print-magic device-magic copy-magic" id="copy-magic" data-stage="inspect">
+      <div class="print-magic-glow" aria-hidden="true"></div>
+      <div class="print-magic-art" aria-hidden="true">
+        <div class="print-magic-paid"><span></span></div>
+        <span class="device-magic-hat"></span>
+        <img class="print-magic-paper" src="/static/img/magic-paper.png" alt="">
+        <img class="print-magic-quill" src="/static/img/magic-quill.png" alt="">
+        <span class="device-magic-copy-ready"></span>
+      </div>
+      <p class="print-magic-kicker" id="copy-kicker">Магия копирования</p>
+      <h2 id="copy-magic-title">Сейчас посмотрим, что вы принесли</h2>
+      <p id="copy-magic-text">Волшебная шляпа внимательно изучает оригинал</p>
+      <div class="print-magic-progress" id="copy-progress" aria-hidden="true"><span></span><span></span><span></span></div>
+      <div class="print-magic-actions" id="copy-actions" hidden>
+        <button type="button" class="primary-btn" id="copy-magic-more">Скопировать ещё</button>
+        <button type="button" class="secondary-btn" id="copy-magic-home">Завершить копирование</button>
+      </div>
     </div>
   </div>
 
@@ -118,6 +129,12 @@
     const successModal = document.getElementById('success-modal');
     const paperModal = document.getElementById('paper-modal');
     const copyOverlay = document.getElementById('copy-overlay');
+    const copyMagic = document.getElementById('copy-magic');
+    function setCopyStage(stage, title, text) {
+      copyMagic.dataset.stage = stage;
+      document.getElementById('copy-magic-title').textContent = title;
+      document.getElementById('copy-magic-text').textContent = text;
+    }
 
     function showError(msg) {
       KioskUI.setError(errorEl, msg);
@@ -288,22 +305,24 @@
 
         copyOverlay.hidden = false;
         document.body.classList.add('loading-lock');
+        setCopyStage('paid', 'Оплата прошла успешно', 'Всё получилось — начинаем магию копирования');
+        const inspectStage = setTimeout(() => setCopyStage('inspect', 'Сейчас посмотрим, что вы принесли', 'Волшебная шляпа внимательно изучает оригинал'), 2600);
+        const paperStage = setTimeout(() => setCopyStage('paper', 'Готовим волшебную бумагу', 'Чистые листы уже ждут свою копию'), 3800);
+        const quillStage = setTimeout(() => setCopyStage('quill', 'Повторяем всё волшебным пером', 'Переносим каждую строчку и деталь'), 7200);
 
-        const copyRes = await fetch('/api/kiosk/copy/jobs/' + encodeURIComponent(jobId) + '/copy', {
-          method: 'POST',
-        });
+        const [copyRes] = await Promise.all([
+          fetch('/api/kiosk/copy/jobs/' + encodeURIComponent(jobId) + '/copy', { method: 'POST' }),
+          new Promise((resolve) => setTimeout(resolve, 2500)),
+        ]);
         const copyData = await copyRes.json().catch(() => ({}));
-        copyOverlay.hidden = true;
-        document.body.classList.remove('loading-lock');
+        clearTimeout(inspectStage);
+        clearTimeout(paperStage);
+        clearTimeout(quillStage);
 
         if (!copyRes.ok) {
-          document.getElementById('success-title').textContent = 'Оплата прошла успешно';
-          document.getElementById('success-text').textContent =
-            KioskUI.friendlyError(copyData.error || 'Не удалось выполнить копирование. Обратитесь к администратору.');
+          setCopyStage('error', 'Упс, что-то пошло не так', 'Специалисты уже получили сообщение и устраняют проблему');
         } else {
-          document.getElementById('success-title').textContent = 'Готово!';
-          document.getElementById('success-text').textContent =
-            copyData.message || 'Копирование завершено';
+          setCopyStage('ready', 'Ваша копия готова!', 'Заберите документ из лотка принтера');
           if (copyData.sheets != null) {
             const current = parseInt(String(prices.paper_remaining || '0'), 10);
             if (!Number.isNaN(current)) {
@@ -313,7 +332,8 @@
             }
           }
         }
-        successModal.showModal();
+        document.getElementById('copy-progress').hidden = true;
+        document.getElementById('copy-actions').hidden = false;
       } catch (e) {
         KioskPayment.closeWaiting();
         copyOverlay.hidden = true;
@@ -327,6 +347,8 @@
     document.getElementById('success-home').addEventListener('click', () => {
       location.href = '/';
     });
+    document.getElementById('copy-magic-home').addEventListener('click', () => { location.href = '/'; });
+    document.getElementById('copy-magic-more').addEventListener('click', () => { location.href = '/copy/'; });
 
     loadJob();
   </script>

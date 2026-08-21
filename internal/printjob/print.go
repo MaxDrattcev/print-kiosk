@@ -12,9 +12,10 @@ import (
 )
 
 type PrintOptions struct {
-	Color  bool
-	Duplex bool
-	Copies int
+	Color       bool
+	Duplex      bool
+	Copies      int
+	Orientation string
 }
 
 func (s *Service) Print(job *Job, opt PrintOptions) error {
@@ -66,6 +67,11 @@ func printLP(bin, filePath string, opt PrintOptions) error {
 		"-o", "CNUseSecuredPrint=False",
 		"-o", "CNJobExecMode=print",
 	}
+	if opt.Orientation == "landscape" {
+		args = append(args, "-o", "orientation-requested=4")
+	} else if opt.Orientation == "portrait" {
+		args = append(args, "-o", "orientation-requested=3")
+	}
 	if opt.Duplex {
 		args = append(args, "-o", "sides=two-sided-long-edge", "-o", "CNDuplex=DuplexFront")
 	} else {
@@ -83,6 +89,9 @@ func printLP(bin, filePath string, opt PrintOptions) error {
 
 func printLPR(bin, filePath string, opt PrintOptions) error {
 	args := []string{"-#", strconv.Itoa(opt.Copies), "-o", "media=A4"}
+	if opt.Orientation == "landscape" {
+		args = append(args, "-o", "landscape")
+	}
 	if opt.Duplex {
 		args = append(args, "-o", "sides=two-sided-long-edge")
 	} else {
@@ -104,12 +113,21 @@ func (s *Service) printWindows(filePath string, opt PrintOptions) error {
 		return fmt.Errorf("путь файла: %w", err)
 	}
 
+	spoolPrinter, err := resolveWindowsPrinter(s.printerName)
+	if err != nil {
+		return err
+	}
+
 	if sumatra := resolveSumatra(s.sumatraPath); sumatra != "" {
-		return printSumatra(sumatra, abs, s.printerName, opt)
+		return monitorWindowsPrint(spoolPrinter, abs, func() error {
+			return printSumatra(sumatra, abs, s.printerName, opt)
+		})
 	}
 
 	slog.Warn("SumatraPDF не найден, печать через ассоциацию Windows (менее надёжно)")
-	if err := printWindowsShell(abs, s.printerName, opt); err != nil {
+	if err := monitorWindowsPrint(spoolPrinter, abs, func() error {
+		return printWindowsShell(abs, s.printerName, opt)
+	}); err != nil {
 		slog.Warn("windows shell print failed", "error", err)
 		return fmt.Errorf("не найден SumatraPDF. Скачайте SumatraPDF и положите SumatraPDF.exe в папку с киоском")
 	}
@@ -119,6 +137,11 @@ func (s *Service) printWindows(filePath string, opt PrintOptions) error {
 func printSumatra(bin, filePath, printer string, opt PrintOptions) error {
 	// fit — вписать страницу в лист. noscale даёт «только уголок», если PDF не A4.
 	settings := []string{"fit", "paper=A4"}
+	if opt.Orientation == "landscape" {
+		settings = append(settings, "landscape")
+	} else if opt.Orientation == "portrait" {
+		settings = append(settings, "portrait")
+	}
 	if opt.Duplex {
 		settings = append(settings, "duplex")
 	} else {

@@ -39,10 +39,13 @@ type Job struct {
 }
 
 type Service struct {
-	jobsDir string
-	dryRun  bool
-	mu      sync.RWMutex
-	jobs    map[string]*Job
+	jobsDir          string
+	dryRun           bool
+	mu               sync.RWMutex
+	jobs             map[string]*Job
+	fileNameCounter  int
+	counterStartedAt time.Time
+	now              func() time.Time
 }
 
 func NewService(jobsDir string, dryRun bool) (*Service, error) {
@@ -53,6 +56,7 @@ func NewService(jobsDir string, dryRun bool) (*Service, error) {
 		jobsDir: jobsDir,
 		dryRun:  dryRun,
 		jobs:    make(map[string]*Job),
+		now:     time.Now,
 	}, nil
 }
 
@@ -62,17 +66,32 @@ func (s *Service) Create(price float64) (*Job, error) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return nil, err
 	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	now := s.now()
 	job := &Job{
 		ID:           id,
 		Status:       StatusCreated,
-		FileName:     defaultFileName(),
+		FileName:     s.nextDefaultFileName(now),
 		PricePerScan: price,
-		CreatedAt:    time.Now(),
+		CreatedAt:    now,
 	}
-	s.mu.Lock()
 	s.jobs[id] = job
-	s.mu.Unlock()
 	return job, nil
+}
+
+const fileNameCounterWindow = 10 * time.Minute
+
+// nextDefaultFileName numbers scans within a ten-minute series. The next
+// series starts again at File_1, making the suggested name short and familiar.
+// The caller must hold s.mu.
+func (s *Service) nextDefaultFileName(now time.Time) string {
+	if s.counterStartedAt.IsZero() || now.Before(s.counterStartedAt) || now.Sub(s.counterStartedAt) >= fileNameCounterWindow {
+		s.counterStartedAt = now
+		s.fileNameCounter = 0
+	}
+	s.fileNameCounter++
+	return fmt.Sprintf("Файл_%d.pdf", s.fileNameCounter)
 }
 
 func (s *Service) Get(id string) (*Job, bool) {
@@ -95,6 +114,14 @@ func (s *Service) MarkPaid(id string) (*Job, error) {
 }
 
 func (s *Service) Scan(id string) (*Job, error) {
+	return s.scan(id, s.dryRun)
+}
+
+func (s *Service) ScanTest(id string) (*Job, error) {
+	return s.scan(id, true)
+}
+
+func (s *Service) scan(id string, dryRun bool) (*Job, error) {
 	job, err := s.mustGet(id)
 	if err != nil {
 		return nil, err
@@ -105,7 +132,7 @@ func (s *Service) Scan(id string) (*Job, error) {
 
 	dir := filepath.Join(s.jobsDir, id)
 	out := filepath.Join(dir, "scan.pdf")
-	if err := performScan(out, s.dryRun); err != nil {
+	if err := performScan(out, dryRun); err != nil {
 		return nil, err
 	}
 
@@ -242,10 +269,6 @@ func (s *Service) mustGet(id string) (*Job, error) {
 		return nil, fmt.Errorf("заказ не найден")
 	}
 	return job, nil
-}
-
-func defaultFileName() string {
-	return "scan_" + time.Now().Format("20060102_1504") + ".pdf"
 }
 
 var unsafeName = regexp.MustCompile(`[<>:"/\\|?*\x00-\x1f]`)

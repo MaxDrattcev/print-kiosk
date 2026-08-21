@@ -11,6 +11,8 @@ import (
 	"runtime"
 	"strings"
 	"time"
+
+	"print-kiosk/internal/kioskhost"
 )
 
 func publicURL(addr string) string {
@@ -61,7 +63,11 @@ func openBrowser(url string) error {
 		if exe, edge := findWindowsChromium(); exe != "" {
 			args := chromiumKioskArgs(url, profile, edge)
 			cmd := exec.Command(exe, args...)
-			return cmd.Start()
+			if err := cmd.Start(); err != nil {
+				return err
+			}
+			kioskhost.RecordBrowserPID(cmd.Process.Pid)
+			return nil
 		}
 		return exec.Command("cmd", "/c", "start", "", url).Start()
 	case "darwin":
@@ -88,6 +94,10 @@ func chromiumKioskArgs(url, profile string, edge bool) []string {
 		"--disable-session-crashed-bubble",
 		"--disable-infobars",
 		"--disable-translate",
+		"--noerrdialogs",
+		"--disable-pinch",
+		"--overscroll-history-navigation=0",
+		"--disable-features=OverscrollHistoryNavigation,TouchpadOverscrollHistoryNavigation,ElasticOverscroll,PullToRefresh",
 		"--kiosk",
 		"--start-fullscreen",
 	}

@@ -3,19 +3,19 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Админ-панель — PrintStart</title>
+  <title>Кабинет специалиста — PRINTUS</title>
   <link rel="stylesheet" href="/admin/style.css">
 </head>
 <body class="admin-app">
   <div class="admin-shell">
     <aside class="admin-nav">
-      <div class="admin-nav-brand">PrintStart<span>Администратор</span></div>
+      <div class="admin-nav-brand"><strong>PRINTUS</strong><span>Магия цветной печати</span><small>Кабинет специалиста</small></div>
       <nav class="admin-nav-list" aria-label="Разделы">
         <button type="button" class="admin-nav-item is-active" data-section="overview">Обзор</button>
+        <button type="button" class="admin-nav-item" data-section="history">Выгрузить историю</button>
         <button type="button" class="admin-nav-item" data-section="prices">Цены</button>
         <button type="button" class="admin-nav-item" data-section="paper">Бумага</button>
-        <button type="button" class="admin-nav-item" data-section="print">Печать</button>
-        <button type="button" class="admin-nav-item" data-section="scan">Сканирование</button>
+        <button type="button" class="admin-nav-item" data-section="print">Оборудование</button>
         <button type="button" class="admin-nav-item" data-section="email">Email</button>
         <button type="button" class="admin-nav-item" data-section="max">MAX</button>
         <button type="button" class="admin-nav-item" data-section="payment">Оплата</button>
@@ -32,14 +32,57 @@
         <h1 id="section-title">Обзор</h1>
         <div class="admin-top-actions">
           <p class="unsaved-hint" id="unsaved-hint" hidden>Есть несохранённые изменения</p>
+          <button type="button" class="admin-home admin-minimize" id="minimize-browser">Свернуть окно</button>
           <button type="button" class="admin-home" id="home-link">В меню терминала</button>
         </div>
       </header>
 
       <div class="admin-content">
         <section class="admin-panel" id="panel-overview">
+          <div class="admin-overview-head">
+            <div>
+              <p class="admin-eyebrow">Состояние терминала</p>
+              <h2>Всё важное — одним взглядом</h2>
+              <p>Данные обновляются из backend и подключённых устройств.</p>
+            </div>
+            <button type="button" class="admin-btn secondary" id="refresh-overview">Обновить состояние</button>
+          </div>
           <div class="admin-grid" id="overview-status"></div>
-          <div class="admin-grid" style="margin-top:12px" id="overview-metrics"></div>
+          <div class="admin-statistics">
+            <div class="admin-stat-tabs" role="tablist" aria-label="Период статистики">
+              <button type="button" class="is-active" id="stats-today-btn" data-stats-scope="today" role="tab" aria-selected="true">За сегодня</button>
+              <button type="button" id="stats-total-btn" data-stats-scope="total" role="tab" aria-selected="false">Всего</button>
+            </div>
+            <div class="admin-stat-head">
+              <div>
+                <p class="admin-eyebrow" id="stats-kicker">Текущие сутки</p>
+                <h2 id="stats-title">Статистика за сегодня</h2>
+              </div>
+              <p id="stats-period-note">Новый счётчик начнётся автоматически в 00:00</p>
+            </div>
+            <div class="admin-stats-grid" id="statistics-grid"></div>
+            <button type="button" class="admin-reset-stats" id="reset-statistics-btn">Сбросить статистику за сегодня</button>
+          </div>
+          <div class="admin-section-caption">Информация о точке</div>
+          <div class="admin-grid" id="overview-metrics"></div>
+        </section>
+
+        <section class="admin-panel admin-history" id="panel-history" hidden>
+          <div class="history-hero">
+            <div><p class="admin-eyebrow">Журнал терминала</p><h2>История всех операций</h2><p>Успешные задания и технические ошибки хранятся 30 дней.</p></div>
+            <form class="history-filter" id="history-filter">
+              <label>Последние дней <input id="history-days" type="number" min="1" max="30" value="7" inputmode="numeric"></label>
+              <button class="admin-btn" type="submit">Показать</button>
+            </form>
+          </div>
+          <div class="history-summary" id="history-summary" hidden></div>
+          <div class="history-empty" id="history-empty">Укажите период от 1 до 30 дней и нажмите «Показать».</div>
+          <div class="history-table-wrap" id="history-table-wrap" hidden>
+            <table class="history-table"><thead><tr><th>Дата и время</th><th>Операция</th><th>Страниц</th><th>Листов</th><th>Оплачено</th><th>Результат</th><th>Техническая ошибка</th></tr></thead><tbody id="history-rows"></tbody></table>
+          </div>
+          <div class="history-actions" id="history-actions" hidden>
+            <button type="button" class="admin-btn" id="history-report-btn">Подготовить PDF</button>
+          </div>
         </section>
 
         <form class="settings-form" id="settings-form">
@@ -121,6 +164,20 @@
           </section>
 
           <section class="admin-panel" id="panel-print" hidden>
+            <div class="admin-section-head">
+              <p class="admin-eyebrow">Физические устройства</p>
+              <h2>Оборудование терминала</h2>
+              <p>Фактическое обнаружение устройств показывается в карточках ниже.</p>
+            </div>
+            <div class="admin-card" style="margin-bottom:12px">
+              <div class="admin-row">
+                <div>
+                  <h3>Тестовый режим оборудования</h3>
+                  <p class="admin-muted" style="margin:0">Не обращаться к принтеру и сканеру. Печать, копирование и сканирование имитируются 10 секунд.</p>
+                </div>
+                <label class="admin-toggle"><input type="checkbox" name="test_device_mode" value="true"><span class="admin-toggle-ui"></span></label>
+              </div>
+            </div>
             <div class="admin-card">
               <h2>Принтер</h2>
               <p class="admin-muted">Эти параметры задаются в configs/config.yaml и применяются при запуске приложения.</p>
@@ -146,18 +203,17 @@
                 <label class="admin-toggle"><input type="checkbox" name="source_usb_enabled" value="true"><span class="admin-toggle-ui"></span></label>
               </div>
             </div>
-          </section>
-
-          <section class="admin-panel" id="panel-scan" hidden>
+            <div class="admin-equipment-grid">
             <div class="admin-card">
               <h2>Сканер</h2>
               <p class="admin-status" id="scan-device-status"><i></i> —</p>
               <p class="admin-muted" id="scan-device-help">Сканирование снимает страницу со стекла МФУ (Windows WIA или NAPS2) и сохраняет PDF. В режиме dry_run файл тестовый.</p>
             </div>
-            <div class="admin-card" style="margin-top:12px">
+            <div class="admin-card">
               <h2>Копирование</h2>
               <p class="admin-status" id="copy-device-status"><i></i> —</p>
               <p class="admin-muted" id="copy-device-help">Копия — скан со стекла и печать на ту же очередь, что и обычная печать (SumatraPDF / системный принтер). Цвет и число копий задаёт посетитель.</p>
+            </div>
             </div>
           </section>
 
@@ -214,6 +270,10 @@
               </div>
               <p class="admin-muted">Включение и выключение применяются сразу, без перезапуска приложения.</p>
               <p class="admin-muted" id="max-token-state">Токен бота: не задан</p>
+              <label class="admin-field">Имя бота в MAX
+                <input type="text" id="max-bot-username" value="Проверяем…" readonly>
+                <span class="admin-help">Вводить имя вручную не нужно. Оно определяется автоматически по токену и подставляется пользователям.</span>
+              </label>
               <label class="admin-field">ID админа (user_id)
                 <input type="text" name="max_admin_id" inputmode="numeric" placeholder="например 123456789">
               </label>
@@ -232,10 +292,24 @@
           </section>
 
           <section class="admin-panel" id="panel-payment" hidden>
+            <div class="admin-section-head">
+              <p class="admin-eyebrow">Приём платежей</p>
+              <h2>Платёжный терминал</h2>
+              <p>Тестовый режим переключается сразу. Адрес драйвера задаётся в config.yaml.</p>
+            </div>
             <div class="admin-card">
-              <h2>Режим оплаты</h2>
-              <p class="admin-status warn"><i></i> Тестовый режим</p>
-              <p class="admin-muted">Реальный платёжный терминал пока не подключён. Система имитирует успешную оплату примерно через 5 секунд. Длительность заглушки задана в коде и не настраивается.</p>
+              <div class="admin-row">
+                <div>
+                  <h3>Тестовый режим оплаты</h3>
+                  <p class="admin-muted" style="margin:0">Не обращаться к платёжному терминалу. Успешная оплата имитируется 5 секунд.</p>
+                </div>
+                <label class="admin-toggle"><input type="checkbox" name="test_payment_mode" value="true"><span class="admin-toggle-ui"></span></label>
+              </div>
+              <p class="admin-muted" style="margin-top:12px">Если режим выключен, запрос отправляется в драйвер из <code>payment.driver_url</code>.</p>
+              <label class="admin-field">Адрес платёжного драйвера
+                <input type="text" id="payment-driver-url" readonly>
+                <span class="admin-help">Фактическая связь проверяется при проведении оплаты.</span>
+              </label>
             </div>
           </section>
 
@@ -317,6 +391,59 @@
         <button type="button" class="unsaved-save" id="danger-yes">Подтвердить</button>
         <button type="button" class="unsaved-cancel" id="danger-no">Отмена</button>
       </div>
+    </div>
+  </dialog>
+
+  <dialog class="unsaved-modal" id="stats-reset-modal">
+    <div class="unsaved-card">
+      <p class="admin-eyebrow">Необратимое действие</p>
+      <h2 id="stats-reset-title">Сбросить статистику?</h2>
+      <p id="stats-reset-text"></p>
+      <div class="unsaved-actions">
+        <button type="button" class="unsaved-save stats-reset-confirm" id="stats-reset-yes">Да, сбросить</button>
+        <button type="button" class="unsaved-cancel" id="stats-reset-no">Отмена</button>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog class="unsaved-modal history-print-modal" id="history-print-modal">
+    <div class="unsaved-card">
+      <p class="admin-eyebrow">Бесплатная служебная печать</p>
+      <h2>Какие страницы напечатать?</h2>
+      <p id="history-report-pages">PDF подготовлен.</p>
+      <div class="history-report-preview"><iframe id="history-report-preview" title="Предпросмотр PDF-отчёта"></iframe></div>
+      <div class="history-page-range"><label>С страницы<input type="number" id="history-page-from" min="1" value="1"></label><label>По страницу<input type="number" id="history-page-to" min="1" value="1"></label></div>
+      <p class="error" id="history-print-error" hidden></p>
+      <div class="unsaved-actions">
+        <button type="button" class="unsaved-save" id="history-print-btn">Напечатать бесплатно</button>
+        <button type="button" class="unsaved-discard" id="history-take-btn">Забрать PDF</button>
+        <button type="button" class="unsaved-cancel" id="history-print-cancel">Отмена</button>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog class="unsaved-modal history-delivery-modal" id="history-delivery-modal">
+    <div class="unsaved-card history-delivery-card">
+      <p class="admin-eyebrow">Волшебная выдача отчёта</p>
+      <h2 id="history-delivery-title">Как назвать PDF?</h2>
+      <div id="history-name-step">
+        <label class="admin-field">Название файла<input type="text" id="history-file-name" maxlength="96" inputmode="none"><span class="admin-help">Расширение .pdf добавится автоматически.</span></label>
+        <button type="button" class="admin-btn" id="history-name-next">Продолжить</button>
+      </div>
+      <div id="history-channel-step" hidden>
+        <p class="admin-muted">Выберите, куда отправить готовый отчёт</p>
+        <div class="history-channel-grid">
+          <button type="button" data-history-channel="usb"><strong>На флешку</strong><span>Сохранить в USB</span></button>
+          <button type="button" data-history-channel="email"><strong>По Email</strong><span>Отправить вложением</span></button>
+          <button type="button" data-history-channel="max"><strong>Через MAX</strong><span>Получить в чате</span></button>
+        </div>
+      </div>
+      <div id="history-usb-step" hidden><p class="admin-muted">Вставьте флешку и выберите накопитель</p><div class="history-drive-list" id="history-drive-list"></div></div>
+      <div id="history-email-step" hidden><label class="admin-field">Email получателя<input type="email" id="history-email" inputmode="none" placeholder="name@example.com"></label><button type="button" class="admin-btn" id="history-email-send">Отправить отчёт</button><p class="history-delivery-status" id="history-email-status" hidden>Отправляем письмо, пожалуйста подождите…</p></div>
+      <div id="history-max-step" hidden><p class="admin-muted">Откройте бота MAX и отправьте ему код:</p><strong class="history-max-code" id="history-max-code">…</strong><p id="history-max-bot"></p><p class="admin-muted" id="history-max-status">Ожидаем подтверждение…</p></div>
+      <div class="history-delivery-success" id="history-delivery-success" hidden><div class="history-success-mark">✓</div><h2>Магия сработала!</h2><p id="history-delivery-success-text">Отчёт отправлен.</p><div class="unsaved-actions"><button type="button" class="unsaved-save" id="history-delivery-more">Забрать ещё раз</button><button type="button" class="unsaved-cancel" id="history-delivery-finish">Завершить</button></div></div>
+      <p class="error" id="history-delivery-error" hidden></p>
+      <button type="button" class="unsaved-cancel history-delivery-close" id="history-delivery-close">Закрыть</button>
     </div>
   </dialog>
 

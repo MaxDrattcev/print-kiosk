@@ -22,7 +22,6 @@
           <div class="brand-subtitle">Сервис печати</div>
         </div>
       </a>
-      <a class="specialist-link" href="/admin/">Вход для специалиста</a>
     </header>
     <header class="top top-nav">
       <a class="back-btn" href="/print/max/">
@@ -31,10 +30,20 @@
       </a>
     </header>
 
-    <section class="prompt-card" id="wait-panel">
-      <div class="status-illustration card-terminal" aria-hidden="true"></div>
-      <h1>Ищем ваш файл в MAX…</h1>
-      <p id="status-text">Проверяем сообщения боту. Ожидание до 2 минут.</p>
+    <section class="prompt-card wait-magic-card" id="wait-panel">
+      <div class="wait-magic-art wait-magic-art--max" aria-hidden="true">
+        <span class="wait-magic-glow"></span>
+        <span class="wait-magic-ring wait-magic-ring--one"></span>
+        <span class="wait-magic-ring wait-magic-ring--two"></span>
+        <span class="wait-magic-channel"></span>
+        <span class="wait-magic-page wait-magic-page--one"></span>
+        <span class="wait-magic-page wait-magic-page--two"></span>
+        <span class="wait-magic-page wait-magic-page--three"></span>
+        <span class="wait-magic-sparkles"></span>
+      </div>
+      <p class="wait-magic-kicker">Магический поиск в MAX</p>
+      <h1>Ищем ваш файл…</h1>
+      <p class="wait-magic-phrase" id="status-text">Заглядываем в волшебные сообщения MAX…</p>
       <div class="dots-loader" aria-hidden="true"><span></span><span></span><span></span></div>
       <p class="scan-price" id="countdown" hidden></p>
       <p class="error" id="error" hidden></p>
@@ -67,9 +76,27 @@
     const noBtn = document.getElementById('no-btn');
     let timer = null;
     let countdownTimer = null;
+    let phraseTimer = null;
+    let phraseIndex = 0;
     let stopped = false;
     let deadlineMs = 0;
     let busy = false;
+    const magicPhrases = [
+      'Заглядываем в волшебные сообщения MAX…',
+      'Отправляем искру по цифровым тропинкам…',
+      'Ищем ваш файл среди магических свитков…',
+      'Проверяем новые послания и вложения…',
+      'Заклинание поиска уже совсем близко к цели…',
+    ];
+
+    function rotateMagicPhrase() {
+      statusText.classList.add('is-changing');
+      setTimeout(() => {
+        phraseIndex = (phraseIndex + 1) % magicPhrases.length;
+        statusText.textContent = magicPhrases[phraseIndex];
+        statusText.classList.remove('is-changing');
+      }, 220);
+    }
 
     function showError(msg) {
       errorEl.textContent = msg || '';
@@ -163,13 +190,9 @@
         }
 
         showWait();
-        if (sess.error) {
-          statusText.textContent = 'Проверяем MAX… (' + sess.error + ')';
-        } else {
-          statusText.textContent = 'Проверяем сообщения боту. Ожидание до 2 минут.';
-        }
+        if (sess.error) showError('Связь ненадолго ослабла — продолжаем искать файл');
       } catch (e) {
-        statusText.textContent = 'Нет связи, повторяем…';
+        showError('Связь ненадолго ослабла — продолжаем искать файл');
       }
     }
 
@@ -177,6 +200,7 @@
       stopped = true;
       if (timer) clearInterval(timer);
       if (countdownTimer) clearInterval(countdownTimer);
+      if (phraseTimer) clearInterval(phraseTimer);
     }
 
     document.getElementById('cancel-btn').addEventListener('click', () => {
@@ -255,6 +279,7 @@
       poll();
       timer = setInterval(poll, 2000);
       countdownTimer = setInterval(tickCountdown, 1000);
+      phraseTimer = setInterval(rotateMagicPhrase, 4000);
     }
   </script>
   <script src="/static/ui.js"></script>

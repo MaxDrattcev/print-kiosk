@@ -3,10 +3,13 @@ package kiosk
 import (
 	"context"
 	"errors"
+	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
@@ -14,6 +17,7 @@ import (
 	"print-kiosk/internal/copyjob"
 	"print-kiosk/internal/mailinbox"
 	"print-kiosk/internal/maxsvc"
+	"print-kiosk/internal/ophistory"
 	"print-kiosk/internal/printjob"
 	"print-kiosk/internal/scanjob"
 	"print-kiosk/internal/stats"
@@ -30,6 +34,7 @@ type Handler struct {
 	mail     *mailinbox.Service
 	max      *maxsvc.Service
 	stats    *stats.Repo
+	history  *ophistory.Repo
 }
 
 func NewHandler(
@@ -41,10 +46,20 @@ func NewHandler(
 	mail *mailinbox.Service,
 	max *maxsvc.Service,
 	st *stats.Repo,
+	history *ophistory.Repo,
 ) *Handler {
 	return &Handler{
 		cfg: cfg, settings: settings, jobs: jobs, scans: scans,
-		copies: copies, mail: mail, max: max, stats: st,
+		copies: copies, mail: mail, max: max, stats: st, history: history,
+	}
+}
+
+func (h *Handler) recordOperation(ctx context.Context, e ophistory.Entry) {
+	if h.history == nil {
+		return
+	}
+	if err := h.history.Add(ctx, e); err != nil {
+		slog.Error("operation history write failed", "operation", e.Operation, "job_id", e.JobID, "error", err)
 	}
 }
 
@@ -275,7 +290,7 @@ func (h *Handler) PayPrintJob(c *gin.Context) {
 		return
 	}
 
-	if err := simulatePayment(in.Method); err != nil {
+	if err := h.processPayment(c.Request.Context(), in.Method, quote.Total, job.ID); err != nil {
 		if errors.Is(err, errPaymentQR) {
 			c.JSON(http.StatusNotImplemented, gin.H{"error": err.Error()})
 			return
@@ -320,31 +335,6 @@ func (h *Handler) ExecutePrintJob(c *gin.Context) {
 	}
 
 	sheets := printjob.PaperSheets(job.Pages, in.Copies, in.Duplex)
-	if _, err := h.settings.ConsumePaper(sheets); err != nil {
-		if errors.Is(err, storage.ErrInsufficientPaper) {
-			c.JSON(http.StatusConflict, gin.H{
-				"error":           "В принтере недостаточно бумаги для печати",
-				"code":            "paper_insufficient",
-				"sheets_required": sheets,
-				"paper_remaining": h.paperRemaining(),
-			})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "не удалось обновить счётчик бумаги"})
-		return
-	}
-
-	if err := h.jobs.Print(job, printjob.PrintOptions{
-		Color:  in.Color,
-		Duplex: in.Duplex,
-		Copies: in.Copies,
-	}); err != nil {
-		_, _ = h.settings.RefundPaper(sheets)
-		h.notifyErr(err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "не удалось отправить на печать: " + err.Error()})
-		return
-	}
-
 	pages := job.Pages * in.Copies
 	if pages < 1 {
 		pages = job.Pages
@@ -355,18 +345,69 @@ func (h *Handler) ExecutePrintJob(c *gin.Context) {
 		price = colorPrice
 	}
 	revenue := price * float64(pages)
-	if h.stats != nil {
-		_ = h.stats.AddPrint(revenue, pages, in.Color, sheets)
+	paidAmount := revenue
+	if h.testPaymentMode() {
+		paidAmount = 0
 	}
-	if h.max != nil {
+	deviceTest := h.testDeviceMode()
+	if !deviceTest {
+		if _, err := h.settings.ConsumePaper(sheets); err != nil {
+			h.recordOperation(c.Request.Context(), ophistory.Entry{Operation: "print", JobID: job.ID, Pages: pages, Amount: paidAmount, Success: false, ErrorText: err.Error()})
+			if errors.Is(err, storage.ErrInsufficientPaper) {
+				c.JSON(http.StatusConflict, gin.H{
+					"error":           "В принтере недостаточно бумаги для печати",
+					"code":            "paper_insufficient",
+					"sheets_required": sheets,
+					"paper_remaining": h.paperRemaining(),
+				})
+				return
+			}
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "не удалось обновить счётчик бумаги"})
+			return
+		}
+	}
+
+	var printErr error
+	if deviceTest {
+		time.Sleep(10 * time.Second)
+		slog.Info("test print completed", "job_id", job.ID)
+	} else {
+		if err := h.jobs.ApplyImageOrientation(job, in.Orientation); err != nil {
+			printErr = fmt.Errorf("подготовка ориентации изображения: %w", err)
+		} else {
+			printErr = h.jobs.Print(job, printjob.PrintOptions{Color: in.Color, Duplex: in.Duplex, Copies: in.Copies, Orientation: in.Orientation})
+		}
+	}
+	if printErr != nil {
+		if !deviceTest {
+			_, _ = h.settings.RefundPaper(sheets)
+		}
+		technicalErr := fmt.Errorf("печать задания %s на принтере %q: %w", job.ID, h.cfg.Printer.Name, printErr)
+		slog.Error("print job failed", "job_id", job.ID, "printer", h.cfg.Printer.Name, "error", printErr)
+		h.notifyErr(technicalErr)
+		h.recordOperation(c.Request.Context(), ophistory.Entry{Operation: "print", JobID: job.ID, Pages: pages, Amount: paidAmount, Success: false, ErrorText: technicalErr.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "не удалось отправить на печать: " + printErr.Error()})
+		return
+	}
+
+	if h.testPaymentMode() {
+		revenue = 0
+	}
+	if h.stats != nil {
+		if err := h.stats.AddPrint(revenue, pages, in.Color, sheets); err != nil {
+			slog.Error("print statistics update failed", "job_id", job.ID, "error", err)
+		}
+	}
+	if h.max != nil && !deviceTest {
 		h.max.CheckPaperAlert(context.Background())
 	}
+	h.recordOperation(c.Request.Context(), ophistory.Entry{Operation: "print", JobID: job.ID, Pages: pages, Sheets: sheets, Amount: paidAmount, Success: true})
 
 	h.jobs.Cleanup(job.ID)
 
 	c.JSON(http.StatusOK, gin.H{
 		"ok":      true,
-		"message": "Документ отправлен на печать",
+		"message": "Печать документа завершена",
 		"sheets":  sheets,
 		"pages":   job.Pages,
 		"duplex":  in.Duplex,

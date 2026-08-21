@@ -109,6 +109,8 @@ func IsKnownSetting(key string) bool {
 		SettingEmailMaxFileSizeMB,
 		SettingPaymentEnabled,
 		SettingPaymentQREnabled,
+		SettingTestDeviceMode,
+		SettingTestPaymentMode,
 		SettingSessionTimeoutSec,
 		SettingSupportText,
 		SettingServicePrintEnabled,

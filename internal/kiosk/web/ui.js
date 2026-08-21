@@ -2,6 +2,38 @@
  * Shared kiosk UI helpers. Does not change API contracts.
  */
 (function () {
+  // Keep vertical touch scrolling for long lists, but prevent kiosk users from
+  // navigating away with horizontal swipe gestures or multi-touch zoom.
+  let touchStartX = 0;
+  let touchStartY = 0;
+
+  document.addEventListener("touchstart", (event) => {
+    if (event.touches.length > 1) {
+      event.preventDefault();
+      return;
+    }
+    const touch = event.touches[0];
+    if (!touch) return;
+    touchStartX = touch.clientX;
+    touchStartY = touch.clientY;
+  }, { passive: false });
+
+  document.addEventListener("touchmove", (event) => {
+    if (event.touches.length > 1) {
+      event.preventDefault();
+      return;
+    }
+    const touch = event.touches[0];
+    if (!touch) return;
+    const deltaX = Math.abs(touch.clientX - touchStartX);
+    const deltaY = Math.abs(touch.clientY - touchStartY);
+    if (deltaX > 12 && deltaX > deltaY) event.preventDefault();
+  }, { passive: false });
+
+  for (const eventName of ["gesturestart", "gesturechange", "gestureend"]) {
+    document.addEventListener(eventName, (event) => event.preventDefault(), { passive: false });
+  }
+
   const FRIENDLY =
     "Что-то пошло не так. Попробуйте ещё раз. Если ошибка повторится, обратитесь к специалисту.";
   const TECHNICAL =

@@ -22,7 +22,6 @@
           <div class="brand-subtitle">Сервис печати</div>
         </div>
       </a>
-      <a class="specialist-link" href="/admin/">Вход для специалиста</a>
     </header>
     <header class="top top-nav">
       <a class="back-btn" href="/print/email/">
@@ -31,10 +30,20 @@
       </a>
     </header>
 
-    <section class="prompt-card" id="wait-panel">
-      <div class="status-illustration card-terminal" aria-hidden="true"></div>
+    <section class="prompt-card wait-magic-card" id="wait-panel">
+      <div class="wait-magic-art wait-magic-art--email" aria-hidden="true">
+        <span class="wait-magic-glow"></span>
+        <span class="wait-magic-ring wait-magic-ring--one"></span>
+        <span class="wait-magic-ring wait-magic-ring--two"></span>
+        <span class="wait-magic-channel"></span>
+        <span class="wait-magic-page wait-magic-page--one"></span>
+        <span class="wait-magic-page wait-magic-page--two"></span>
+        <span class="wait-magic-page wait-magic-page--three"></span>
+        <span class="wait-magic-sparkles"></span>
+      </div>
+      <p class="wait-magic-kicker">Почтовая магия работает</p>
       <h1>Ищем ваше письмо…</h1>
-      <p id="status-text">Проверяем почтовый ящик. Ожидание до 2 минут.</p>
+      <p class="wait-magic-phrase" id="status-text">Открываем волшебный почтовый ящик…</p>
       <div class="dots-loader" aria-hidden="true"><span></span><span></span><span></span></div>
       <p class="scan-price" id="countdown" hidden></p>
       <p class="error" id="error" hidden></p>
@@ -67,9 +76,27 @@
     const noBtn = document.getElementById('no-btn');
     let timer = null;
     let countdownTimer = null;
+    let phraseTimer = null;
+    let phraseIndex = 0;
     let stopped = false;
     let deadlineMs = 0;
     let busy = false;
+    const magicPhrases = [
+      'Открываем волшебный почтовый ящик…',
+      'Зовём почтовых сов — они уже в пути…',
+      'Ищем ваше письмо среди цифровых свитков…',
+      'Проверяем магические печати и вложения…',
+      'Ещё немного — заклинание поиска почти сработало…',
+    ];
+
+    function rotateMagicPhrase() {
+      statusText.classList.add('is-changing');
+      setTimeout(() => {
+        phraseIndex = (phraseIndex + 1) % magicPhrases.length;
+        statusText.textContent = magicPhrases[phraseIndex];
+        statusText.classList.remove('is-changing');
+      }, 220);
+    }
 
     function showError(msg) {
       errorEl.textContent = msg || '';
@@ -163,13 +190,9 @@
         }
 
         showWait();
-        if (sess.error) {
-          statusText.textContent = 'Проверяем почту… (' + sess.error + ')';
-        } else {
-          statusText.textContent = 'Проверяем почтовый ящик. Ожидание до 2 минут.';
-        }
+        if (sess.error) showError('Связь ненадолго ослабла — продолжаем искать письмо');
       } catch (e) {
-        statusText.textContent = 'Нет связи, повторяем…';
+        showError('Связь ненадолго ослабла — продолжаем искать письмо');
       }
     }
 
@@ -177,6 +200,7 @@
       stopped = true;
       if (timer) clearInterval(timer);
       if (countdownTimer) clearInterval(countdownTimer);
+      if (phraseTimer) clearInterval(phraseTimer);
     }
 
     document.getElementById('cancel-btn').addEventListener('click', () => {
@@ -255,6 +279,7 @@
       poll();
       timer = setInterval(poll, 2000);
       countdownTimer = setInterval(tickCountdown, 1000);
+      phraseTimer = setInterval(rotateMagicPhrase, 4000);
     }
   </script>
   <script src="/static/ui.js"></script>

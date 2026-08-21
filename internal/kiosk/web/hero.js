@@ -5,25 +5,27 @@
 (function () {
   if (window.__printstartHero) return;
 
-  const INTERVAL_MS = 4500;
+  const INTERVAL_MS = 5000;
   const FADE_MS = 360;
   const PHRASES = [
-    { before: "Распечатайте документ за пару ", accent: "минут", after: "" },
-    { before: "Печать, копирование и сканирование — ", accent: "без очереди", after: "" },
-    { before: "Отправьте файл с ", accent: "телефона", after: " и заберите распечатку" },
-    { before: "Нужна ", accent: "копия", after: "? Сделайте её прямо здесь" },
-    { before: "", accent: "Сканируйте", after: " документы и отправляйте их себе" },
+    { question: "Документы?", before: "", accent: "Готово", after: "\nза пару минут" },
+    { question: "Файл в телефоне?", before: "", accent: "Отправьте", after: "\nмы напечатаем" },
+    { question: "Цените своё время?", before: "Печатайте ", accent: "без очереди", after: "" },
+    { question: "Нужна копия?", before: "Сделайте ее ", accent: "прямо здесь", after: "" },
+    { question: "Документ нужен в PDF?", before: "", accent: "Сканируйте", after: "\nза несколько касаний" },
   ];
 
-  const title = document.getElementById("hero-title");
+  const message = document.getElementById("hero-message");
+  const questionEl = document.getElementById("hero-question");
   const textEl = document.getElementById("hero-title-text");
-  if (!title || !textEl) return;
+  if (!message || !questionEl || !textEl) return;
 
   let index = 0;
   let timer = null;
   let fading = false;
 
   function render(phrase) {
+    questionEl.textContent = phrase.question;
     textEl.replaceChildren();
     if (phrase.before) textEl.appendChild(document.createTextNode(phrase.before));
     if (phrase.accent) {
@@ -32,22 +34,28 @@
       em.textContent = phrase.accent;
       textEl.appendChild(em);
     }
-    if (phrase.after) textEl.appendChild(document.createTextNode(phrase.after));
+    if (phrase.after) {
+      const parts = phrase.after.split("\n");
+      parts.forEach((part, partIndex) => {
+        if (partIndex > 0) textEl.appendChild(document.createElement("br"));
+        if (part) textEl.appendChild(document.createTextNode(part));
+      });
+    }
   }
 
   function showEnter() {
-    textEl.classList.remove("is-leave");
-    textEl.classList.add("is-enter");
-    void textEl.offsetWidth;
-    textEl.classList.remove("is-enter");
-    textEl.classList.add("is-in");
+    message.classList.remove("is-leave");
+    message.classList.add("is-enter");
+    void message.offsetWidth;
+    message.classList.remove("is-enter");
+    message.classList.add("is-in");
   }
 
   function tick() {
     if (fading || document.hidden) return;
     fading = true;
-    textEl.classList.remove("is-in", "is-enter");
-    textEl.classList.add("is-leave");
+    message.classList.remove("is-in", "is-enter");
+    message.classList.add("is-leave");
 
     window.setTimeout(() => {
       index = (index + 1) % PHRASES.length;
@@ -69,7 +77,7 @@
   }
 
   render(PHRASES[0]);
-  textEl.classList.add("is-in");
+  message.classList.add("is-in");
 
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) stop();

@@ -20,7 +20,10 @@ import (
 	"print-kiosk/internal/admin"
 	"print-kiosk/internal/config"
 	"print-kiosk/internal/kiosk"
+	"print-kiosk/internal/kioskhost"
 	"print-kiosk/internal/libreoffice"
+	"print-kiosk/internal/ophistory"
+	"print-kiosk/internal/stats"
 	"print-kiosk/internal/storage"
 )
 
@@ -83,12 +86,14 @@ func main() {
 	})
 
 	settingsRepo := storage.NewSettingsRepo(db)
-	maxSvc, err := kiosk.RegisterRoutes(r, cfg, settingsRepo, db)
+	statsRepo := stats.NewRepo(db)
+	historyRepo := ophistory.NewRepo(db)
+	maxSvc, printerSvc, err := kiosk.RegisterRoutes(r, cfg, settingsRepo, statsRepo, historyRepo)
 	if err != nil {
 		slog.Error("failed to register kiosk routes", "error", err)
 		os.Exit(1)
 	}
-	if err := admin.RegisterRoutes(r, cfg, settingsRepo, db); err != nil {
+	if err := admin.RegisterRoutes(r, cfg, settingsRepo, statsRepo, historyRepo, printerSvc, maxSvc); err != nil {
 		slog.Error("failed to register admin routes", "error", err)
 		os.Exit(1)
 	}
@@ -105,7 +110,13 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
+	uptimeDone := make(chan struct{})
+	go func() {
+		statsRepo.TrackUptime(ctx)
+		close(uptimeDone)
+	}()
 	go maxSvc.Run(ctx)
+	go historyRepo.RunRetention(ctx)
 
 	srv := &http.Server{Handler: r}
 	go func() {
@@ -121,10 +132,16 @@ func main() {
 
 	<-ctx.Done()
 	slog.Info("shutting down")
+	select {
+	case <-uptimeDone:
+	case <-time.After(time.Second):
+		slog.Warn("uptime counter did not stop in time")
+	}
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
 	defer cancel()
 	maxSvc.NotifyShutdown(shutdownCtx)
+	_ = kioskhost.CloseBrowser()
 	_ = srv.Shutdown(shutdownCtx)
 }
 

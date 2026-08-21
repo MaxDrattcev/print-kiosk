@@ -22,25 +22,16 @@
           <div class="brand-subtitle">Сервис печати</div>
         </div>
       </a>
-      <a class="specialist-link" href="/admin/">Вход для специалиста</a>
     </header>
     <header class="top top-nav">
-      <a class="back-btn" href="/print/">
+      <a class="back-btn" id="back-btn" href="/print/">
         <span aria-hidden="true">‹</span>
         Назад
       </a>
     </header>
 
     <section class="prompt-card">
-      <div class="prompt-icon" aria-hidden="true">
-        <svg viewBox="0 0 96 96" fill="none">
-          <rect x="34" y="12" width="28" height="28" rx="6" fill="#3d7eff"/>
-          <rect x="22" y="36" width="52" height="42" rx="10" fill="#5b9bff"/>
-          <rect x="34" y="48" width="28" height="8" rx="4" fill="#fff"/>
-          <rect x="34" y="62" width="28" height="8" rx="4" fill="#fff"/>
-          <circle cx="48" cy="22" r="4" fill="#fff"/>
-        </svg>
-      </div>
+      <span class="prompt-usb-art" aria-hidden="true"></span>
       <h1>Вставьте флешку в USB-разъём</h1>
       <p>После подключения нажмите «Продолжить», чтобы открыть файлы на накопителе</p>
       <p class="error" id="error" hidden></p>
@@ -59,6 +50,9 @@
   </dialog>
 
   <script>
+    const entryParams = new URLSearchParams(location.search);
+    const fromHome = entryParams.get('origin') === 'home';
+    document.getElementById('back-btn').href = fromHome ? '/' : '/print/';
     const errorEl = document.getElementById('error');
     const continueBtn = document.getElementById('continue-btn');
     const drivesModal = document.getElementById('drives-modal');
@@ -74,6 +68,7 @@
         try { sessionStorage.setItem('kiosk_usb_browse_path', path); } catch (e) {}
       }
       const url = new URL('/print/usb/browse/', location.origin);
+      if (fromHome) url.searchParams.set('origin', 'home');
       if (path) url.searchParams.set('path', path);
       location.href = url.toString();
     }

@@ -1,7 +1,6 @@
 package admin
 
 import (
-	"database/sql"
 	"embed"
 	"io/fs"
 	"net/http"
@@ -11,6 +10,10 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"print-kiosk/internal/config"
+	"print-kiosk/internal/kioskhost"
+	"print-kiosk/internal/maxsvc"
+	"print-kiosk/internal/ophistory"
+	"print-kiosk/internal/printjob"
 	"print-kiosk/internal/stats"
 	"print-kiosk/internal/storage"
 )
@@ -18,9 +21,9 @@ import (
 //go:embed web/*
 var webFS embed.FS
 
-func RegisterRoutes(r *gin.Engine, cfg *config.Config, settings *storage.SettingsRepo, db *sql.DB) error {
+func RegisterRoutes(r *gin.Engine, cfg *config.Config, settings *storage.SettingsRepo, st *stats.Repo, history *ophistory.Repo, printer *printjob.Service, max *maxsvc.Service) error {
 	sessions := NewSessionStore()
-	h := NewHandler(cfg, sessions, settings, stats.NewRepo(db))
+	h := NewHandler(cfg, sessions, settings, st, history, printer, max)
 
 	api := r.Group("/api/admin")
 	{
@@ -32,10 +35,28 @@ func RegisterRoutes(r *gin.Engine, cfg *config.Config, settings *storage.Setting
 		{
 			auth.GET("/me", h.Me)
 			auth.GET("/overview", h.Overview)
+			auth.GET("/stats", h.Statistics)
+			auth.POST("/stats/reset", h.ResetStatistics)
+			auth.GET("/history", h.OperationHistory)
+			auth.POST("/history/report", h.CreateHistoryReport)
+			auth.GET("/history/reports/:id/preview", h.PreviewHistoryReport)
+			auth.POST("/history/print", h.PrintHistoryReport)
+			auth.POST("/history/deliver/usb", h.SaveHistoryReportUSB)
+			auth.POST("/history/deliver/email", h.SendHistoryReportEmail)
+			auth.POST("/history/deliver/max", h.StartHistoryReportMAX)
+			auth.GET("/history/deliver/max/:sid", h.GetHistoryReportMAX)
+			auth.POST("/history/deliver/max/:sid/complete", h.CompleteHistoryReportMAX)
 			auth.GET("/settings", h.GetSettings)
 			auth.PUT("/settings", h.UpdateSettings)
 			auth.POST("/email/test", h.TestEmail)
 			auth.POST("/max/test", h.TestMAX)
+			auth.POST("/browser/minimize", func(c *gin.Context) {
+				if err := kioskhost.MinimizeBrowser(); err != nil {
+					c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+					return
+				}
+				c.JSON(http.StatusOK, gin.H{"ok": true})
+			})
 		}
 	}
 

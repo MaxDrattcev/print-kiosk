@@ -3,15 +3,20 @@ package admin
 import (
 	"log/slog"
 	"net/http"
+	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
 
 	"print-kiosk/internal/config"
+	"print-kiosk/internal/device"
 	"print-kiosk/internal/libreoffice"
 	"print-kiosk/internal/mailcfg"
+	"print-kiosk/internal/maxsvc"
+	"print-kiosk/internal/ophistory"
 	"print-kiosk/internal/printjob"
 	"print-kiosk/internal/stats"
 	"print-kiosk/internal/storage"
@@ -19,20 +24,31 @@ import (
 )
 
 type Handler struct {
-	cfg       *config.Config
-	sessions  *SessionStore
-	settings  *storage.SettingsRepo
-	stats     *stats.Repo
-	startedAt time.Time
+	cfg        *config.Config
+	sessions   *SessionStore
+	settings   *storage.SettingsRepo
+	stats      *stats.Repo
+	history    *ophistory.Repo
+	printer    *printjob.Service
+	max        *maxsvc.Service
+	deliveryMu sync.Mutex
+	delivering map[string]bool
+	delivered  map[string]bool
+	startedAt  time.Time
 }
 
-func NewHandler(cfg *config.Config, sessions *SessionStore, settings *storage.SettingsRepo, st *stats.Repo) *Handler {
+func NewHandler(cfg *config.Config, sessions *SessionStore, settings *storage.SettingsRepo, st *stats.Repo, history *ophistory.Repo, printer *printjob.Service, max *maxsvc.Service) *Handler {
 	return &Handler{
-		cfg:       cfg,
-		sessions:  sessions,
-		settings:  settings,
-		stats:     st,
-		startedAt: time.Now(),
+		cfg:        cfg,
+		sessions:   sessions,
+		settings:   settings,
+		stats:      st,
+		history:    history,
+		printer:    printer,
+		max:        max,
+		delivering: make(map[string]bool),
+		delivered:  make(map[string]bool),
+		startedAt:  time.Now(),
 	}
 }
 
@@ -175,7 +191,7 @@ func (h *Handler) Overview(c *gin.Context) {
 	} else if !emailReady {
 		emailStatus, emailLabel = "warn", "Не настроен"
 	} else {
-		emailStatus, emailLabel = "ok", "Настроен"
+		emailStatus, emailLabel = "warn", "Данные заполнены · нужна проверка"
 	}
 
 	maxOn := storage.SettingEnabled(values, storage.SettingMaxEnabled, false)
@@ -188,22 +204,25 @@ func (h *Handler) Overview(c *gin.Context) {
 	case !maxToken:
 		maxStatus, maxLabel = "warn", "Не настроен"
 	default:
-		maxStatus, maxLabel = "ok", "Активирован"
+		maxStatus, maxLabel = "warn", "Токен задан · нужна проверка"
 	}
 
 	printerName := strings.TrimSpace(h.cfg.Printer.Name)
 	if printerName == "" {
 		printerName = "принтер по умолчанию"
 	}
+	deviceTest := h.cfg.Printer.DryRun || storage.SettingEnabled(values, storage.SettingTestDeviceMode, true)
+	paymentTest := storage.SettingEnabled(values, storage.SettingTestPaymentMode, true)
 	printer := gin.H{
-		"known":   true,
-		"dry_run": h.cfg.Printer.DryRun,
-		"name":    printerName,
-		"status":  "ok",
-		"label":   "Реальная печать",
-		"source":  "configs/config.yaml",
+		"known":          true,
+		"dry_run":        deviceTest,
+		"config_dry_run": h.cfg.Printer.DryRun,
+		"name":           printerName,
+		"status":         "ok",
+		"label":          "Реальная печать",
+		"source":         "configs/config.yaml",
 	}
-	if h.cfg.Printer.DryRun {
+	if deviceTest {
 		printer["status"] = "warn"
 		printer["label"] = "Режим тестирования"
 	}
@@ -220,11 +239,44 @@ func (h *Handler) Overview(c *gin.Context) {
 		"status": "ok",
 		"label":  "Скан и печать",
 	}
-	if h.cfg.Printer.DryRun {
+	if deviceTest {
 		scanner["status"] = "warn"
 		scanner["label"] = "Режим тестирования"
 		copyDev["status"] = "warn"
 		copyDev["label"] = "Режим тестирования"
+	} else {
+		if runtime.GOOS == "windows" {
+			name, state, available, probeErr := printjob.ProbeWindowsPrinter(h.cfg.Printer.Name)
+			if name != "" {
+				printer["name"] = name
+			}
+			if probeErr != nil {
+				printer["status"], printer["label"] = "err", "Не удалось проверить очередь"
+			} else if !available {
+				printer["status"], printer["label"] = "err", "Принтер недоступен"
+			} else {
+				printer["status"], printer["label"] = "ok", "Доступен"+printerStateSuffix(state)
+			}
+		} else {
+			printer["status"], printer["label"] = "off", "Проверка очереди доступна на Windows"
+		}
+
+		scannerName, scannerAvailable, scannerErr := device.ProbeScanner()
+		scanner["name"] = scannerName
+		switch {
+		case scannerErr != nil:
+			scanner["status"], scanner["label"] = "err", "Не удалось проверить сканер"
+		case !scannerAvailable:
+			scanner["status"], scanner["label"] = "err", "Сканер не обнаружен"
+		default:
+			scanner["status"], scanner["label"] = "ok", "Доступен"+deviceNameSuffix(scannerName)
+		}
+		copyDev["status"] = map[bool]string{true: "ok", false: "err"}[scannerAvailable && printer["status"] == "ok"]
+		if copyDev["status"] == "ok" {
+			copyDev["label"] = "Сканер и принтер доступны"
+		} else {
+			copyDev["label"] = "Проверьте сканер и принтер"
+		}
 	}
 
 	_, loErr := libreoffice.Find(h.cfg.Paths.LibreOffice)
@@ -270,11 +322,12 @@ func (h *Handler) Overview(c *gin.Context) {
 		"scanner":           scanner,
 		"copy":              copyDev,
 		"payment": gin.H{
-			"known":     true,
-			"stub":      true,
-			"delay_sec": 5,
-			"status":    "warn",
-			"label":     "Тестовый режим",
+			"known":      true,
+			"stub":       paymentTest,
+			"delay_sec":  5,
+			"status":     "warn",
+			"label":      map[bool]string{true: "Тестовый режим", false: "Реальный режим · проверка при оплате"}[paymentTest],
+			"driver_url": h.cfg.Payment.DriverURL,
 		},
 		"kiosk_name":     values[storage.SettingKioskName],
 		"kiosk_id":       values[storage.SettingKioskID],
@@ -285,6 +338,91 @@ func (h *Handler) Overview(c *gin.Context) {
 		"username":       username,
 		"today":          today,
 	})
+}
+
+func (h *Handler) Statistics(c *gin.Context) {
+	if h.stats == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Статистика недоступна"})
+		return
+	}
+	scope := strings.TrimSpace(c.DefaultQuery("scope", "today"))
+	var (
+		value stats.Day
+		err   error
+	)
+	if scope == "total" {
+		value, err = h.stats.GetTotal()
+	} else if scope == "today" {
+		value, err = h.stats.GetDay("")
+	} else {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Неизвестный период статистики"})
+		return
+	}
+	if err != nil {
+		slog.Error("admin statistics read", "scope", scope, "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось загрузить статистику"})
+		return
+	}
+	c.JSON(http.StatusOK, statisticsJSON(scope, value))
+}
+
+type resetStatisticsRequest struct {
+	Scope string `json:"scope"`
+}
+
+func (h *Handler) ResetStatistics(c *gin.Context) {
+	if h.stats == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Статистика недоступна"})
+		return
+	}
+	var req resetStatisticsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный запрос"})
+		return
+	}
+	req.Scope = strings.TrimSpace(req.Scope)
+	if req.Scope != "today" && req.Scope != "total" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Неизвестный период статистики"})
+		return
+	}
+	if err := h.stats.Reset(req.Scope); err != nil {
+		slog.Error("admin statistics reset", "scope", req.Scope, "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось сбросить статистику"})
+		return
+	}
+	slog.Warn("statistics reset by specialist", "scope", req.Scope)
+	c.JSON(http.StatusOK, gin.H{"ok": true})
+}
+
+func statisticsJSON(scope string, d stats.Day) gin.H {
+	return gin.H{
+		"scope":          scope,
+		"day":            d.Day,
+		"revenue":        d.Revenue,
+		"printed_copied": d.PagesBW + d.PagesColor,
+		"pages_bw":       d.PagesBW,
+		"pages_color":    d.PagesColor,
+		"scans":          d.Scans,
+		"copies":         d.Copies,
+		"sheets_used":    d.SheetsUsed,
+		"uptime_seconds": d.UptimeSeconds,
+	}
+}
+
+func printerStateSuffix(state string) string {
+	state = strings.TrimSpace(state)
+	if state == "" || strings.EqualFold(state, "Unknown") {
+		return ""
+	}
+	return " · " + state
+}
+
+func deviceNameSuffix(name string) string {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return ""
+	}
+	return " · " + name
 }
 
 func (h *Handler) RequireAuth() gin.HandlerFunc {
@@ -321,6 +459,7 @@ func validateSetting(key, value string) error {
 		}
 	case storage.SettingTelegramCartridgeAlerts, storage.SettingPaymentEnabled,
 		storage.SettingPaymentQREnabled,
+		storage.SettingTestDeviceMode, storage.SettingTestPaymentMode,
 		storage.SettingMaxEnabled, storage.SettingMaxInkAlerts,
 		storage.SettingServicePrintEnabled, storage.SettingServiceCopyEnabled,
 		storage.SettingServiceScanEnabled, storage.SettingSourceUSBEnabled,

@@ -15,7 +15,7 @@
         </div>
         <div>
           <div class="home-logo-name">PRINTUS</div>
-          <div class="home-logo-tag">Магия печати</div>
+          <div class="home-logo-tag">Магия цветной печати</div>
         </div>
       </div>
       <a class="home-service" href="/admin/" draggable="false">
@@ -29,8 +29,10 @@
 
     <section class="home-hero">
       <div class="home-hero-copy">
-        <h1>Документы?</h1>
-        <p class="home-hero-lead"><span>Готово</span><br>за пару минут</p>
+        <div class="home-hero-message" id="hero-message">
+          <p class="home-hero-question" id="hero-question">Документы?</p>
+          <h1 class="home-hero-offer" id="hero-title"><span id="hero-title-text"><span class="hero-accent">Готово</span><br>за пару минут</span></h1>
+        </div>
         <ul class="home-pills">
           <li>
             <i aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M13.1 2 5 13h6l-.9 9L19 10h-6l.1-8z"/></svg></i>
@@ -58,6 +60,7 @@
     <section class="home-print" id="card-print">
       <a class="home-print-visual" href="/print/" draggable="false" aria-label="Распечатать документ">
         <div class="home-print-icon" aria-hidden="true">
+          <span class="home-icon-magic" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
           <span class="home-print-button-icon"></span>
         </div>
       </a>
@@ -65,19 +68,19 @@
         <a class="home-print-head" href="/print/" draggable="false">
           <div>
           <h2>Распечатать</h2>
-            <p>Выберите способ загрузки файла</p>
+            <p class="home-operation-price" id="home-price-print">Стоимость загружается…</p>
           </div>
         </a>
         <div class="home-print-sources">
-          <a class="home-source" id="source-usb" href="/print/usb/" draggable="false">
+          <a class="home-source" id="source-usb" href="/print/usb/?origin=home" draggable="false">
           <span class="home-source-icon home-atlas home-atlas--usb" aria-hidden="true"></span>
           <strong>С флешки</strong>
           </a>
-          <a class="home-source" id="source-max" href="/print/max/" draggable="false">
+          <a class="home-source" id="source-max" href="/print/max/?origin=home" draggable="false">
           <span class="home-source-icon home-atlas home-atlas--max" aria-hidden="true"></span>
           <strong>Через MAX</strong>
           </a>
-          <a class="home-source" id="source-email" href="/print/email/" draggable="false">
+          <a class="home-source" id="source-email" href="/print/email/?origin=home" draggable="false">
           <span class="home-source-icon home-atlas home-atlas--mail" aria-hidden="true"></span>
           <strong>С почты</strong>
           </a>
@@ -87,24 +90,24 @@
 
     <a class="home-row home-row--copy" id="card-copy" href="/copy/" draggable="false">
       <span class="home-row-icon" aria-hidden="true">
+        <span class="home-icon-magic" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
         <span class="home-atlas home-atlas--copy"></span>
       </span>
       <span class="home-row-text">
         <strong>Сделать копию</strong>
-        <span>Быстро и удобно</span>
+        <span class="home-operation-price" id="home-price-copy">Стоимость загружается…</span>
       </span>
-      <span class="home-row-go" aria-hidden="true">→</span>
     </a>
 
     <a class="home-row home-row--scan" id="card-scan" href="/scan/" draggable="false">
       <span class="home-row-icon" aria-hidden="true">
+        <span class="home-icon-magic" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
         <span class="home-atlas home-atlas--scan"></span>
       </span>
       <span class="home-row-text">
         <strong>Отсканировать</strong>
-        <span>Получить документ в PDF</span>
+        <span class="home-operation-price" id="home-price-scan">Стоимость загружается…</span>
       </span>
-      <span class="home-row-go" aria-hidden="true">→</span>
     </a>
 
     <div class="home-foot-actions">
@@ -149,8 +152,7 @@
     <form method="dialog" class="modal-card">
       <h2>Нужна помощь?</h2>
       <p>Свяжитесь с менеджером</p>
-      <p class="support-phone" id="support-phone" hidden></p>
-      <p id="support-text">—</p>
+      <p class="support-contact" id="support-text">—</p>
       <button value="close">Закрыть</button>
     </form>
   </dialog>
@@ -169,9 +171,15 @@
       return n.toLocaleString('ru-RU') + ' ₽';
     }
 
-    function extractPhone(text) {
-      const m = String(text || '').match(/(?:\+7|8)[\s\-]?\(?\d{3}\)?[\s\-]?\d{3}[\s\-]?\d{2}[\s\-]?\d{2}/);
-      return m ? m[0] : '';
+    function formatFromPrice(value, perPage) {
+      const normalized = String(value == null ? '' : value).trim().replace(',', '.');
+      const n = Number(normalized);
+      if (!Number.isFinite(n)) return 'Стоимость уточняется';
+      const formatted = n.toLocaleString('ru-RU', { maximumFractionDigits: 2 });
+      const whole = Number.isInteger(n);
+      const abs = Math.abs(Math.trunc(n));
+      const rubles = whole && abs % 10 === 1 && abs % 100 !== 11 ? 'рубля' : 'рублей';
+      return 'от ' + formatted + ' ' + rubles + (perPage ? ' за страницу' : '');
     }
 
     function setShown(id, on) {
@@ -186,6 +194,9 @@
       document.getElementById('price-color').textContent = formatPrice(info.price_color);
       document.getElementById('price-copy').textContent = formatPrice(info.price_copy);
       document.getElementById('price-scan').textContent = formatPrice(info.price_scan);
+      document.getElementById('home-price-print').textContent = formatFromPrice(info.price_bw, true);
+      document.getElementById('home-price-copy').textContent = formatFromPrice(info.price_copy, false);
+      document.getElementById('home-price-scan').textContent = formatFromPrice(info.price_scan, false);
 
       const usb = info.source_usb !== false;
       const email = info.source_email === true;
@@ -197,19 +208,10 @@
       setShown('card-copy', info.service_copy !== false);
       setShown('card-scan', info.service_scan !== false);
 
-      const support = info.support_text || 'Обратитесь к администратору';
-      const phone = extractPhone(support);
-      const phoneEl = document.getElementById('support-phone');
+      const support = String(info.support_text || 'Обратитесь к администратору')
+        .replace(/^\s*тел(?:ефон)?\.?\s*:?\s*/i, '');
       const textEl = document.getElementById('support-text');
-      if (phone) {
-        phoneEl.hidden = false;
-        phoneEl.textContent = phone;
-        const rest = support.replace(phone, '').trim();
-        textEl.textContent = rest || '';
-        textEl.hidden = !rest;
-      } else {
-        textEl.textContent = support;
-      }
+      textEl.textContent = support;
     })();
 
     document.getElementById('price-btn').addEventListener('click', () => {
@@ -227,6 +229,7 @@
     document.addEventListener('dragover', blockFileHandoff);
     document.addEventListener('drop', blockFileHandoff);
   </script>
+  <script src="/static/hero.js"></script>
   <script src="/static/idle.js"></script>
 </body>
 </html>

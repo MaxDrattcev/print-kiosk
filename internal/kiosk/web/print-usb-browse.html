@@ -22,14 +22,12 @@
           <div class="brand-subtitle">Сервис печати</div>
         </div>
       </a>
-      <a class="specialist-link" href="/admin/">Вход для специалиста</a>
     </header>
     <header class="top top-nav browse-top">
       <a class="back-btn" id="back-btn" href="/print/usb/">
         <span aria-hidden="true">‹</span>
         Назад
       </a>
-      <button type="button" class="text-btn" id="home-usb-btn">К флешке</button>
     </header>
 
     <section class="browse-header">
@@ -44,10 +42,19 @@
   </div>
 
   <div class="loading-overlay" id="loading-overlay" hidden>
-    <div class="loading-card">
-      <div class="spinner" aria-hidden="true"></div>
-      <h2>Подготовка документа</h2>
-      <p class="muted" id="loading-text">Конвертация файла, пожалуйста подождите…</p>
+    <div class="prepare-magic-card">
+      <div class="prepare-magic-glow" aria-hidden="true"></div>
+      <div class="prepare-magic-art" aria-hidden="true">
+        <span class="prepare-magic-orbit"></span><span class="prepare-magic-source"><i></i></span>
+        <img class="prepare-magic-quill" src="/static/img/magic-quill.png" alt="">
+        <span class="prepare-magic-pdf"><strong>PDF</strong></span>
+        <span class="prepare-magic-spark spark-one"></span><span class="prepare-magic-spark spark-two"></span><span class="prepare-magic-spark spark-three"></span>
+      </div>
+      <p class="prepare-magic-kicker">Мастерская документов</p>
+      <h2>Наводим порядок в страницах</h2>
+      <div class="prepare-magic-steps" aria-live="polite"><p>Раскрываем документ заклинанием</p><p>Собираем шрифты и изображения</p><p>Запечатываем всё в аккуратный PDF</p></div>
+      <p class="prepare-magic-file" id="loading-text">Подготовка файла…</p>
+      <div class="print-magic-progress" aria-hidden="true"><span></span><span></span><span></span></div>
     </div>
   </div>
 
@@ -55,6 +62,7 @@
     const USB_PATH_KEY = 'kiosk_usb_browse_path';
     const params = new URLSearchParams(location.search);
     let currentPath = params.get('path') || '';
+    const fromHome = params.get('origin') === 'home';
     let rootPath = '';
 
     function lastUsbPath() {
@@ -71,15 +79,14 @@
     const listEl = document.getElementById('file-list');
     const errorEl = document.getElementById('error');
     const backBtn = document.getElementById('back-btn');
-    const homeUsbBtn = document.getElementById('home-usb-btn');
     const loadingOverlay = document.getElementById('loading-overlay');
     const loadingText = document.getElementById('loading-text');
 
     function setLoading(show, fileName) {
       if (show) {
         loadingText.textContent = fileName
-          ? 'Конвертация «' + fileName + '», пожалуйста подождите…'
-          : 'Конвертация файла, пожалуйста подождите…';
+          ? 'Колдуем над файлом «' + fileName + '»'
+          : 'Колдуем над выбранным документом';
         loadingOverlay.hidden = false;
         document.body.classList.add('loading-lock');
       } else {
@@ -129,7 +136,7 @@
           setPath(data.parent);
         };
       } else {
-        backBtn.href = '/print/usb/';
+        backBtn.href = fromHome ? '/print/usb/?origin=home' : '/print/usb/';
         backBtn.onclick = null;
       }
 
@@ -214,7 +221,7 @@
             setPath(remembered.indexOf(match.path) === 0 && remembered !== match.path ? remembered : match.path);
             return;
           }
-          location.href = '/print/usb/';
+          location.href = fromHome ? '/print/usb/?origin=home' : '/print/usb/';
           return;
         }
         renderEntries(data);
@@ -223,10 +230,6 @@
         subtitleEl.textContent = '';
       }
     }
-
-    homeUsbBtn.addEventListener('click', () => {
-      if (rootPath) setPath(rootPath);
-    });
 
     if (!currentPath) currentPath = lastUsbPath();
     loadDir(currentPath);

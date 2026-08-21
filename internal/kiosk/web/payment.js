@@ -49,11 +49,16 @@
   const WAIT_HTML =
     '<dialog class="modal payment-screen" id="terminal-modal">' +
     '<div class="payment-card payment-card--waiting">' +
-    '<div class="payment-waiting-icon" aria-hidden="true">' +
-    CARD_ICON +
+    '<div class="payment-tap-scene" aria-hidden="true">' +
+    '<span class="payment-tap-glow"></span>' +
+    '<span class="payment-tap-sparkles"></span>' +
+    '<span class="payment-terminal-art"><i class="payment-terminal-screen"></i><i class="payment-terminal-keypad"></i></span>' +
+    '<span class="payment-tap-waves"><i></i><i></i><i></i></span>' +
+    '<span class="payment-card-hand"><i class="payment-bank-card"><b></b></i><i class="payment-hand-palm"></i><i class="payment-hand-wrist"></i></span>' +
     "</div>" +
-    '<h2 class="payment-title">Завершите оплату</h2>' +
-    '<p class="payment-waiting-text">Приложите карту или телефон к платёжному терминалу</p>' +
+    '<p class="payment-waiting-kicker">Платёжное волшебство</p>' +
+    '<h2 class="payment-title">Поднесите карту к терминалу</h2>' +
+    '<p class="payment-waiting-text">Приложите карту или телефон и подержите, пока терминал не подаст сигнал</p>' +
     '<div class="dots-loader" aria-hidden="true"><span></span><span></span><span></span></div>' +
     "</div>" +
     "</dialog>";

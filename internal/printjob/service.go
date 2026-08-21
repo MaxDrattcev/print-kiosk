@@ -39,10 +39,11 @@ type Job struct {
 	PreviewPath string `json:"-"`
 
 	// Options locked after successful payment.
-	Paid   bool `json:"-"`
-	Color  bool `json:"-"`
-	Duplex bool `json:"-"`
-	Copies int  `json:"-"`
+	Paid        bool   `json:"-"`
+	Color       bool   `json:"-"`
+	Duplex      bool   `json:"-"`
+	Copies      int    `json:"-"`
+	Orientation string `json:"-"`
 }
 
 type Service struct {
@@ -145,6 +146,14 @@ func (s *Service) Get(id string) (*Job, bool) {
 	return job, ok
 }
 
+// ApplyImageOrientation rebuilds an image job on an A4 page in the chosen orientation.
+func (s *Service) ApplyImageOrientation(job *Job, orientation string) error {
+	if job == nil || job.PreviewKind != PreviewImage {
+		return nil
+	}
+	return device.ImageToA4PDFOrientation(job.SourcePath, job.PreviewPath, normalizeOrientation(orientation) == "landscape")
+}
+
 // Cleanup removes a finished job and its temporary files from disk.
 func (s *Service) Cleanup(id string) {
 	s.mu.Lock()
@@ -159,9 +168,10 @@ func (s *Service) Cleanup(id string) {
 }
 
 type QuoteInput struct {
-	Color  bool `json:"color"`
-	Duplex bool `json:"duplex"`
-	Copies int  `json:"copies"`
+	Color       bool   `json:"color"`
+	Duplex      bool   `json:"duplex"`
+	Copies      int    `json:"copies"`
+	Orientation string `json:"orientation,omitempty"`
 }
 
 type Quote struct {
@@ -228,6 +238,7 @@ func (s *Service) LockOptions(job *Job, in QuoteInput) {
 	job.Color = in.Color
 	job.Duplex = in.Duplex
 	job.Copies = copies
+	job.Orientation = normalizeOrientation(in.Orientation)
 }
 
 // LockedOptions returns paid print options when available.
@@ -236,10 +247,18 @@ func (s *Service) LockedOptions(job *Job) (QuoteInput, bool) {
 		return QuoteInput{}, false
 	}
 	return QuoteInput{
-		Color:  job.Color,
-		Duplex: job.Duplex,
-		Copies: job.Copies,
+		Color:       job.Color,
+		Duplex:      job.Duplex,
+		Copies:      job.Copies,
+		Orientation: job.Orientation,
 	}, true
+}
+
+func normalizeOrientation(value string) string {
+	if strings.EqualFold(strings.TrimSpace(value), "landscape") {
+		return "landscape"
+	}
+	return "portrait"
 }
 
 func (s *Service) buildPreview(sourcePath, dir string) (string, PreviewKind, int, error) {

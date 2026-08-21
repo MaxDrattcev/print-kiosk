@@ -78,6 +78,11 @@ func imageToPDF(imgPath, pdfPath string) error {
 // ImageToA4PDF places an image on a portrait A4 page, centered and fitted.
 // Needed before printing: SumatraPDF often sends a blank sheet for raw JPEG/PNG.
 func ImageToA4PDF(imgPath, pdfPath string) error {
+	return ImageToA4PDFOrientation(imgPath, pdfPath, false)
+}
+
+// ImageToA4PDFOrientation centers an image on a portrait or landscape A4 page.
+func ImageToA4PDFOrientation(imgPath, pdfPath string, landscape bool) error {
 	if pdfPath == "" {
 		return fmt.Errorf("не задан файл PDF")
 	}
@@ -92,7 +97,11 @@ func ImageToA4PDF(imgPath, pdfPath string) error {
 	defer os.Remove(pngPath)
 
 	// pos:full makes the PDF page equal to image pixels — A4 print then shows a corner or a blank sheet.
-	imp, err := api.Import("formsize:A4, position:c, scalefactor:1", types.POINTS)
+	pageSize := "A4"
+	if landscape {
+		pageSize = "A4L"
+	}
+	imp, err := api.Import("formsize:"+pageSize+", position:c, scalefactor:1", types.POINTS)
 	if err != nil {
 		slog.Warn("image pdf params", "error", err)
 		return fmt.Errorf("не удалось подготовить изображение")

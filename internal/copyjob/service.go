@@ -166,6 +166,20 @@ func (s *Service) Execute(id string) (*Job, int, error) {
 	return job, copies, nil
 }
 
+func (s *Service) CompleteTest(id string) (*Job, int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	job, ok := s.jobs[id]
+	if !ok {
+		return nil, 0, fmt.Errorf("заказ не найден")
+	}
+	if !job.Paid {
+		return nil, 0, fmt.Errorf("сначала оплатите копирование")
+	}
+	job.Status = StatusDone
+	return job, job.Copies, nil
+}
+
 func (s *Service) Delete(id string) {
 	s.mu.Lock()
 	delete(s.jobs, id)

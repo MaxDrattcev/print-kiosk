@@ -3,12 +3,15 @@ package kiosk
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
 	"print-kiosk/internal/copyjob"
+	"print-kiosk/internal/ophistory"
 	"print-kiosk/internal/storage"
 )
 
@@ -119,7 +122,7 @@ func (h *Handler) PayCopyJob(c *gin.Context) {
 		return
 	}
 
-	if err := simulatePayment(in.Method); err != nil {
+	if err := h.processPayment(c.Request.Context(), in.Method, quote.Total, c.Param("id")); err != nil {
 		if errors.Is(err, errPaymentQR) {
 			c.JSON(http.StatusNotImplemented, gin.H{"error": err.Error()})
 			return
@@ -153,35 +156,64 @@ func (h *Handler) ExecuteCopyJob(c *gin.Context) {
 	if sheetsNeeded < 1 {
 		sheetsNeeded = 1
 	}
-	if _, err := h.settings.ConsumePaper(sheetsNeeded); err != nil {
-		if errors.Is(err, storage.ErrInsufficientPaper) {
-			c.JSON(http.StatusConflict, gin.H{
-				"error":           "В принтере недостаточно бумаги для печати",
-				"code":            "paper_insufficient",
-				"sheets_required": sheetsNeeded,
-				"paper_remaining": h.paperRemaining(),
-			})
+	deviceTest := h.testDeviceMode()
+	priceBW, priceColor, _, _ := h.copyPrices()
+	unitPrice := priceBW
+	if job.Color {
+		unitPrice = priceColor
+	}
+	paidAmount := unitPrice * float64(job.Copies)
+	if h.testPaymentMode() {
+		paidAmount = 0
+	}
+	if !deviceTest {
+		if _, err := h.settings.ConsumePaper(sheetsNeeded); err != nil {
+			h.recordOperation(c.Request.Context(), ophistory.Entry{Operation: "copy", JobID: job.ID, Pages: job.Copies, Amount: paidAmount, Success: false, ErrorText: err.Error()})
+			if errors.Is(err, storage.ErrInsufficientPaper) {
+				c.JSON(http.StatusConflict, gin.H{
+					"error":           "В принтере недостаточно бумаги для печати",
+					"code":            "paper_insufficient",
+					"sheets_required": sheetsNeeded,
+					"paper_remaining": h.paperRemaining(),
+				})
+				return
+			}
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "не удалось обновить счётчик бумаги"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "не удалось обновить счётчик бумаги"})
-		return
 	}
-	job, sheets, err := h.copies.Execute(c.Param("id"))
+	var sheets int
+	var err error
+	if deviceTest {
+		time.Sleep(10 * time.Second)
+		job, sheets, err = h.copies.CompleteTest(c.Param("id"))
+	} else {
+		job, sheets, err = h.copies.Execute(c.Param("id"))
+	}
 	if err != nil {
-		_, _ = h.settings.RefundPaper(sheetsNeeded)
+		if !deviceTest {
+			_, _ = h.settings.RefundPaper(sheetsNeeded)
+		}
 		h.notifyErr(err)
+		h.recordOperation(c.Request.Context(), ophistory.Entry{Operation: "copy", JobID: job.ID, Pages: job.Copies, Amount: paidAmount, Success: false, ErrorText: err.Error()})
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 	if h.stats != nil {
-		priceBW, priceColor, _, _ := h.copyPrices()
 		price := priceBW
 		if job.Color {
 			price = priceColor
 		}
-		_ = h.stats.AddCopy(price*float64(job.Copies), job.Copies, sheets, job.Color)
+		revenue := price * float64(job.Copies)
+		if h.testPaymentMode() {
+			revenue = 0
+		}
+		if err := h.stats.AddCopy(revenue, job.Copies, sheets, job.Color); err != nil {
+			slog.Error("copy statistics update failed", "job_id", job.ID, "error", err)
+		}
 	}
-	if h.max != nil {
+	h.recordOperation(c.Request.Context(), ophistory.Entry{Operation: "copy", JobID: job.ID, Pages: job.Copies, Sheets: sheets, Amount: paidAmount, Success: true})
+	if h.max != nil && !deviceTest {
 		h.max.CheckPaperAlert(context.Background())
 	}
 	c.JSON(http.StatusOK, gin.H{

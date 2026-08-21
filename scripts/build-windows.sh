@@ -14,6 +14,9 @@ CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o "
 
 cp "${ROOT}/configs/config.example.yaml" "${OUT_DIR}/config.example.yaml"
 cp "${ROOT}/deploy/windows/start.bat" "${OUT_DIR}/start.bat"
+cp "${ROOT}/deploy/windows/run-kiosk.vbs" "${OUT_DIR}/run-kiosk.vbs"
+cp "${ROOT}/deploy/windows/install-autostart.bat" "${OUT_DIR}/install-autostart.bat"
+cp "${ROOT}/deploy/windows/uninstall-autostart.bat" "${OUT_DIR}/uninstall-autostart.bat"
 cp "${ROOT}/deploy/windows/README.txt" "${OUT_DIR}/README.txt"
 
 (
@@ -22,6 +25,9 @@ cp "${ROOT}/deploy/windows/README.txt" "${OUT_DIR}/README.txt"
     print-kiosk.exe \
     config.example.yaml \
     start.bat \
+    run-kiosk.vbs \
+    install-autostart.bat \
+    uninstall-autostart.bat \
     README.txt
 ) || true
 

@@ -22,7 +22,6 @@
           <div class="brand-subtitle">Сервис печати</div>
         </div>
       </a>
-      <a class="specialist-link" href="/admin/">Вход для специалиста</a>
     </header>
 
     <header class="top top-nav">
@@ -42,38 +41,31 @@
         <div class="step purple">
           <div class="step-num">1</div>
           <div class="step-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
-              <path d="M4 20V8l8-4 8 4v12"/>
-              <path d="M4 8h16"/>
-            </svg>
+            <img src="/static/img/scanner-step-open.png" alt="">
           </div>
           <div>
             <div class="step-title">Откройте крышку</div>
+            <div class="step-sub">Поднимите её до упора</div>
           </div>
         </div>
         <div class="step purple">
           <div class="step-num">2</div>
           <div class="step-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
-              <rect x="5" y="4" width="14" height="16" rx="2"/>
-              <path d="M8 9h8M8 13h6"/>
-            </svg>
+            <img class="scan-step-place-corrected" src="/static/img/copy-step-place.png" alt="">
           </div>
           <div>
             <div class="step-title">Положите документ</div>
-            <div class="step-sub">Текстом вниз</div>
+            <div class="step-sub">Текстом вниз, к стеклу</div>
           </div>
         </div>
         <div class="step purple">
           <div class="step-num">3</div>
           <div class="step-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
-              <rect x="4" y="10" width="16" height="10" rx="2"/>
-              <path d="M4 10V8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v2"/>
-            </svg>
+            <img src="/static/img/scanner-step-close.png" alt="">
           </div>
           <div>
             <div class="step-title">Закройте крышку</div>
+            <div class="step-sub">Аккуратно опустите её до конца</div>
           </div>
         </div>
       </div>
@@ -89,11 +81,19 @@
   </div>
 
   <div class="loading-overlay" id="scan-overlay" hidden>
-    <div class="loading-card">
-      <div class="status-illustration scanner-icon" aria-hidden="true"></div>
-      <h2>Сканируем документ</h2>
-      <p class="muted">Пожалуйста, не открывайте крышку</p>
-      <div class="progress-indeterminate" aria-hidden="true"></div>
+    <div class="print-magic device-magic scan-magic" id="scan-magic" data-stage="scan">
+      <div class="print-magic-glow" aria-hidden="true"></div>
+      <div class="print-magic-art" aria-hidden="true">
+        <div class="print-magic-paid"><span></span></div>
+        <span class="device-magic-scan"></span>
+        <span class="device-magic-scan-lines"></span>
+        <span class="device-magic-scan-file"></span>
+        <span class="device-magic-scan-ready"></span>
+      </div>
+      <p class="print-magic-kicker">Магия сканирования</p>
+      <h2 id="scan-magic-title">Пробуждаем сканер</h2>
+      <p id="scan-magic-text">Световой луч готовится прочитать документ</p>
+      <div class="print-magic-progress" id="scan-progress" aria-hidden="true"><span></span><span></span><span></span></div>
     </div>
   </div>
 
@@ -181,22 +181,52 @@
 
         scanOverlay.hidden = false;
         document.body.classList.add('loading-lock');
+        const scanMagic = document.getElementById('scan-magic');
+        const scanTitle = document.getElementById('scan-magic-title');
+        const scanText = document.getElementById('scan-magic-text');
+        scanMagic.dataset.stage = 'paid';
+        scanTitle.textContent = 'Оплата прошла успешно';
+        scanText.textContent = 'Всё получилось — начинаем магию сканирования';
+        document.getElementById('scan-progress').hidden = false;
+        const scanStartStage = setTimeout(() => {
+          scanTitle.textContent = 'Пробуждаем сканер';
+          scanText.textContent = 'Световой луч готовится прочитать документ';
+          scanMagic.dataset.stage = 'scan';
+        }, 2600);
+        const scanLineStage = setTimeout(() => {
+          scanTitle.textContent = 'Ловим каждую строчку';
+          scanText.textContent = 'Свет проходит по документу и замечает все детали';
+          scanMagic.dataset.stage = 'lines';
+        }, 4400);
+        const scanFileStage = setTimeout(() => {
+          scanTitle.textContent = 'Собираем цифровой свиток';
+          scanText.textContent = 'Превращаем изображение в аккуратный PDF';
+          scanMagic.dataset.stage = 'file';
+        }, 7800);
 
-        const scanRes = await fetch('/api/kiosk/scan/jobs/' + encodeURIComponent(jobId) + '/scan', {
-          method: 'POST',
-        });
+        const [scanRes] = await Promise.all([
+          fetch('/api/kiosk/scan/jobs/' + encodeURIComponent(jobId) + '/scan', { method: 'POST' }),
+          new Promise((resolve) => setTimeout(resolve, 2500)),
+        ]);
         const scanData = await scanRes.json().catch(() => ({}));
-        scanOverlay.hidden = true;
-        document.body.classList.remove('loading-lock');
+        clearTimeout(scanStartStage);
+        clearTimeout(scanLineStage);
+        clearTimeout(scanFileStage);
 
         if (!scanRes.ok) {
+          scanOverlay.hidden = true;
+          document.body.classList.remove('loading-lock');
           showError(scanData.error || 'Не удалось отсканировать документ');
           busy = false;
           readyBtn.disabled = false;
           return;
         }
 
-        location.href = '/scan/name/?job=' + encodeURIComponent(jobId);
+        scanMagic.dataset.stage = 'ready';
+        scanTitle.textContent = 'Скан готов!';
+        scanText.textContent = 'Документ превратился в цифровой файл';
+        document.getElementById('scan-progress').hidden = true;
+        setTimeout(() => { location.href = '/scan/name/?job=' + encodeURIComponent(jobId); }, 1200);
       } catch (e) {
         KioskPayment.closeWaiting();
         scanOverlay.hidden = true;
