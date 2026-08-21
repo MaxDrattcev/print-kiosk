@@ -157,6 +157,7 @@ func (h *Handler) PrepareMaxPrint(c *gin.Context) {
 			"pages":               job.Pages,
 			"preview_kind":        job.PreviewKind,
 			"natural_orientation": job.NaturalOrientation,
+			"suggested_color":     job.SuggestedColor,
 			"preview_url":         "/api/kiosk/print/jobs/" + job.ID + "/preview",
 		},
 		"prices": prices,

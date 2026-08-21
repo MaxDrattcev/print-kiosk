@@ -46,9 +46,18 @@
       </section>
 
       <div class="scan-review-page-actions">
-        <a class="primary-btn scan-add-btn" id="add-page" href="#">＋ Отсканировать ещё один лист</a>
-        <a class="secondary-btn" id="rescan-page" href="#">↻ Пересканировать</a>
-        <button type="button" class="secondary-btn scan-delete-btn" id="delete-page">Удалить страницу</button>
+        <a class="primary-btn scan-add-btn scan-review-action" id="add-page" href="#">
+          <span class="scan-review-action-icon" aria-hidden="true"><svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="12"></circle><path d="M16 10v12M10 16h12"></path></svg></span>
+          <span class="scan-review-action-label">Отсканировать ещё один лист</span>
+        </a>
+        <a class="secondary-btn scan-review-action" id="rescan-page" href="#">
+          <span class="scan-review-action-icon" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M25 12a10 10 0 1 0 1 8"></path><path d="M25 6v6h-6"></path></svg></span>
+          <span class="scan-review-action-label">Пересканировать</span>
+        </a>
+        <button type="button" class="secondary-btn scan-delete-btn scan-review-action" id="delete-page">
+          <span class="scan-review-action-icon" aria-hidden="true"><svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="12"></circle><path d="m12 12 8 8M20 12l-8 8"></path></svg></span>
+          <span class="scan-review-action-label">Удалить страницу</span>
+        </button>
       </div>
 
       <section class="name-form scan-review-name">
@@ -85,8 +94,8 @@
   <dialog class="modal kiosk-sheet" id="leave-scan-modal">
     <div class="modal-card scan-leave-card">
       <div class="scan-leave-icon" aria-hidden="true">!</div>
-      <h2>Документ ещё не сохранён</h2>
-      <p>Если выйти сейчас, вы можете потерять отсканированные страницы. Сначала сохраните PDF на флешку или отправьте его себе.</p>
+      <h2 id="leave-scan-title">Документ ещё не сохранён</h2>
+      <p id="leave-scan-text">Если выйти сейчас, вы можете потерять отсканированные страницы. Сначала сохраните PDF на флешку или отправьте его себе.</p>
       <div class="scan-confirm-actions">
         <button type="button" class="primary-btn" id="leave-scan-cancel">Остаться и сохранить</button>
         <button type="button" class="danger-btn" id="leave-scan-confirm">Выйти без сохранения</button>
@@ -280,15 +289,36 @@
 
     function protectUnsavedExit(event) {
       const hasScannedPages = job && Number(job.page_count || 0) > 0;
-      if (!hasScannedPages) return;
+      const hasPaidSession = job && Boolean(job.paid);
+      const alreadyDelivered = job && (job.saved_path || job.sent_to_email);
+      if ((!hasScannedPages && !hasPaidSession) || alreadyDelivered) return;
       event.preventDefault();
       pendingExitURL = event.currentTarget.href || '/';
+      if (hasScannedPages) {
+        document.getElementById('leave-scan-title').textContent = 'Документ ещё не сохранён';
+        document.getElementById('leave-scan-text').textContent =
+          'Если выйти сейчас, вы можете потерять отсканированные страницы. Сначала сохраните PDF на флешку или отправьте его себе.';
+        document.getElementById('leave-scan-cancel').textContent = 'Остаться и сохранить';
+        document.getElementById('leave-scan-confirm').textContent = 'Выйти без сохранения';
+      } else {
+        document.getElementById('leave-scan-title').textContent = 'Вы ещё не отсканировали документ';
+        document.getElementById('leave-scan-text').textContent =
+          'После удаления страницы документ остался пустым. Вернитесь к сканированию и добавьте хотя бы один лист.';
+        document.getElementById('leave-scan-cancel').textContent = 'Вернуться к сканированию';
+        document.getElementById('leave-scan-confirm').textContent = 'Выйти без документа';
+      }
       if (!leaveScanModal.open) leaveScanModal.showModal();
     }
 
     document.getElementById('back-btn').addEventListener('click', protectUnsavedExit);
     document.getElementById('home-link').addEventListener('click', protectUnsavedExit);
-    document.getElementById('leave-scan-cancel').addEventListener('click', () => leaveScanModal.close());
+    document.getElementById('leave-scan-cancel').addEventListener('click', () => {
+      if (job && Number(job.page_count || 0) === 0) {
+        location.href = '/scan/?job=' + encodeURIComponent(jobId);
+        return;
+      }
+      leaveScanModal.close();
+    });
     document.getElementById('leave-scan-confirm').addEventListener('click', () => {
       location.href = pendingExitURL;
     });

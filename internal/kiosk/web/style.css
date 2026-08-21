@@ -700,6 +700,13 @@ body.print-setup-page .duplex-note {
   line-height: 1.35;
   font-weight: 750;
 }
+body.print-setup-page .color-auto-note {
+  margin: 7px 4px 0;
+  color: #2762c8;
+  font-size: 13px;
+  line-height: 1.3;
+  font-weight: 750;
+}
 body.print-setup-page .duplex-unavailable .segmented label:last-child span {
   color: #8b97b0;
   background: #e8edf5;
@@ -1135,6 +1142,54 @@ body.print-setup-page .orientation-visual > p {
   font-size: 19px;
   line-height: 1.35;
   font-weight: 800;
+  text-align: center;
+}
+body.print-setup-page .preview-orientation-control {
+  width: 100%;
+  margin: 0 0 12px;
+  padding: 12px 16px;
+  border: 1px solid rgba(60,101,176,.11);
+  border-radius: 18px;
+  background: linear-gradient(145deg,rgba(239,246,255,.96),rgba(245,240,255,.92));
+}
+body.print-setup-page .preview-orientation-control .option-label {
+  display: block;
+  margin: 0 0 6px;
+  color: #304d83;
+  font-size: 15px;
+  font-weight: 850;
+}
+body.print-setup-page .preview-orientation-control .orientation-segmented {
+  display: grid;
+  width: 100%;
+  grid-template-columns: repeat(2,minmax(0,1fr));
+  gap: 7px;
+  padding: 5px;
+  border-radius: 16px;
+  background: #e6edf8;
+}
+body.print-setup-page .preview-orientation-control .orientation-segmented label {
+  width: 100%;
+  min-width: 0;
+}
+body.print-setup-page .preview-orientation-control .orientation-segmented span {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  min-height: 58px;
+  padding: 7px 10px;
+  align-items: center;
+  justify-content: center;
+  flex-direction: row;
+  gap: 9px;
+  border-radius: 13px;
+  font-size: 17px;
+  line-height: 1.1;
+  text-align: center;
+}
+body.print-setup-page .preview-orientation-control .orientation-note {
+  margin: 6px 3px 0;
+  font-size: 12px;
   text-align: center;
 }
 
@@ -6728,7 +6783,7 @@ body.kiosk-user:not(.kiosk-home) .scan-page-thumb.is-selected .scan-page-thumb-n
 
 body.kiosk-user:not(.kiosk-home) .scan-review-page-actions {
   display: grid;
-  grid-template-columns: 1.4fr 1fr 1fr;
+  grid-template-columns: repeat(3,minmax(0,1fr));
   gap: 14px;
 }
 
@@ -6744,10 +6799,66 @@ body.kiosk-user:not(.kiosk-home) .scan-review-page-actions .scan-add-btn {
   line-height: 1.25;
 }
 
+body.kiosk-user:not(.kiosk-home) .scan-review-page-actions .scan-review-action {
+  display: flex;
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: 122px;
+  padding: 14px 12px;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 8px;
+  border-radius: 24px;
+  line-height: 1.15;
+  text-align: center;
+}
+
+body.kiosk-user:not(.kiosk-home) .scan-review-action-icon {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  place-items: center;
+  border-radius: 50%;
+  color: currentColor;
+  background: rgba(255,255,255,.22);
+}
+
+body.kiosk-user:not(.kiosk-home) .secondary-btn .scan-review-action-icon {
+  background: #e7effc;
+}
+
+body.kiosk-user:not(.kiosk-home) .scan-review-action-icon svg {
+  width: 32px;
+  height: 32px;
+  overflow: visible;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+body.kiosk-user:not(.kiosk-home) .scan-review-action-label {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  font-size: 17px;
+  line-height: 1.18;
+  font-weight: 900;
+  text-align: center;
+}
+
 body.kiosk-user:not(.kiosk-home) .scan-delete-btn {
   color: #c63850;
   border-color: rgba(215,62,87,.22);
   background: rgba(255,244,246,.92);
+}
+body.kiosk-user:not(.kiosk-home) .scan-delete-btn .scan-review-action-icon {
+  color: #c63850;
+  background: #ffe1e6;
 }
 
 body.kiosk-user:not(.kiosk-home) .scan-review-name {
@@ -6786,6 +6897,36 @@ body.kiosk-user:not(.kiosk-home) .scan-confirm-actions {
 body.kiosk-user:not(.kiosk-home) .scan-confirm-actions > * {
   min-height: 76px;
   margin: 0;
+}
+
+body.kiosk-user:not(.kiosk-home) #delete-modal .scan-confirm-actions > button {
+  display: flex;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 82px;
+  margin: 0;
+  padding: 16px 22px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 27px;
+  font-size: 21px;
+  line-height: 1.15;
+  font-weight: 900;
+  text-align: center;
+}
+
+body.kiosk-user:not(.kiosk-home) #delete-modal #delete-confirm {
+  color: #fff;
+  background: linear-gradient(145deg,#ef5368,#c92f49);
+  box-shadow: 0 16px 34px rgba(201,47,73,.25),inset 0 1px 0 rgba(255,255,255,.28);
+}
+
+body.kiosk-user:not(.kiosk-home) #delete-modal #delete-cancel {
+  color: #35496e;
+  border: 1px solid rgba(70,101,160,.14);
+  background: #edf3fc;
+  box-shadow: 0 10px 24px rgba(38,73,135,.08);
 }
 
 body.kiosk-user:not(.kiosk-home) .scan-leave-card {
@@ -6940,3 +7081,307 @@ body.kiosk-user:not(.kiosk-home) .usb-reminder-countdown {
   font-size: 18px;
   font-weight: 750;
 }
+
+/* Compact print settings for the 1080×1920 kiosk: keep every control touchable
+   while avoiding an unnecessarily long settings sheet. */
+body.print-setup-page .setup-layout { gap: 20px; padding-bottom: 24px; }
+body.print-setup-page .preview-panel { padding: 20px; }
+body.print-setup-page .preview-frame:not(.image-preview),
+body.print-setup-page .preview-frame:not(.image-preview) iframe {
+  height: clamp(650px, 43vh, 800px);
+  min-height: clamp(650px, 43vh, 800px);
+}
+body.print-setup-page .settings-panel {
+  gap: 14px;
+  padding: 24px;
+  border-radius: 30px;
+}
+body.print-setup-page .settings-panel h1 { font-size: 34px; }
+body.print-setup-page .settings-panel .paper-remaining {
+  margin: -8px 0 0;
+  font-size: 16px;
+}
+body.print-setup-page .settings-panel .option-group,
+body.print-setup-page .settings-panel .print-pages-group {
+  padding: 16px;
+  border-radius: 20px;
+}
+body.print-setup-page .settings-panel .option-label {
+  margin-bottom: 7px;
+  font-size: 17px;
+}
+body.print-setup-page .settings-panel .segmented {
+  padding: 5px;
+  border-radius: 18px;
+}
+body.print-setup-page .settings-panel .segmented span,
+body.print-setup-page .print-pages-mode span {
+  min-height: 58px;
+  padding: 9px 7px;
+  border-radius: 14px;
+  font-size: 16px;
+}
+body.print-setup-page .print-pages-mode input[value="custom"]:not(:checked) + span {
+  color: #2458bd;
+  border: 2px solid rgba(39,108,245,.42);
+  background: linear-gradient(145deg,#e8f1ff,#eeeaff);
+  box-shadow: 0 8px 18px rgba(39,108,245,.1);
+  font-weight: 900;
+}
+body.print-setup-page .page-range-wrap {
+  margin-top: 10px;
+  padding: 13px;
+  border-radius: 16px;
+}
+body.print-setup-page .page-range-wrap label { margin-bottom: 6px; font-size: 15px; }
+body.print-setup-page .page-range-wrap input {
+  min-height: 62px;
+  padding: 10px 15px;
+  border-radius: 15px;
+  font-size: 20px;
+}
+body.print-setup-page .page-range-wrap > p { margin-top: 6px; font-size: 14px; }
+body.print-setup-page .orientation-segmented span { min-height: 62px; }
+body.print-setup-page .orientation-note,
+body.print-setup-page .duplex-note {
+  margin-top: 7px;
+  font-size: 13px;
+}
+body.print-setup-page .scale-segmented span { min-height: 64px; gap: 2px; }
+body.print-setup-page .scale-segmented strong { font-size: 16px; }
+body.print-setup-page .scale-segmented small { font-size: 12px; }
+body.print-setup-page .scale-demo {
+  grid-template-columns: 122px minmax(0,1fr);
+  gap: 18px;
+  margin-top: 10px;
+  padding: 14px 16px;
+  border-radius: 17px;
+}
+body.print-setup-page .scale-demo-stack {
+  width: 94px;
+  height: 122px;
+  margin: 7px 0 24px 8px;
+}
+body.print-setup-page .scale-demo-content { inset: 15px 13px; padding: 10px 8px; }
+body.print-setup-page .scale-demo-content i { height: 3px; margin-bottom: 6px; }
+body.print-setup-page .scale-demo[data-scale="actual"] .scale-demo-content {
+  inset: 7px -12px;
+  padding: 15px 13px;
+}
+body.print-setup-page .scale-demo-mode {
+  bottom: -29px;
+  max-width: 132px;
+  padding: 6px 8px;
+  font-size: 9px;
+}
+body.print-setup-page .scale-demo-copy strong { font-size: 19px; }
+body.print-setup-page .scale-demo-copy p {
+  margin: 7px 0 9px;
+  font-size: 15px;
+  line-height: 1.28;
+}
+body.print-setup-page .scale-demo-copy span {
+  padding: 6px 9px;
+  border-radius: 9px;
+  font-size: 13px;
+}
+body.print-setup-page .copies-row { grid-template-columns: 62px 1fr 62px; }
+body.print-setup-page .round-btn { width: 62px; height: 62px; border-radius: 18px; }
+body.print-setup-page .copies-row input { min-height: 62px; font-size: 25px; }
+body.print-setup-page .settings-panel .price-box {
+  margin-top: 0;
+  padding: 15px 20px;
+  border-radius: 20px;
+}
+body.print-setup-page .settings-panel .price-line { font-size: 17px; }
+body.print-setup-page .settings-panel .price-line.total { font-size: 23px; }
+body.print-setup-page .settings-panel .pay-btn {
+  min-height: 76px;
+  font-size: 25px;
+}
+
+@media (max-width: 760px) {
+  body.print-setup-page .settings-panel { padding: 20px; }
+  body.print-setup-page .scale-demo { grid-template-columns: 110px minmax(0,1fr); }
+  body.print-setup-page .scale-demo-stack { width: 88px; height: 114px; }
+}
+
+/* Stable photo preview: orientation changes the sheet inside this stage, never
+   the stage height, so the settings below do not jump. */
+body.kiosk-user.print-setup-page:not(.kiosk-home) .preview-panel:has(.image-preview) {
+  width: 100%;
+  align-items: stretch;
+}
+body.kiosk-user.print-setup-page:not(.kiosk-home) .preview-frame.image-preview,
+body.kiosk-user.print-setup-page:not(.kiosk-home) .preview-frame.image-preview.preview-portrait,
+body.kiosk-user.print-setup-page:not(.kiosk-home) .preview-frame.image-preview.preview-landscape {
+  display: grid;
+  width: 100%;
+  max-width: none;
+  height: clamp(430px, 31vh, 560px);
+  min-height: clamp(430px, 31vh, 560px);
+  aspect-ratio: auto;
+  place-items: center;
+  padding: 16px;
+  border-radius: 20px;
+  background: #dfe7f2;
+  box-shadow: inset 0 2px 8px rgba(30,50,89,.08);
+  transition: box-shadow 200ms ease;
+}
+body.kiosk-user.print-setup-page:not(.kiosk-home) .preview-frame.image-preview img {
+  min-width: 0;
+  min-height: 0;
+  padding: clamp(14px,2vw,22px);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 18px 38px rgba(27,55,112,.16);
+  transition: width 220ms ease,height 220ms ease,aspect-ratio 220ms ease;
+}
+body.kiosk-user.print-setup-page:not(.kiosk-home) .preview-frame.image-preview.preview-portrait img {
+  width: auto;
+  height: 100%;
+  aspect-ratio: 210 / 297;
+}
+body.kiosk-user.print-setup-page:not(.kiosk-home) .preview-frame.image-preview.preview-landscape img {
+  width: min(100%, 720px);
+  height: auto;
+  max-height: 100%;
+  aspect-ratio: 297 / 210;
+}
+body.kiosk-user.print-setup-page:not(.kiosk-home) .preview-frame.image-preview.preview-scale-actual img {
+  padding: 6px;
+}
+body.kiosk-user.print-setup-page:not(.kiosk-home) .preview-frame.image-preview::after {
+  right: 24px;
+  bottom: 22px;
+}
+
+/* Second compact pass: reduce whitespace rather than shrinking the primary
+   labels below comfortable kiosk size. */
+body.print-setup-page .settings-panel { gap: 10px; padding: 18px; }
+body.print-setup-page .settings-panel h1 { font-size: 30px; line-height: 1.05; }
+body.print-setup-page .settings-panel .paper-remaining { margin: -4px 0 0; font-size: 14px; }
+body.print-setup-page .settings-panel .option-group,
+body.print-setup-page .settings-panel .print-pages-group {
+  padding: 12px;
+  border-radius: 17px;
+}
+body.print-setup-page .settings-panel .option-label { margin-bottom: 5px; font-size: 15px; }
+body.print-setup-page .settings-panel .segmented { gap: 5px; padding: 4px; border-radius: 15px; }
+body.print-setup-page .settings-panel .segmented span,
+body.print-setup-page .print-pages-mode span {
+  display: flex;
+  min-height: 54px;
+  padding: 7px 6px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  font-size: 15px;
+  line-height: 1.15;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+body.print-setup-page .settings-panel .orientation-segmented span,
+body.print-setup-page .settings-panel .scale-segmented span {
+  flex-direction: column;
+  text-align: center;
+}
+body.print-setup-page .orientation-segmented span { min-height: 56px; }
+body.print-setup-page .orientation-note,
+body.print-setup-page .duplex-note,
+body.print-setup-page .color-auto-note { margin-top: 5px; font-size: 12px; }
+body.print-setup-page .scale-segmented span { min-height: 56px; }
+body.print-setup-page .scale-segmented strong { font-size: 15px; line-height: 1.1; text-align: center; }
+body.print-setup-page .scale-segmented small { font-size: 11px; line-height: 1.1; text-align: center; }
+body.print-setup-page .scale-demo {
+  grid-template-columns: 92px minmax(0,1fr);
+  gap: 12px;
+  margin-top: 7px;
+  padding: 10px 12px;
+}
+body.print-setup-page .scale-demo-stack { width: 70px; height: 91px; margin: 5px 0 21px 6px; }
+body.print-setup-page .scale-demo-printable { inset: 7px; }
+body.print-setup-page .scale-demo-content { inset: 11px 10px; padding: 7px 6px; }
+body.print-setup-page .scale-demo-content i { height: 2px; margin-bottom: 4px; }
+body.print-setup-page .scale-demo-copy strong { font-size: 17px; }
+body.print-setup-page .scale-demo-copy p { margin: 5px 0 7px; font-size: 13px; }
+body.print-setup-page .scale-demo-copy span { padding: 5px 7px; font-size: 11px; }
+body.print-setup-page .copies-row { grid-template-columns: 56px 1fr 56px; gap: 7px; }
+body.print-setup-page .round-btn { width: 56px; height: 56px; border-radius: 16px; font-size: 30px; }
+body.print-setup-page .copies-row input { min-height: 56px; font-size: 23px; }
+body.print-setup-page .copies-option-group,
+body.print-setup-page .copies-row {
+  width: 100%;
+  min-width: 0;
+}
+body.print-setup-page .copies-row {
+  grid-template-columns: 56px minmax(0,1fr) 56px;
+  overflow: visible;
+}
+body.print-setup-page .copies-row .round-btn {
+  box-sizing: border-box;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  place-self: center;
+}
+body.print-setup-page .copies-row input {
+  box-sizing: border-box;
+  min-width: 0;
+  width: 100%;
+  padding-inline: 6px;
+}
+
+/* Compact orientation summary above the document preview. */
+body.print-setup-page .orientation-visual {
+  margin: 7px 0 12px;
+  padding: 12px 16px 13px;
+  border-radius: 20px;
+}
+body.print-setup-page .orientation-visual-head { gap: 12px; }
+body.print-setup-page .orientation-visual-kicker { margin-bottom: 2px; font-size: 12px; }
+body.print-setup-page .orientation-visual-head strong { font-size: 19px; }
+body.print-setup-page .orientation-visual-badge {
+  padding: 8px 11px;
+  border-radius: 11px;
+  font-size: 11px;
+}
+body.print-setup-page .orientation-sheets {
+  min-height: 108px;
+  margin-top: 7px;
+  gap: 17px;
+}
+body.print-setup-page .orientation-sheet {
+  width: 66px;
+  height: 94px;
+  padding: 16px 9px 8px;
+  gap: 5px;
+  border-width: 1px;
+  border-radius: 5px;
+  box-shadow: 0 8px 16px rgba(31,65,126,.12);
+}
+body.print-setup-page .orientation-visual[data-orientation="landscape"] .orientation-sheet {
+  width: 94px;
+  height: 67px;
+  padding: 14px 11px 7px;
+}
+body.print-setup-page .orientation-sheet i { height: 3px; }
+body.print-setup-page .orientation-sheet-number {
+  top: 4px;
+  right: 5px;
+  font-size: 8px;
+}
+body.print-setup-page .orientation-sheet-more {
+  left: -13px;
+  font-size: 11px;
+  letter-spacing: 1px;
+}
+body.print-setup-page .orientation-visual > p {
+  margin-top: 1px;
+  font-size: 13px;
+  line-height: 1.2;
+}
+body.print-setup-page .settings-panel .price-box { padding: 11px 16px; border-radius: 17px; }
+body.print-setup-page .settings-panel .price-line { font-size: 15px; line-height: 1.2; }
+body.print-setup-page .settings-panel .price-line.total { font-size: 20px; }
+body.print-setup-page .settings-panel .pay-btn { min-height: 68px; font-size: 22px; }

@@ -49,6 +49,14 @@
           <div class="orientation-sheets" id="orientation-sheets" aria-hidden="true"></div>
           <p id="orientation-visual-text">Все страницы документа будут напечатаны вертикально</p>
         </div>
+        <div class="option-group print-option-card preview-orientation-control" id="orientation-group">
+          <span class="option-label">Расположение страниц</span>
+          <div class="segmented orientation-segmented">
+            <label><input type="radio" name="orientation" value="portrait" checked><span><i class="orientation-icon portrait" aria-hidden="true"></i>Вертикально</span></label>
+            <label><input type="radio" name="orientation" value="landscape"><span><i class="orientation-icon landscape" aria-hidden="true"></i>Горизонтально</span></label>
+          </div>
+          <p class="orientation-note" id="orientation-note">Выбранное расположение применяется ко всем страницам файла</p>
+        </div>
         <p class="preview-scroll-hint" id="preview-scroll-hint">Листайте документ вниз, чтобы посмотреть следующие страницы</p>
         <div class="preview-frame" id="preview-frame">
           <div class="preview-loading">Подготовка документа…</div>
@@ -79,24 +87,16 @@
             <label><input type="radio" name="duplex" value="false" checked><span>Односторонняя</span></label>
             <label><input type="radio" name="duplex" value="true"><span>Двухсторонняя</span></label>
           </div>
-          <p class="duplex-note" id="duplex-note" hidden>Для одной страницы доступна только односторонняя печать</p>
+          <p class="duplex-note" id="duplex-note" hidden>Для одного отпечатка доступна только односторонняя печать</p>
         </div>
 
-        <div class="option-group print-option-card">
+        <div class="option-group print-option-card" id="color-group">
           <span class="option-label">Цветность</span>
           <div class="segmented">
             <label><input type="radio" name="color" value="false" checked><span>Чёрно-белая</span></label>
             <label><input type="radio" name="color" value="true"><span>Цветная</span></label>
           </div>
-        </div>
-
-        <div class="option-group print-option-card" id="orientation-group">
-          <span class="option-label">Расположение страниц</span>
-          <div class="segmented orientation-segmented">
-            <label><input type="radio" name="orientation" value="portrait" checked><span><i class="orientation-icon portrait" aria-hidden="true"></i>Вертикально</span></label>
-            <label><input type="radio" name="orientation" value="landscape"><span><i class="orientation-icon landscape" aria-hidden="true"></i>Горизонтально</span></label>
-          </div>
-          <p class="orientation-note" id="orientation-note">Выбранное расположение применяется ко всем страницам файла</p>
+          <p class="color-auto-note" id="color-auto-note" hidden></p>
         </div>
 
         <div class="option-group print-option-card scale-option-group">
@@ -389,14 +389,14 @@
       };
     }
 
-    function updateDuplexAvailability(pageCount) {
-      const onePage = Number(pageCount) <= 1;
+    function updateDuplexAvailability(pageCount, copies) {
+      const oneImpression = Number(pageCount) * Math.max(1, Number(copies) || 1) <= 1;
       const simplex = document.querySelector('input[name="duplex"][value="false"]');
       const duplex = document.querySelector('input[name="duplex"][value="true"]');
-      duplex.disabled = onePage;
-      document.getElementById('duplex-note').hidden = !onePage;
-      document.getElementById('duplex-group').classList.toggle('duplex-unavailable', onePage);
-      if (onePage && duplex.checked) simplex.checked = true;
+      duplex.disabled = oneImpression;
+      document.getElementById('duplex-note').hidden = !oneImpression;
+      document.getElementById('duplex-group').classList.toggle('duplex-unavailable', oneImpression);
+      if (oneImpression && duplex.checked) simplex.checked = true;
     }
 
     function renderPreview() {
@@ -428,12 +428,13 @@
       const selected = document.querySelector('input[name="orientation"]:checked');
       const landscape = selected && selected.value === 'landscape';
       const actualScale = document.querySelector('input[name="scale"]:checked')?.value === 'actual';
-      previewFrame.classList.toggle('preview-landscape', landscape);
-      previewFrame.classList.toggle('preview-portrait', !landscape);
+      const showOrientationInFile = job.preview_kind === 'image' || Number(job.pages) <= 1;
+      previewFrame.classList.toggle('preview-landscape', showOrientationInFile && landscape);
+      previewFrame.classList.toggle('preview-portrait', showOrientationInFile && !landscape);
       previewFrame.classList.toggle('preview-scale-actual', actualScale);
-      previewFrame.setAttribute('aria-label', landscape
-        ? 'Предпросмотр всех страниц на горизонтальных листах'
-        : 'Предпросмотр всех страниц на вертикальных листах');
+      previewFrame.setAttribute('aria-label', showOrientationInFile
+        ? (landscape ? 'Предпросмотр на горизонтальном листе' : 'Предпросмотр на вертикальном листе')
+        : 'Предпросмотр документа в исходном виде');
       orientationVisual.dataset.orientation = landscape ? 'landscape' : 'portrait';
       document.getElementById('orientation-visual-title').textContent = landscape
         ? 'Горизонтальные страницы'
@@ -494,7 +495,7 @@
       quoteValid = true;
       document.getElementById('pay-btn').disabled = false;
       document.getElementById('page-range-error').hidden = true;
-      updateDuplexAvailability(data.pages);
+      updateDuplexAvailability(data.pages, data.copies);
       document.getElementById('sum-pages').textContent = data.pages + ' × ' + data.copies + ' = ' + (data.pages * data.copies);
       lastSheets = Number(data.sheets != null ? data.sheets : data.pages * data.copies) || 0;
       document.getElementById('sum-sheets').textContent = sheetsLabel(lastSheets);
@@ -549,26 +550,32 @@
       const naturalOrientation = job.natural_orientation === 'landscape' ? 'landscape' : 'portrait';
       const naturalOrientationInput = document.querySelector('input[name="orientation"][value="' + naturalOrientation + '"]');
       if (naturalOrientationInput) naturalOrientationInput.checked = true;
+      const suggestedColor = Boolean(job.suggested_color);
+      const suggestedColorInput = document.querySelector('input[name="color"][value="' + suggestedColor + '"]');
+      if (suggestedColorInput) suggestedColorInput.checked = true;
+      const colorAutoNote = document.getElementById('color-auto-note');
+      colorAutoNote.textContent = suggestedColor
+        ? 'Автоматически выбрана цветная печать: в документе найдены цвета'
+        : 'Автоматически выбрана чёрно-белая печать: документ выглядит монохромным';
+      colorAutoNote.hidden = false;
       document.getElementById('file-name').textContent = job.file_name;
       document.getElementById('page-count').textContent = job.pages + ' стр.';
-      updateDuplexAvailability(job.pages);
+      updateDuplexAvailability(job.pages, document.getElementById('copies').value);
       if (job.pages <= 1) {
         document.querySelector('input[name="pages-mode"][value="custom"]').disabled = true;
       }
       document.getElementById('preview-scroll-hint').hidden = job.preview_kind === 'image' || job.pages < 2;
-      orientationVisual.hidden = job.preview_kind === 'image';
-      if (job.preview_kind !== 'image') {
-        const shownPages = Math.min(3, Math.max(1, Number(job.pages) || 1));
-        const sheets = [];
-        for (let i = 1; i <= shownPages; i += 1) {
-          const pageNumber = i === 3 && job.pages > 3 ? job.pages : i;
-          const gap = i === 3 && job.pages > 3 ? '<span class="orientation-sheet-more">•••</span>' : '';
-          sheets.push('<div class="orientation-sheet">' + gap +
-            '<span class="orientation-sheet-number">' + pageNumber + '</span>' +
-            '<i></i><i></i><i></i><i></i><i></i></div>');
-        }
-        document.getElementById('orientation-sheets').innerHTML = sheets.join('');
+      orientationVisual.hidden = false;
+      const shownPages = Math.min(3, Math.max(1, Number(job.pages) || 1));
+      const sheets = [];
+      for (let i = 1; i <= shownPages; i += 1) {
+        const pageNumber = i === 3 && job.pages > 3 ? job.pages : i;
+        const gap = i === 3 && job.pages > 3 ? '<span class="orientation-sheet-more">•••</span>' : '';
+        sheets.push('<div class="orientation-sheet">' + gap +
+          '<span class="orientation-sheet-number">' + pageNumber + '</span>' +
+          '<i></i><i></i><i></i><i></i><i></i></div>');
       }
+      document.getElementById('orientation-sheets').innerHTML = sheets.join('');
       setPaperRemaining(prices.paper_remaining);
       renderPreview();
       await refreshQuote();
@@ -576,6 +583,7 @@
 
     document.querySelectorAll('input[name="duplex"], input[name="color"], input[name="orientation"], input[name="scale"]').forEach((el) => {
       el.addEventListener('change', () => {
+        if (el.name === 'color') document.getElementById('color-auto-note').hidden = true;
         if (el.name === 'scale') renderPreview();
         else if (el.name === 'orientation') updatePreviewOrientation();
         refreshQuote();

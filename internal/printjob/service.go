@@ -42,6 +42,7 @@ type Job struct {
 	Pages              int         `json:"pages"`
 	PreviewKind        PreviewKind `json:"preview_kind"`
 	NaturalOrientation string      `json:"natural_orientation"`
+	SuggestedColor     bool        `json:"suggested_color"`
 	CreatedAt          time.Time   `json:"created_at"`
 
 	Dir         string `json:"-"`
@@ -139,6 +140,10 @@ func (s *Service) PrepareFromLocal(sourcePath, displayName string) (*Job, error)
 		slog.Warn("could not detect document orientation", "file", displayName, "error", orientationErr)
 		naturalOrientation = "portrait"
 	}
+	suggestedColor, colorErr := detectDocumentColor(localSource, previewPath, kind)
+	if colorErr != nil {
+		slog.Warn("could not detect document color", "file", displayName, "error", colorErr)
+	}
 
 	job := &Job{
 		ID:                 id,
@@ -146,6 +151,7 @@ func (s *Service) PrepareFromLocal(sourcePath, displayName string) (*Job, error)
 		Pages:              pages,
 		PreviewKind:        kind,
 		NaturalOrientation: naturalOrientation,
+		SuggestedColor:     suggestedColor,
 		CreatedAt:          time.Now(),
 		Dir:                dir,
 		SourcePath:         localSource,
@@ -275,9 +281,9 @@ func (s *Service) Quote(job *Job, in QuoteInput, priceBW, priceColor float64) (*
 		price = priceColor
 	}
 	pageCount := len(selectedPages)
-	// A one-page document cannot form a duplex sheet. Keep separate copies on
-	// separate sheets instead of placing two copies on opposite sides.
-	effectiveDuplex := in.Duplex && pageCount > 1
+	// Duplex becomes meaningful as soon as the job contains at least two
+	// impressions, including two copies of a one-page document.
+	effectiveDuplex := in.Duplex && pageCount*in.Copies > 1
 	total := float64(pageCount) * price * float64(in.Copies)
 	return &Quote{
 		Pages:        pageCount,
@@ -394,7 +400,7 @@ func (s *Service) LockOptions(job *Job, in QuoteInput) {
 	job.Paid = true
 	job.Color = in.Color
 	selectedPages, _, _ := ParsePageRange(in.PageRange, job.Pages)
-	job.Duplex = in.Duplex && len(selectedPages) > 1
+	job.Duplex = in.Duplex && len(selectedPages)*copies > 1
 	job.Copies = copies
 	job.Orientation = normalizeOrientation(in.Orientation)
 	_, job.PageRange, _ = ParsePageRange(in.PageRange, job.Pages)
