@@ -1144,6 +1144,25 @@ body.print-setup-page .orientation-visual > p {
   font-weight: 800;
   text-align: center;
 }
+
+/* Finished copy gets its own magical document illustration instead of the
+   home-screen printer sprite. */
+body.kiosk-user:not(.kiosk-home) .copy-magic .device-magic-copy-ready {
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  background-image: url("/static/img/copy-magic-ready.png");
+  background-position: center;
+  background-size: 115% 115%;
+  background-repeat: no-repeat;
+  filter: drop-shadow(0 24px 30px rgba(85,66,211,.24));
+}
+body.kiosk-user:not(.kiosk-home) .copy-magic[data-stage="ready"] .device-magic-copy-ready {
+  animation: copy-ready-float 3.8s ease-in-out infinite;
+}
+@keyframes copy-ready-float {
+  50% { transform: translateY(-9px) scale(1.025); filter: drop-shadow(0 30px 38px rgba(85,66,211,.3)); }
+}
 body.print-setup-page .preview-orientation-control {
   width: 100%;
   margin: 0 0 12px;
@@ -2037,6 +2056,15 @@ body.kiosk-user:not(.kiosk-home) .print-magic-oops span {
   filter: saturate(.78);
 }
 body.kiosk-user:not(.kiosk-home) .print-magic-ready { padding: 45px; }
+body.kiosk-user:not(.kiosk-home) .print-magic-ready {
+  filter: drop-shadow(0 24px 30px rgba(85,66,211,.24));
+}
+body.kiosk-user:not(.kiosk-home) .print-magic[data-stage="ready"] .print-magic-ready {
+  animation: print-ready-float 3.8s ease-in-out infinite;
+}
+@keyframes print-ready-float {
+  50% { transform: translateY(-9px) scale(1.025); filter: drop-shadow(0 30px 38px rgba(85,66,211,.3)); }
+}
 body.kiosk-user:not(.kiosk-home) .print-magic[data-stage="paid"] .print-magic-paid,
 body.kiosk-user:not(.kiosk-home) .print-magic[data-stage="paper"] .print-magic-paper,
 body.kiosk-user:not(.kiosk-home) .print-magic[data-stage="quill"] .print-magic-quill,
