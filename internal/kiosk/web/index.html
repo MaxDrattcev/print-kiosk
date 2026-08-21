@@ -3,29 +3,23 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-  <title>PrintStart — терминал самообслуживания</title>
+  <title>PRINTUS — магия печати</title>
   <link rel="stylesheet" href="/static/style.css">
 </head>
-<body class="kiosk-user kiosk-home">
-  <div class="app">
-    <header class="app-header">
-      <div class="brand">
-        <div class="brand-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M6 9V3h12v6"/>
-            <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
-            <rect x="6" y="14" width="12" height="7" rx="1"/>
-            <path d="M18 12h.01"/>
-          </svg>
+<body class="kiosk-user kiosk-home home-printus">
+  <div class="app home-app">
+    <header class="home-top">
+      <div class="home-brand">
+        <div class="home-logo" aria-hidden="true">
+          <span class="home-atlas home-atlas--hat"></span>
         </div>
         <div>
-          <div class="brand-title">PrintStart</div>
-          <div class="brand-subtitle">Сервис печати</div>
+          <div class="home-logo-name">PRINTUS</div>
+          <div class="home-logo-tag">Магия печати</div>
         </div>
       </div>
-
-      <a class="specialist-button" href="/admin/" draggable="false">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <a class="home-service" href="/admin/" draggable="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
           <circle cx="12" cy="8" r="4"/>
           <path d="M4 21v-2a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v2"/>
         </svg>
@@ -33,112 +27,109 @@
       </a>
     </header>
 
-    <section class="hero">
-      <h1>Добро пожаловать!</h1>
-      <p>Выберите нужную операцию</p>
+    <section class="home-hero">
+      <div class="home-hero-copy">
+        <h1>Документы?</h1>
+        <p class="home-hero-lead"><span>Готово</span><br>за пару минут</p>
+        <ul class="home-pills">
+          <li>
+            <i aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M13.1 2 5 13h6l-.9 9L19 10h-6l.1-8z"/></svg></i>
+            <strong>Быстро</strong>
+            <span>Экономьте время</span>
+          </li>
+          <li>
+            <i aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3 20 6v6c0 5-3.4 8.4-8 9.5C7.4 20.4 4 17 4 12V6l8-3z"/><path d="m9 12 2 2 4-4"/></svg></i>
+            <strong>Надёжно</strong>
+            <span>Ваши файлы под защитой</span>
+          </li>
+          <li>
+            <i aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m5 12 4 4L19 6"/></svg></i>
+            <strong>Просто</strong>
+            <span>Понятно каждому</span>
+          </li>
+        </ul>
+      </div>
+      <div class="home-hero-art" aria-hidden="true">
+        <!-- Drop the final transparent hero artwork here; the layout already reserves its space. -->
+        <img src="/static/img/kiosk-hero.png" alt="">
+      </div>
     </section>
 
-    <main class="actions" aria-label="Основные операции">
-      <a class="action-card" id="card-print" href="/print/" draggable="false">
-        <div class="action-visual">
-          <div class="action-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M6 9V3h12v6"/>
-              <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
-              <rect x="6" y="14" width="12" height="7" rx="1"/>
-            </svg>
-          </div>
-        </div>
-        <div class="action-text">
-          <div class="action-title">Печать документов</div>
-          <div class="action-description">Загрузите файл и распечатайте его</div>
-        </div>
-        <div class="arrow" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M9 18l6-6-6-6"/>
-          </svg>
+    <section class="home-print" id="card-print">
+      <a class="home-print-visual" href="/print/" draggable="false" aria-label="Распечатать документ">
+        <div class="home-print-icon" aria-hidden="true">
+          <span class="home-print-button-icon"></span>
         </div>
       </a>
-
-      <a class="action-card green" id="card-copy" href="/copy/" draggable="false">
-        <div class="action-visual">
-          <div class="action-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="8" y="8" width="12" height="12" rx="2"/>
-              <path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>
-            </svg>
+      <div class="home-print-content">
+        <a class="home-print-head" href="/print/" draggable="false">
+          <div>
+          <h2>Распечатать</h2>
+            <p>Выберите способ загрузки файла</p>
           </div>
+        </a>
+        <div class="home-print-sources">
+          <a class="home-source" id="source-usb" href="/print/usb/" draggable="false">
+          <span class="home-source-icon home-atlas home-atlas--usb" aria-hidden="true"></span>
+          <strong>С флешки</strong>
+          </a>
+          <a class="home-source" id="source-max" href="/print/max/" draggable="false">
+          <span class="home-source-icon home-atlas home-atlas--max" aria-hidden="true"></span>
+          <strong>Через MAX</strong>
+          </a>
+          <a class="home-source" id="source-email" href="/print/email/" draggable="false">
+          <span class="home-source-icon home-atlas home-atlas--mail" aria-hidden="true"></span>
+          <strong>С почты</strong>
+          </a>
         </div>
-        <div class="action-text">
-          <div class="action-title">Копирование документов</div>
-          <div class="action-description">Сделайте копию документа</div>
-        </div>
-        <div class="arrow" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M9 18l6-6-6-6"/>
-          </svg>
-        </div>
-      </a>
-
-      <a class="action-card purple" id="card-scan" href="/scan/" draggable="false">
-        <div class="action-visual">
-          <div class="action-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M5 7l14-4"/>
-              <path d="M5 7v5"/>
-              <path d="M19 3v5"/>
-              <rect x="4" y="12" width="16" height="7" rx="2"/>
-              <path d="M8 22h8"/>
-            </svg>
-          </div>
-        </div>
-        <div class="action-text">
-          <div class="action-title">Сканирование документов</div>
-          <div class="action-description">Получите электронную копию</div>
-        </div>
-        <div class="arrow" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M9 18l6-6-6-6"/>
-          </svg>
-        </div>
-      </a>
-    </main>
-
-    <section class="secondary-actions">
-      <button class="secondary-card" type="button" id="price-btn">
-        <div class="secondary-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M6 2h9l4 4v16H6z"/>
-            <path d="M14 2v5h5"/>
-            <path d="M9 12h6"/>
-            <path d="M9 16h6"/>
-          </svg>
-        </div>
-        <div class="secondary-title">Прайс всех услуг</div>
-        <div class="secondary-arrow" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M9 18l6-6-6-6"/>
-          </svg>
-        </div>
-      </button>
-
-      <button class="secondary-card" type="button" id="support-btn">
-        <div class="secondary-icon green">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M4 14v-3a8 8 0 0 1 16 0v3"/>
-            <path d="M18 19h1a2 2 0 0 0 2-2v-3h-4v5z"/>
-            <path d="M6 19H5a2 2 0 0 1-2-2v-3h4v5z"/>
-            <path d="M18 19c0 2-2 3-5 3"/>
-          </svg>
-        </div>
-        <div class="secondary-title">Связаться с менеджером</div>
-        <div class="secondary-arrow" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M9 18l6-6-6-6"/>
-          </svg>
-        </div>
-      </button>
+      </div>
     </section>
+
+    <a class="home-row home-row--copy" id="card-copy" href="/copy/" draggable="false">
+      <span class="home-row-icon" aria-hidden="true">
+        <span class="home-atlas home-atlas--copy"></span>
+      </span>
+      <span class="home-row-text">
+        <strong>Сделать копию</strong>
+        <span>Быстро и удобно</span>
+      </span>
+      <span class="home-row-go" aria-hidden="true">→</span>
+    </a>
+
+    <a class="home-row home-row--scan" id="card-scan" href="/scan/" draggable="false">
+      <span class="home-row-icon" aria-hidden="true">
+        <span class="home-atlas home-atlas--scan"></span>
+      </span>
+      <span class="home-row-text">
+        <strong>Отсканировать</strong>
+        <span>Получить документ в PDF</span>
+      </span>
+      <span class="home-row-go" aria-hidden="true">→</span>
+    </a>
+
+    <div class="home-foot-actions">
+      <button class="home-mini home-mini--price" type="button" id="price-btn">
+        <span class="home-mini-icon" aria-hidden="true">
+          <span class="home-atlas home-atlas--price"></span>
+        </span>
+        <span class="home-mini-text"><strong>Прайс</strong><small>Все услуги и цены</small></span>
+      </button>
+      <button class="home-mini home-mini--help" type="button" id="support-btn">
+        <span class="home-mini-icon" aria-hidden="true">
+          <span class="home-atlas home-atlas--help"></span>
+        </span>
+        <span class="home-mini-text"><strong>Помощь</strong><small>Связаться с менеджером</small></span>
+      </button>
+    </div>
+
+    <p class="home-trust">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+        <path d="M12 3l8 3v6c0 5-3.4 8.4-8 9.5C7.4 20.4 4 17 4 12V6l8-3z"/>
+        <path d="M9 12l2 2 4-4"/>
+      </svg>
+      Надёжно. Удобно. Для вас.
+    </p>
+
   </div>
 
   <dialog class="modal" id="price-modal">
@@ -183,6 +174,11 @@
       return m ? m[0] : '';
     }
 
+    function setShown(id, on) {
+      const el = document.getElementById(id);
+      if (el) el.hidden = !on;
+    }
+
     (async () => {
       const info = await loadInfo();
       if (!info) return;
@@ -190,13 +186,17 @@
       document.getElementById('price-color').textContent = formatPrice(info.price_color);
       document.getElementById('price-copy').textContent = formatPrice(info.price_copy);
       document.getElementById('price-scan').textContent = formatPrice(info.price_scan);
-      const setCard = (id, on) => {
-        const el = document.getElementById(id);
-        if (el) el.hidden = on === false;
-      };
-      setCard('card-print', info.service_print);
-      setCard('card-copy', info.service_copy);
-      setCard('card-scan', info.service_scan);
+
+      const usb = info.source_usb !== false;
+      const email = info.source_email === true;
+      const max = info.source_max === true;
+      setShown('source-usb', usb);
+      setShown('source-email', email);
+      setShown('source-max', max);
+      setShown('card-print', info.service_print !== false && (usb || email || max));
+      setShown('card-copy', info.service_copy !== false);
+      setShown('card-scan', info.service_scan !== false);
+
       const support = info.support_text || 'Обратитесь к администратору';
       const phone = extractPhone(support);
       const phoneEl = document.getElementById('support-phone');
