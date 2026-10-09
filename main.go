@@ -49,6 +49,12 @@ func main() {
 	}
 	defer logFile.Close()
 	slog.SetDefault(logger)
+	executable, _ := os.Executable()
+	absoluteConfig, _ := filepath.Abs(*configPath)
+	slog.Info("application startup", "pid", os.Getpid(), "executable", executable, "config", absoluteConfig)
+	if st, err := os.Stat(executable); err == nil {
+		slog.Info("application binary", "modified", st.ModTime().UTC().Format(time.RFC3339), "bytes", st.Size())
+	}
 
 	db, err := storage.Open(cfg.Database.Path)
 	if err != nil {

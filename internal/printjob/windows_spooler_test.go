@@ -79,3 +79,43 @@ func TestDeviceErrorsCannotConfirmIdle(t *testing.T) {
 		}
 	}
 }
+
+func TestUnavailableQueueStillSubmitsOnce(t *testing.T) {
+	for _, submitErr := range []error{nil, errors.New("submission failed")} {
+		calls := 0
+		completion := &PrintCompletion{Confirmed: true}
+		err := monitorWindowsPrintWithQueue("Pantum", "document.pdf", completion, func() error {
+			calls++
+			return submitErr
+		}, func(string) ([]windowsSpoolJob, error) { return nil, errors.New("queue query failed") })
+		if calls != 1 {
+			t.Fatalf("submission calls = %d", calls)
+		}
+		if !errors.Is(err, submitErr) {
+			t.Fatalf("got %v, want %v", err, submitErr)
+		}
+		if completion.Confirmed {
+			t.Fatal("unavailable queue must not confirm physical output")
+		}
+	}
+}
+
+func TestDecodeWindowsPrintJobs(t *testing.T) {
+	for _, tc := range []struct {
+		input string
+		count int
+	}{
+		{"", 0}, {"null", 0}, {"[]", 0},
+		{`{"id":12,"status":"Printing","document":"scan.pdf"}`, 1},
+		{`[{"id":12},{"id":13}]`, 2},
+		{"\ufeff[{\"id\":12}]", 1},
+	} {
+		jobs, err := decodeWindowsPrintJobs([]byte(tc.input))
+		if err != nil || len(jobs) != tc.count {
+			t.Fatalf("%q: count=%d err=%v", tc.input, len(jobs), err)
+		}
+	}
+	if _, err := decodeWindowsPrintJobs([]byte("not json")); err == nil {
+		t.Fatal("invalid response accepted")
+	}
+}

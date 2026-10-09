@@ -67,6 +67,16 @@ func (h *Handler) PreviewScanPage(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
 	}
+	if c.Query("format") == "image" {
+		data, err := scanPreviewPNG(path)
+		if err != nil {
+			c.Status(http.StatusUnprocessableEntity)
+			return
+		}
+		c.Header("Cache-Control", "no-store")
+		c.Data(http.StatusOK, "image/png", data)
+		return
+	}
 	c.File(path)
 }
 

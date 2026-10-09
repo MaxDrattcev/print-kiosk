@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"print-kiosk/internal/executil"
 	"runtime"
 	"strconv"
 	"strings"
@@ -146,6 +147,7 @@ func printLP(bin, filePath string, opt PrintOptions) error {
 	args = append(args, filePath)
 
 	cmd := exec.Command(bin, args...)
+	executil.HideWindow(cmd)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("печать lp: %w (%s)", err, strings.TrimSpace(string(out)))
@@ -175,6 +177,7 @@ func printLPR(bin, filePath string, opt PrintOptions) error {
 	args = append(args, filePath)
 
 	cmd := exec.Command(bin, args...)
+	executil.HideWindow(cmd)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("печать lpr: %w (%s)", err, strings.TrimSpace(string(out)))
@@ -204,7 +207,7 @@ func (s *Service) printWindows(filePath string, opt PrintOptions) error {
 		return printWindowsShell(abs, spoolPrinter, opt)
 	}); err != nil {
 		slog.Warn("windows shell print failed", "error", err)
-		return fmt.Errorf("не найден SumatraPDF. Скачайте SumatraPDF и положите SumatraPDF.exe в папку с киоском")
+		return fmt.Errorf("печать через ассоциацию Windows: %w. Для надёжной печати установите SumatraPDF", err)
 	}
 	return nil
 }
@@ -248,6 +251,7 @@ func printSumatra(bin, filePath, printer string, opt PrintOptions) error {
 	args = append(args, "-print-settings", strings.Join(settings, ","), filePath)
 
 	cmd := exec.Command(bin, args...)
+	executil.HideWindow(cmd)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("печать SumatraPDF: %w (%s)", err, strings.TrimSpace(string(out)))
@@ -289,6 +293,7 @@ func printWindowsShell(filePath, printer string, opt PrintOptions) error {
 	}
 
 	cmd := exec.Command("powershell", "-NoProfile", "-NonInteractive", "-Command", ps)
+	executil.HideWindow(cmd)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("печать windows: %w (%s)", err, strings.TrimSpace(string(out)))

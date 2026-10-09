@@ -199,8 +199,10 @@ func contentType(name string) string {
 		return "text/html; charset=utf-8"
 	case ".css":
 		return "text/css; charset=utf-8"
-	case ".js":
+	case ".js", ".mjs":
 		return "application/javascript; charset=utf-8"
+	case ".wasm":
+		return "application/wasm"
 	case ".svg":
 		return "image/svg+xml"
 	default:

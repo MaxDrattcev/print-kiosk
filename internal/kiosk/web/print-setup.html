@@ -134,8 +134,8 @@
 
         <button type="button" class="primary-btn pay-btn" id="pay-btn">Оплатить</button>
         <div class="color-print-survey">
-          <p>Хотели бы вы печатать в цвете?</p>
-          <button type="button" class="color-vote-btn" id="color-vote-btn" aria-pressed="false">Да, хочу цветную печать</button>
+          <p>Помогите нам стать лучше: добавить цветную печать?</p>
+          <button type="button" class="color-vote-btn" id="color-vote-btn" aria-pressed="false">Да, добавить</button>
           <span id="color-vote-status" role="status" hidden></span>
         </div>
       </section>
@@ -193,6 +193,7 @@
     </div>
   </dialog>
 
+  <script src="/static/pdf-preview.js"></script>
   <script src="/static/keyboard.js"></script>
   <script src="/static/ui.js"></script>
   <script src="/static/payment.js"></script>
@@ -397,7 +398,9 @@
       if (oneImpression && duplex.checked) simplex.checked = true;
     }
 
+    let disposePDFPreview = null;
     function renderPreview() {
+      if (disposePDFPreview) { disposePDFPreview(); disposePDFPreview = null; }
       previewFrame.innerHTML = '';
       if (!job) return;
       if (job.preview_kind === 'image') {
@@ -411,12 +414,7 @@
       } else {
         previewFrame.classList.remove('image-preview');
         previewFrame.classList.add('document-preview');
-        const iframe = document.createElement('iframe');
-        const actualScale = document.querySelector('input[name="scale"]:checked')?.value === 'actual';
-        iframe.src = job.preview_url + '#page=1&zoom=' + (actualScale ? '100' : 'page-width') + '&toolbar=0&navpanes=0';
-        iframe.title = job.file_name;
-        iframe.scrolling = 'yes';
-        previewFrame.appendChild(iframe);
+        disposePDFPreview = KioskPDFPreview.mount(previewFrame, job.preview_url);
         updatePreviewOrientation();
       }
     }

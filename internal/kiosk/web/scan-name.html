@@ -38,6 +38,7 @@
     <main class="scan-review" id="scan-review" hidden>
       <section class="scan-review-preview">
         <div class="scan-review-page-number" id="selected-label">Страница 1</div>
+        <img id="scan-preview-image" alt="Отсканированная страница" hidden>
         <iframe id="preview-frame" title="Предпросмотр выбранной страницы"></iframe>
       </section>
 
@@ -173,7 +174,13 @@
       document.getElementById('add-page').hidden = pages.length >= Number(job.max_pages || 30);
       document.getElementById('page-summary').textContent = pagesLabel(pages.length) + ' в одном PDF';
       document.getElementById('selected-label').textContent = 'Страница ' + (selectedIndex + 1) + ' из ' + pages.length;
-      document.getElementById('preview-frame').src = pageURL(selectedIndex);
+      const preview = document.getElementById('preview-frame');
+      const scanImage = document.getElementById('scan-preview-image');
+      scanImage.onload = () => { scanImage.hidden = false; preview.hidden = true; preview.removeAttribute('src'); };
+      scanImage.onerror = () => { scanImage.hidden = true; preview.hidden = false; preview.src = pageURL(selectedIndex); };
+      preview.hidden = true;
+      scanImage.hidden = true;
+      scanImage.src = '/api/kiosk/scan/jobs/' + encodeURIComponent(jobId) + '/pages/' + selectedIndex + '/preview?format=image';
       document.getElementById('rescan-page').href = '/scan/?job=' + encodeURIComponent(jobId) + '&replace=' + selectedIndex;
       document.getElementById('total-pages').textContent = 'В документе: ' + pagesLabel(pages.length);
 

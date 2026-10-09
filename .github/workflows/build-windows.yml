@@ -31,6 +31,9 @@ jobs:
           go build -trimpath -ldflags="-s -w" -o dist/windows/print-kiosk.exe .
           cp configs/config.example.yaml dist/windows/config.example.yaml
           cp deploy/windows/start.bat dist/windows/start.bat
+          cp deploy/windows/run-kiosk.vbs dist/windows/run-kiosk.vbs
+          cp deploy/windows/install-autostart.bat dist/windows/install-autostart.bat
+          cp deploy/windows/uninstall-autostart.bat dist/windows/uninstall-autostart.bat
           cp deploy/windows/README.txt dist/windows/README.txt
 
       - name: Pack zip
@@ -40,6 +43,9 @@ jobs:
             print-kiosk.exe \
             config.example.yaml \
             start.bat \
+            run-kiosk.vbs \
+            install-autostart.bat \
+            uninstall-autostart.bat \
             README.txt
 
       - name: Upload artifact

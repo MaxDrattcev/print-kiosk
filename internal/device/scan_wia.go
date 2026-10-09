@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"print-kiosk/internal/executil"
 	"strings"
 	"time"
 )
@@ -49,6 +50,7 @@ func scanNAPS2(bin, destPDF string, opt ScanOptions) error {
 		bitDepth = "color"
 	}
 	cmd := exec.CommandContext(ctx, bin, "-o", destPDF, "--force", "--disableocr", "--source", "glass", "--pagesize", "a4", "--dpi", fmt.Sprint(opt.dpi()), "--bitdepth", bitDepth)
+	executil.HideWindow(cmd)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("сканирование NAPS2: %w (%s)", err, strings.TrimSpace(string(out)))
@@ -85,6 +87,7 @@ func scanWIA(destPDF string, opt ScanOptions) error {
 		"-Color", color,
 		"-Dpi", fmt.Sprintf("%d", opt.dpi()),
 	)
+	executil.HideWindow(cmd)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		msg := strings.TrimSpace(string(out))

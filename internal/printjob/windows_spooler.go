@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os/exec"
 	"path/filepath"
+	"print-kiosk/internal/executil"
 	"strconv"
 	"strings"
 	"time"
@@ -34,7 +35,9 @@ func ProbeWindowsPrinter(configured string) (name, state string, available bool,
 	script := fmt.Sprintf(`$ErrorActionPreference='Stop'; [Console]::OutputEncoding=[Text.UTF8Encoding]::new(); $p=Get-CimInstance Win32_Printer | Where-Object {$_.Name -eq '%s'} | Select-Object -First 1; if (-not $p) { throw 'printer not found' }; [pscustomobject]@{name=[string]$p.Name; offline=[bool]$p.WorkOffline; status=[string]$p.Status} | ConvertTo-Json -Compress`, quoted)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	out, err := exec.CommandContext(ctx, "powershell", "-NoProfile", "-NonInteractive", "-Command", script).CombinedOutput()
+	cmd := exec.CommandContext(ctx, "powershell", "-NoProfile", "-NonInteractive", "-Command", script)
+	executil.HideWindow(cmd)
+	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return printer, "", false, fmt.Errorf("проверка принтера Windows: %w (%s)", err, strings.TrimSpace(string(out)))
 	}
@@ -60,7 +63,9 @@ func resolveWindowsPrinter(configured string) (string, error) {
 	script := `$ErrorActionPreference='Stop'; [Console]::OutputEncoding=[Text.UTF8Encoding]::new(); $p=Get-CimInstance Win32_Printer | Where-Object {$_.Default -eq $true} | Select-Object -First 1 -ExpandProperty Name; if (-not $p) { throw 'default printer not found' }; [Console]::Write($p)`
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	out, err := exec.CommandContext(ctx, "powershell", "-NoProfile", "-NonInteractive", "-Command", script).CombinedOutput()
+	cmd := exec.CommandContext(ctx, "powershell", "-NoProfile", "-NonInteractive", "-Command", script)
+	executil.HideWindow(cmd)
+	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("не удалось определить принтер Windows: %w (%s)", err, strings.TrimSpace(string(out)))
 	}
@@ -73,26 +78,58 @@ func resolveWindowsPrinter(configured string) (string, error) {
 
 func listWindowsPrintJobs(printer string) ([]windowsSpoolJob, error) {
 	quoted := strings.ReplaceAll(printer, "'", "''")
-	script := fmt.Sprintf(`$ErrorActionPreference='Stop'; [Console]::OutputEncoding=[Text.UTF8Encoding]::new(); @((Get-PrintJob -PrinterName '%s') | ForEach-Object { [pscustomobject]@{id=[int]$_.ID; status=[string]$_.JobStatus; document=[string]$_.DocumentName} }) | ConvertTo-Json -Compress`, quoted)
+	script := fmt.Sprintf(`$ErrorActionPreference='Stop'; [Console]::OutputEncoding=[Text.UTF8Encoding]::new(); $printer='%s'; try {
+  try {
+    $jobs=@(Get-PrintJob -PrinterName $printer -ErrorAction Stop | ForEach-Object { [pscustomobject]@{id=[int]$_.ID; status=[string]$_.JobStatus; document=[string]$_.DocumentName} })
+  } catch {
+    $jobs=@(Get-CimInstance Win32_PrintJob -ErrorAction Stop | Where-Object { $_.Name -like ($printer + ',*') } | ForEach-Object { [pscustomobject]@{id=[int]$_.JobId; status=[string]$_.JobStatus; document=[string]$_.Document} })
+  }
+  ConvertTo-Json -InputObject @($jobs) -Compress
+} catch { [Console]::Error.WriteLine($_.Exception.ToString()); exit 1 }`, quoted)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	out, err := exec.CommandContext(ctx, "powershell", "-NoProfile", "-NonInteractive", "-Command", script).CombinedOutput()
+	cmd := exec.CommandContext(ctx, "powershell", "-NoProfile", "-NonInteractive", "-Command", script)
+	executil.HideWindow(cmd)
+	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return nil, fmt.Errorf("опрос очереди печати Windows: %w (%s)", err, strings.TrimSpace(string(out)))
+		return nil, fmt.Errorf("опрос очереди печати Windows (принтер %q): %w (%s)", printer, err, strings.TrimSpace(string(out)))
 	}
-	var jobs []windowsSpoolJob
-	if text := strings.TrimSpace(string(out)); text != "" && text != "null" {
-		if err := json.Unmarshal([]byte(text), &jobs); err != nil {
+	return decodeWindowsPrintJobs(out)
+}
+
+func decodeWindowsPrintJobs(out []byte) ([]windowsSpoolJob, error) {
+	text := strings.TrimSpace(strings.TrimPrefix(string(out), "\ufeff"))
+	if text == "" || text == "null" {
+		return nil, nil
+	}
+	// Older PowerShell versions can unwrap a single pipeline result.
+	if strings.HasPrefix(text, "{") {
+		var job windowsSpoolJob
+		if err := json.Unmarshal([]byte(text), &job); err != nil {
 			return nil, fmt.Errorf("ответ очереди печати Windows: %w", err)
 		}
+		return []windowsSpoolJob{job}, nil
+	}
+	var jobs []windowsSpoolJob
+	if err := json.Unmarshal([]byte(text), &jobs); err != nil {
+		return nil, fmt.Errorf("ответ очереди печати Windows: %w", err)
 	}
 	return jobs, nil
 }
 
 func monitorWindowsPrint(printer, filePath string, completion *PrintCompletion, submit func() error) error {
-	beforeJobs, err := listWindowsPrintJobs(printer)
+	return monitorWindowsPrintWithQueue(printer, filePath, completion, submit, listWindowsPrintJobs)
+}
+
+func monitorWindowsPrintWithQueue(printer, filePath string, completion *PrintCompletion, submit func() error, listJobs func(string) ([]windowsSpoolJob, error)) error {
+	beforeJobs, err := listJobs(printer)
 	if err != nil {
-		return err
+		// Status queries are optional; submission itself decides whether the job was accepted.
+		slog.Warn("windows queue unavailable before submission", "printer", printer, "error", err)
+		if completion != nil {
+			completion.Confirmed = false
+		}
+		return submit()
 	}
 	before := make(map[int]struct{}, len(beforeJobs))
 	for _, job := range beforeJobs {
@@ -125,11 +162,18 @@ func monitorWindowsPrint(printer, filePath string, completion *PrintCompletion, 
 				return submitErr
 			}
 		case <-ticker.C:
-			jobs, queryErr := listWindowsPrintJobs(printer)
+			jobs, queryErr := listJobs(printer)
 			if queryErr != nil {
 				queryFailures++
-				if queryFailures >= 5 {
-					return queryErr
+				if queryFailures >= 5 && submitFinished {
+					slog.Warn("windows queue monitoring lost after submission", "printer", printer, "error", queryErr, "output_confirmed", false)
+					if completion != nil {
+						completion.Confirmed = false
+					}
+					return nil
+				}
+				if time.Now().After(completionDeadline) {
+					return fmt.Errorf("превышено время ожидания отправки задания: %w", queryErr)
 				}
 				continue
 			}
@@ -347,7 +391,9 @@ func readWindowsDeviceState(printer string) (windowsDeviceState, error) {
 	script := fmt.Sprintf(`$ErrorActionPreference='Stop'; [Console]::OutputEncoding=[Text.UTF8Encoding]::new(); $p=Get-CimInstance Win32_Printer | Where-Object {$_.Name -eq '%s'} | Select-Object -First 1; if (-not $p) { throw 'printer not found' }; [pscustomobject]@{status=[int]$p.PrinterStatus; extended=[int]$p.ExtendedPrinterStatus; offline=[bool]$p.WorkOffline; error=[int]$p.DetectedErrorState} | ConvertTo-Json -Compress`, quoted)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	out, err := exec.CommandContext(ctx, "powershell", "-NoProfile", "-NonInteractive", "-Command", script).CombinedOutput()
+	cmd := exec.CommandContext(ctx, "powershell", "-NoProfile", "-NonInteractive", "-Command", script)
+	executil.HideWindow(cmd)
+	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return windowsDeviceState{}, fmt.Errorf("состояние устройства Windows: %w (%s)", err, strings.TrimSpace(string(out)))
 	}
