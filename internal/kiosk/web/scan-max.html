@@ -32,15 +32,19 @@
 
     <section class="hero compact">
       <h1>Отправить в MAX</h1>
-      <p id="file-hint">Откройте бота и отправьте код с экрана</p>
+      <p id="file-hint">Наведите камеру телефона на QR-код и откройте бота</p>
     </section>
 
     <div class="name-form">
-      <p class="muted">Бот:</p>
+      <img id="bot-qr" alt="QR-код для получения вашего скана в MAX" width="300" height="300" hidden style="display:block;max-width:100%;height:auto;margin:0 auto 16px;border-radius:16px">
+      <p class="hint">Откройте ссылку в MAX и, если появится кнопка «Начать», нажмите её. Скан отправится автоматически.</p>
       <p class="scan-price" id="bot-link">…</p>
-      <p class="muted">Напишите боту этот код:</p>
-      <p class="code-block" id="code">…</p>
-      <p class="hint">Ожидание до 2 минут. После получения кода скан уйдёт вам в MAX.</p>
+      <details id="code-fallback">
+        <summary style="cursor:pointer;padding:16px 0;font-weight:700">Не получилось открыть QR-код?</summary>
+        <p class="muted">Откройте бота по ссылке выше и отправьте эти 6 цифр одним сообщением:</p>
+        <p class="code-block" id="code">…</p>
+      </details>
+      <p class="hint">Ожидание до 2 минут. После открытия бота скан придёт вам в MAX.</p>
       <p class="error" id="error" hidden></p>
       <p class="scan-price" id="countdown" hidden></p>
       <button type="button" class="secondary-btn" id="cancel-btn">Отмена</button>
@@ -87,7 +91,13 @@
     let completing = false;
 
     document.getElementById('back-btn').href = '/scan/delivery/?job=' + encodeURIComponent(jobId || '');
+    function abandonScan() {
+      if (timer) clearInterval(timer);
+      if (sessionId) navigator.sendBeacon('/api/kiosk/session/end', new Blob([JSON.stringify({max_scan_session_id: sessionId})], {type: 'application/json'}));
+    }
+    document.querySelectorAll('#back-btn, .brand').forEach(link => link.addEventListener('click', abandonScan));
     document.getElementById('cancel-btn').addEventListener('click', () => {
+      abandonScan();
       location.href = '/scan/delivery/?job=' + encodeURIComponent(jobId || '');
     });
     document.getElementById('success-home').addEventListener('click', () => { location.href = '/'; });
@@ -175,6 +185,11 @@
         }
         sessionId = data.session.id;
         codeEl.textContent = data.session.code;
+        if (data.bot_qr) {
+          const qr = document.getElementById('bot-qr');
+          qr.src = data.bot_qr;
+          qr.hidden = false;
+        } else { document.getElementById('code-fallback').open = true; }
         botLinkEl.textContent = data.bot_link || ('@' + (data.bot_username || ''));
         if (data.session.deadline_ms) deadlineMs = data.session.deadline_ms;
         timer = setInterval(() => { tick(); poll(); }, 1500);

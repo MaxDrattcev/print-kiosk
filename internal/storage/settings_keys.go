@@ -14,6 +14,7 @@ const (
 	SettingTelegramHeartbeatInterval = "telegram_heartbeat_interval" // legacy, unused
 	SettingTelegramCartridgeAlerts   = "telegram_cartridge_alerts"   // legacy
 	SettingMaxEnabled                = "max_enabled"
+	SettingMaxBotLink                = "max_bot_link"
 	SettingMaxBotToken               = "max_bot_token"
 	SettingMaxAdminID                = "max_admin_id"
 	SettingMaxInkAlerts              = "max_ink_alerts"

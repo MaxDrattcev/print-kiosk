@@ -9,7 +9,7 @@
 <body class="admin-app">
   <div class="admin-shell">
     <aside class="admin-nav">
-      <div class="admin-nav-brand"><strong>PRINTUS</strong><span>Магия цветной печати</span><small>Кабинет специалиста</small></div>
+      <div class="admin-nav-brand"><strong>PRINTUS</strong><span>Магия печати</span><small>Кабинет специалиста</small></div>
       <nav class="admin-nav-list" aria-label="Разделы">
         <button type="button" class="admin-nav-item is-active" data-section="overview">Обзор</button>
         <button type="button" class="admin-nav-item" data-section="history">Выгрузить историю</button>
@@ -85,7 +85,7 @@
           </div>
         </section>
 
-        <form class="settings-form" id="settings-form">
+        <form class="settings-form" id="settings-form" novalidate>
           <section class="admin-panel" id="panel-prices" hidden>
             <div class="admin-card">
               <h2>Печать</h2>
@@ -98,10 +98,6 @@
               </div>
               <label class="admin-field">Чёрно-белая A4
                 <input type="number" step="0.01" min="0" name="price_bw" required>
-                <span class="admin-help">₽ / лист</span>
-              </label>
-              <label class="admin-field">Цветная A4
-                <input type="number" step="0.01" min="0" name="price_color" required>
                 <span class="admin-help">₽ / лист</span>
               </label>
             </div>
@@ -117,10 +113,6 @@
               <label class="admin-field">Чёрно-белая копия
                 <input type="number" step="0.01" min="0" name="price_copy" required>
                 <span class="admin-help">₽ за одну чёрно-белую копию</span>
-              </label>
-              <label class="admin-field">Цветная копия
-                <input type="number" step="0.01" min="0" name="price_copy_color" required>
-                <span class="admin-help">₽ за одну цветную копию</span>
               </label>
             </div>
             <div class="admin-card" style="margin-top:12px">
@@ -247,7 +239,7 @@
               </label>
               <label class="admin-field">Пароль приложения
                 <div class="admin-secret">
-                  <input type="password" name="email_password" autocomplete="new-password" placeholder="оставьте ******** чтобы не менять">
+                  <input type="password" name="email_password" autocomplete="new-password" placeholder="Введите токен бота">
                   <button type="button" class="admin-btn secondary" data-reveal="email_password">Изменить</button>
                 </div>
               </label>
@@ -285,13 +277,25 @@
                 <input type="text" id="max-bot-username" value="Проверяем…" readonly>
                 <span class="admin-help">Вводить имя вручную не нужно. Оно определяется автоматически по токену и подставляется пользователям.</span>
               </label>
-              <label class="admin-field">ID админа (user_id)
+              <label class="admin-field">Ссылка на бота MAX
+                <input type="url" name="max_bot_link" placeholder="https://max.ru/id402709301933_bot">
+                <span class="admin-help">QR-код создаётся автоматически по этой ссылке. Если поле пустое, используется адрес бота, определённый по токену. При смене бота обновите токен и ссылку.</span>
+              </label>
+              <label class="admin-field">Получатель уведомлений (ID пользователя)
                 <input type="text" name="max_admin_id" inputmode="numeric" placeholder="например 123456789">
               </label>
+              <button type="button" class="admin-btn secondary" id="max-bind-btn">Привязать получателя через QR-код</button>
+              <div id="max-bind-panel" hidden style="margin-top:16px;text-align:center">
+                <p class="admin-muted">Отсканируйте QR-код, откройте бота в MAX и при необходимости нажмите «Начать». Получатель сохранится автоматически и заменит предыдущего.</p>
+                <img id="max-bind-qr" alt="Привязка получателя уведомлений MAX" width="280" height="280" style="max-width:100%;height:auto">
+                <p id="max-bind-status" role="status"></p>
+                <button type="button" class="admin-btn secondary" id="max-bind-cancel">Отмена</button>
+              </div>
+              <p class="admin-muted" id="max-bind-result" role="status"></p>
               <label class="admin-field">Токен бота
                 <div class="admin-secret">
-                  <input type="password" name="max_bot_token" autocomplete="new-password" placeholder="оставьте ******** чтобы не менять">
-                  <button type="button" class="admin-btn secondary" data-reveal="max_bot_token">Изменить</button>
+                  <input type="password" name="max_bot_token" autocomplete="new-password" placeholder="Введите токен бота">
+                  <button type="button" class="admin-btn secondary" id="max-token-toggle" aria-pressed="false" aria-label="Показать токен бота">Показать</button>
                 </div>
               </label>
               <p class="admin-muted" id="max-test-result"></p>
@@ -462,7 +466,21 @@
       </div>
       <div id="history-usb-step" hidden><p class="admin-muted">Вставьте флешку и выберите накопитель</p><div class="history-drive-list" id="history-drive-list"></div></div>
       <div id="history-email-step" hidden><label class="admin-field">Email получателя<input type="email" id="history-email" inputmode="none" placeholder="name@example.com"></label><button type="button" class="admin-btn" id="history-email-send">Отправить отчёт</button><p class="history-delivery-status" id="history-email-status" hidden>Отправляем письмо, пожалуйста подождите…</p></div>
-      <div id="history-max-step" hidden><p class="admin-muted">Откройте бота MAX и отправьте ему код:</p><strong class="history-max-code" id="history-max-code">…</strong><p id="history-max-bot"></p><p class="admin-muted" id="history-max-status">Ожидаем подтверждение…</p></div>
+      <div id="history-max-choice-step" hidden>
+        <p class="admin-muted">Кому отправить отчёт в MAX?</p>
+        <div class="history-channel-grid">
+          <button type="button" id="history-max-admin" disabled><strong>Отправить администратору</strong><span>Получателю уведомлений из настроек</span></button>
+          <button type="button" id="history-max-qr"><strong>Отправить по QR-коду</strong><span>На телефон другого получателя</span></button>
+        </div>
+        <p class="admin-muted" id="history-max-admin-hint" role="status">Проверяем настройки…</p>
+      </div>
+      <div id="history-max-step" hidden>
+        <p class="admin-muted">Отсканируйте QR-код, откройте бота в MAX и при необходимости нажмите «Начать».</p>
+        <img id="history-max-qr-image" alt="QR-код для получения отчёта" width="280" height="280" hidden style="display:block;margin:16px auto;max-width:100%;height:auto">
+        <p class="admin-muted" id="history-max-bot"></p>
+        <details id="history-max-fallback"><summary>Не получилось открыть QR-код?</summary><p class="admin-muted">Откройте бота и отправьте эти 6 цифр:</p><div class="history-code" id="history-max-code">…</div></details>
+        <p class="admin-muted" id="history-max-status">Ожидаем подтверждение…</p>
+      </div>
       <div class="history-delivery-success" id="history-delivery-success" hidden><div class="history-success-mark">✓</div><h2>Магия сработала!</h2><p id="history-delivery-success-text">Отчёт отправлен.</p><div class="unsaved-actions"><button type="button" class="unsaved-save" id="history-delivery-more">Забрать ещё раз</button><button type="button" class="unsaved-cancel" id="history-delivery-finish">Завершить</button></div></div>
       <p class="error" id="history-delivery-error" hidden></p>
       <button type="button" class="unsaved-cancel history-delivery-close" id="history-delivery-close">Закрыть</button>

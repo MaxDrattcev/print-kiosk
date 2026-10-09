@@ -1,9 +1,11 @@
 package admin
 
 import (
+	"encoding/base64"
 	"fmt"
 	"html/template"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -14,6 +16,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/pdfcpu/pdfcpu/pkg/api"
+	"github.com/skip2/go-qrcode"
 
 	"print-kiosk/internal/libreoffice"
 	"print-kiosk/internal/mailout"
@@ -159,10 +162,11 @@ func (h *Handler) PreviewHistoryReport(c *gin.Context) {
 }
 
 type historyDeliveryRequest struct {
-	ReportID  string `json:"report_id"`
-	FileName  string `json:"file_name"`
-	DrivePath string `json:"drive_path"`
-	Email     string `json:"email"`
+	ReportID   string `json:"report_id"`
+	FileName   string `json:"file_name"`
+	DrivePath  string `json:"drive_path"`
+	Email      string `json:"email"`
+	DeliveryID string `json:"delivery_id"`
 }
 
 func (h *Handler) reportForDelivery(reportID, requestedName string) (string, string, error) {
@@ -303,7 +307,27 @@ func (h *Handler) StartHistoryReportMAX(c *gin.Context) {
 			username = u
 		}
 	}
-	c.JSON(200, gin.H{"session": maxsvc.ScanSessionJSON(sess), "bot_username": username, "bot_link": "https://max.ru/" + username, "file_name": name})
+	link := "https://max.ru/" + username
+	if configured, err := h.settings.Get(storage.SettingMaxBotLink); err == nil && strings.TrimSpace(configured) != "" {
+		link = strings.TrimSpace(configured)
+	}
+	parsed, err := url.Parse(link)
+	if err != nil {
+		h.max.AbandonScan(sess.ID)
+		c.JSON(400, gin.H{"error": "Проверьте ссылку на бота"})
+		return
+	}
+	query := parsed.Query()
+	query.Set("start", "scan_"+sess.Token)
+	parsed.RawQuery = query.Encode()
+	png, err := qrcode.Encode(parsed.String(), qrcode.Medium, 384)
+	if err != nil {
+		h.max.AbandonScan(sess.ID)
+		c.JSON(500, gin.H{"error": "Не удалось создать QR-код"})
+		return
+	}
+	c.Header("Cache-Control", "no-store")
+	c.JSON(200, gin.H{"session": maxsvc.ScanSessionJSON(sess), "bot_link": link, "bot_qr": "data:image/png;base64," + base64.StdEncoding.EncodeToString(png), "file_name": name})
 }
 
 func (h *Handler) GetHistoryReportMAX(c *gin.Context) {
@@ -331,7 +355,7 @@ func (h *Handler) CompleteHistoryReportMAX(c *gin.Context) {
 		return
 	}
 	if sess.Status != maxsvc.StatusFound || sess.UserID == 0 {
-		c.JSON(400, gin.H{"error": "Пользователь ещё не подтвердил код"})
+		c.JSON(400, gin.H{"error": "Получатель ещё не открыл QR-ссылку и не отправил запасной код"})
 		return
 	}
 	path, name, err := h.reportForDelivery(in.ReportID, in.FileName)
@@ -339,11 +363,7 @@ func (h *Handler) CompleteHistoryReportMAX(c *gin.Context) {
 		c.JSON(400, gin.H{"error": err.Error()})
 		return
 	}
-	if err := h.max.SendFileToUser(c.Request.Context(), sess.UserID, path, name, "Ваш отчёт PRINTUS: "+name); err != nil {
-		c.JSON(502, gin.H{"error": "Не удалось отправить отчёт в MAX"})
-		return
-	}
-	c.JSON(200, gin.H{"ok": true, "message": "Отчёт отправлен в MAX", "file_name": name})
+	h.sendHistoryMAX(c, sess.UserID, in.ReportID, "qr:"+sess.ID, path, name)
 }
 
 func writeHistoryHTML(path string, days int, items []ophistory.Entry) error {
@@ -373,4 +393,78 @@ func operationLabel(v string) string {
 		return "Печать отчёта"
 	}
 	return v
+}
+
+func (h *Handler) HistoryMAXOptions(c *gin.Context) {
+	c.Header("Cache-Control", "no-store")
+	values, err := h.settings.GetAll()
+	if err != nil {
+		c.JSON(500, gin.H{"error": "Не удалось прочитать настройки MAX"})
+		return
+	}
+	c.JSON(200, gin.H{"admin_configured": storage.MaxAdminID(values) > 0})
+}
+
+func (h *Handler) SendHistoryMAXAdmin(c *gin.Context) {
+	var in historyDeliveryRequest
+	if c.ShouldBindJSON(&in) != nil {
+		c.JSON(400, gin.H{"error": "Некорректный запрос"})
+		return
+	}
+	values, err := h.settings.GetAll()
+	if err != nil {
+		c.JSON(500, gin.H{"error": "Не удалось прочитать настройки MAX"})
+		return
+	}
+	userID := storage.MaxAdminID(values)
+	if userID <= 0 {
+		c.JSON(400, gin.H{"error": "Укажите ID получателя в Настройки → MAX или привяжите его через QR-код"})
+		return
+	}
+	if h.max == nil || !h.max.Enabled() {
+		c.JSON(503, gin.H{"error": "MAX не подключён"})
+		return
+	}
+	path, name, err := h.reportForDelivery(in.ReportID, in.FileName)
+	if err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+	deliveryID := strings.TrimSpace(in.DeliveryID)
+	if deliveryID == "" {
+		deliveryID = uuid.NewString()
+	}
+	h.sendHistoryMAX(c, userID, in.ReportID, "admin:"+deliveryID, path, name)
+}
+
+func (h *Handler) sendHistoryMAX(c *gin.Context, userID int64, reportID, deliveryID, path, name string) {
+	key := fmt.Sprintf("max:%s:%d:%s:%s", reportID, userID, deliveryID, name)
+	h.deliveryMu.Lock()
+	if h.delivered[key] {
+		h.deliveryMu.Unlock()
+		c.JSON(200, gin.H{"ok": true, "already_sent": true})
+		return
+	}
+	if h.delivering[key] {
+		h.deliveryMu.Unlock()
+		c.JSON(409, gin.H{"error": "Отчёт уже отправляется"})
+		return
+	}
+	h.delivering[key] = true
+	h.deliveryMu.Unlock()
+	success := false
+	defer func() {
+		h.deliveryMu.Lock()
+		delete(h.delivering, key)
+		if success {
+			h.delivered[key] = true
+		}
+		h.deliveryMu.Unlock()
+	}()
+	if err := h.max.SendFileToUser(c.Request.Context(), userID, path, name, "Ваш отчёт PRINTUS: "+name); err != nil {
+		c.JSON(502, gin.H{"error": "Не удалось отправить отчёт в MAX"})
+		return
+	}
+	success = true
+	c.JSON(200, gin.H{"ok": true, "message": "Отчёт отправлен в MAX", "file_name": name})
 }

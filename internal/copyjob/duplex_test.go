@@ -27,3 +27,13 @@ func TestQuoteAllowsDuplexForSeveralCopies(t *testing.T) {
 		t.Fatalf("got %d sheets, want 2", quote.Sheets)
 	}
 }
+
+func TestMonochromeCopyQuote(t *testing.T) {
+	q, err := QuotePrice(Options{Color: true, Copies: 3}, 10, 50)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if q.Color || q.Total != 30 {
+		t.Fatalf("unexpected monochrome quote: %+v", q)
+	}
+}

@@ -35,7 +35,7 @@
     if (el.tagName !== "INPUT") return false;
     const type = (el.type || "text").toLowerCase();
     return (
-      !el.disabled &&
+      !el.disabled && !el.readOnly &&
       ["text", "password", "email", "search", "tel", "url", "number"].includes(type)
     );
   }
@@ -106,13 +106,32 @@
     document.body.classList.add("osk-open");
     document.querySelectorAll(".osk-target").forEach((el) => el.classList.remove("osk-target"));
     input.classList.add("osk-target");
-    input.scrollIntoView({ block: "center", behavior: "smooth" });
+    requestAnimationFrame(() => {
+      if (activeInput !== input || root.hidden) return;
+      document.body.style.setProperty("--osk-height", root.getBoundingClientRect().height + "px");
+      requestAnimationFrame(keepInputVisible);
+    });
   }
+
+  function keepInputVisible() {
+    if (!activeInput || !root || root.hidden) return;
+    document.body.style.setProperty("--osk-height", root.getBoundingClientRect().height + "px");
+    const keyboardTop = root.getBoundingClientRect().top;
+    // Keep both the field and its label above the keyboard and fixed save bar.
+    const bottom = keyboardTop - (document.body.classList.contains("admin-app") ? 110 : 24);
+    const rect = activeInput.getBoundingClientRect();
+    if (rect.bottom > bottom || rect.top < 24) {
+      const target = Math.max(24, (bottom - rect.height) / 2);
+      window.scrollBy({ top: rect.top - target, behavior: "instant" });
+    }
+  }
+  window.addEventListener("resize", () => requestAnimationFrame(keepInputVisible));
 
   function hide() {
     const input = activeInput;
     if (root) root.hidden = true;
     document.body.classList.remove("osk-open");
+    document.body.style.removeProperty("--osk-height");
     document.querySelectorAll(".osk-target").forEach((el) => el.classList.remove("osk-target"));
     activeInput = null;
     if (input && document.activeElement === input) {

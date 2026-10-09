@@ -49,3 +49,21 @@ func TestQuoteKeepsDuplexForSeveralSelectedPages(t *testing.T) {
 		t.Fatalf("two duplex pages must use one sheet, got %d", quote.Sheets)
 	}
 }
+
+func TestMonochromeQuoteAndPaidOptions(t *testing.T) {
+	s := &Service{}
+	job := &Job{Pages: 2}
+	in := QuoteInput{Color: true, Copies: 2}
+	q, err := s.Quote(job, in, 7, 50)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if q.Color || q.Total != 28 {
+		t.Fatalf("unexpected monochrome quote: %+v", q)
+	}
+	s.LockOptions(job, in)
+	locked, ok := s.LockedOptions(job)
+	if !ok || locked.Color {
+		t.Fatal("paid settings must remain monochrome")
+	}
+}

@@ -2,13 +2,16 @@ package kiosk
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/skip2/go-qrcode"
 
 	"print-kiosk/internal/maxsvc"
 	"print-kiosk/internal/storage"
@@ -28,8 +31,10 @@ func (h *Handler) requireMax(c *gin.Context, needEnabled bool) bool {
 
 func (h *Handler) MaxInfo(c *gin.Context) {
 	maxMB := "20"
+	botLink := ""
 	if h.settings != nil {
 		if values, err := h.settings.GetAll(); err == nil {
+			botLink = strings.TrimSpace(values[storage.SettingMaxBotLink])
 			if v := strings.TrimSpace(values[storage.SettingEmailMaxFileSizeMB]); v != "" {
 				maxMB = v
 			}
@@ -53,8 +58,14 @@ func (h *Handler) MaxInfo(c *gin.Context) {
 	username, enabled, err := h.max.Info(c.Request.Context())
 	out["enabled"] = enabled
 	out["bot_username"] = username
-	if username != "" {
-		out["bot_link"] = "https://max.ru/" + username
+	if botLink == "" && username != "" {
+		botLink = "https://max.ru/" + username
+	}
+	out["bot_link"] = botLink
+	if botLink != "" {
+		if png, qrErr := qrcode.Encode(botLink, qrcode.Medium, 384); qrErr == nil {
+			out["bot_qr"] = "data:image/png;base64," + base64.StdEncoding.EncodeToString(png)
+		}
 	}
 	if err != nil {
 		out["error"] = err.Error()
@@ -188,11 +199,18 @@ func (h *Handler) StartMaxScanSession(c *gin.Context) {
 			username = u
 		}
 	}
-	c.JSON(http.StatusOK, gin.H{
-		"session":      maxsvc.ScanSessionJSON(sess),
-		"bot_username": username,
-		"bot_link":     "https://max.ru/" + username,
-	})
+	botLink := "https://max.ru/" + username
+	if h.settings != nil {
+		if configured, err := h.settings.Get(storage.SettingMaxBotLink); err == nil && strings.TrimSpace(configured) != "" {
+			botLink = strings.TrimSpace(configured)
+		}
+	}
+	deepLink := botLink + "?start=" + url.QueryEscape("scan_"+sess.Token)
+	out := gin.H{"session": maxsvc.ScanSessionJSON(sess), "bot_username": username, "bot_link": botLink}
+	if png, err := qrcode.Encode(deepLink, qrcode.Medium, 384); err == nil {
+		out["bot_qr"] = "data:image/png;base64," + base64.StdEncoding.EncodeToString(png)
+	}
+	c.JSON(http.StatusOK, out)
 }
 
 func (h *Handler) GetMaxScanSession(c *gin.Context) {

@@ -241,10 +241,12 @@ func (h *Handler) ExecuteCopyJob(c *gin.Context) {
 		h.max.CheckPaperAlert(context.Background())
 	}
 	c.JSON(http.StatusOK, gin.H{
-		"ok":      true,
-		"message": "Документ отправлен на копирование",
-		"sheets":  sheets,
-		"job":     copyJobJSON(job),
+		"ok":               true,
+		"message":          "Документ отправлен на копирование",
+		"output_confirmed": job.OutputConfirmed,
+		"test_mode":        deviceTest,
+		"sheets":           sheets,
+		"job":              copyJobJSON(job),
 	})
 }
 

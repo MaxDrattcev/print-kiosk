@@ -53,3 +53,6 @@ config.local.*
 *.pem
 *.key
 secrets.*
+
+# Public CA bundled for MAX HTTPS verification (not a private key).
+!internal/maxsvc/certs/russian_trusted_root_ca.pem

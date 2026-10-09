@@ -1,6 +1,8 @@
 package maxsvc
 
 import (
+	"archive/zip"
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -41,6 +43,10 @@ func (s *Service) pollOnce(ctx context.Context) {
 	s.mu.Unlock()
 
 	for _, u := range updates {
+		if u.UpdateType == model.UpdateBotStarted {
+			s.handleIncoming(ctx, u)
+			continue
+		}
 		if u.UpdateType != model.UpdateMessageCreated || u.Message == nil {
 			continue
 		}
@@ -49,11 +55,10 @@ func (s *Service) pollOnce(ctx context.Context) {
 }
 
 func (s *Service) handleIncoming(ctx context.Context, u model.Update) {
-	text := ""
-	if u.Message != nil {
-		text = strings.TrimSpace(u.Message.Body.Text)
-	}
 	userID := u.UserID
+	if u.User != nil && u.User.UserID != 0 {
+		userID = u.User.UserID
+	}
 	fromName := ""
 	if u.User != nil {
 		fromName = strings.TrimSpace(u.User.Name)
@@ -65,22 +70,13 @@ func (s *Service) handleIncoming(ctx context.Context, u model.Update) {
 		fromName = fmt.Sprintf("user %d", userID)
 	}
 
-	upper := strings.ToUpper(strings.TrimSpace(text))
-	s.mu.Lock()
-	for _, sess := range s.scanSess {
-		if sess.Status != StatusWaiting || sess.Code == "" {
-			continue
-		}
-		if strings.Contains(upper, sess.Code) {
-			sess.UserID = userID
-			sess.Status = StatusFound
-			sess.Error = ""
-			s.mu.Unlock()
-			_ = s.sendUserText(ctx, userID, "Код принят. Отправляем скан…")
-			return
-		}
+	if u.UpdateType == model.UpdateBotStarted && s.claimAdminBinding(u.Payload, userID, fromName, time.Now()) {
+		return
 	}
-	s.mu.Unlock()
+	if s.claimScan(u, userID, time.Now()) {
+		_ = s.sendUserText(ctx, userID, "Готовим документ к отправке…")
+		return
+	}
 
 	atts := collectPrintable(u)
 	if len(atts) == 0 {
@@ -141,25 +137,11 @@ func collectPrintable(u model.Update) []remoteFile {
 				continue
 			}
 			name := strings.TrimSpace(a.FileName)
-			if name == "" {
-				name = filepath.Base(url)
+			// MAX image URLs can contain opaque paths and query tokens, not filenames.
+			if name != "" {
+				name = filepath.Base(strings.ReplaceAll(name, "\\", "/"))
 			}
-			if name == "" || name == "." || name == "/" {
-				if a.Type == model.AttachImage {
-					name = "image.jpg"
-				} else {
-					name = "document.bin"
-				}
-			}
-			ext := strings.ToLower(filepath.Ext(name))
-			if a.Type == model.AttachImage && ext == "" {
-				name += ".jpg"
-				ext = ".jpg"
-			}
-			if !mailinbox.IsSupportedExt(ext) && a.Type != model.AttachImage {
-				continue
-			}
-			if a.Type == model.AttachImage && !mailinbox.IsSupportedExt(ext) {
+			if name != "" && !mailinbox.IsSupportedExt(strings.ToLower(filepath.Ext(name))) && a.Type != model.AttachImage {
 				continue
 			}
 			out = append(out, remoteFile{Name: name, URL: url, Size: int64(a.Size)})
@@ -186,7 +168,10 @@ func (s *Service) maxBytes() int64 {
 
 func (s *Service) downloadAttachments(ctx context.Context, dir string, atts []remoteFile) ([]File, error) {
 	limit := s.maxBytes()
-	client := &http.Client{Timeout: 60 * time.Second}
+	client, err := newHTTPClient(60 * time.Second)
+	if err != nil {
+		return nil, err
+	}
 	var files []File
 	for _, att := range atts {
 		if att.Size > 0 && att.Size > limit {
@@ -208,14 +193,18 @@ func (s *Service) downloadAttachments(ctx context.Context, dir string, atts []re
 		if int64(len(data)) > limit {
 			continue
 		}
+		name, ext := attachmentName(att.Name, data, len(files)+1)
+		if !mailinbox.IsSupportedExt(ext) {
+			continue
+		}
 		fid := uuid.NewString()
-		path := filepath.Join(dir, fid+filepath.Ext(att.Name))
+		path := filepath.Join(dir, fid+ext)
 		if err := os.WriteFile(path, data, 0o644); err != nil {
 			continue
 		}
 		files = append(files, File{
 			ID:   fid,
-			Name: att.Name,
+			Name: name,
 			Size: int64(len(data)),
 			Path: path,
 		})
@@ -224,4 +213,96 @@ func (s *Service) downloadAttachments(ctx context.Context, dir string, atts []re
 		return nil, fmt.Errorf("нет файлов")
 	}
 	return files, nil
+}
+
+// attachmentName uses the downloaded bytes rather than CDN URL parameters.
+func attachmentName(original string, data []byte, index int) (string, string) {
+	ext := ""
+	switch http.DetectContentType(data) {
+	case "application/pdf":
+		ext = ".pdf"
+	case "image/jpeg":
+		ext = ".jpg"
+	case "image/png":
+		ext = ".png"
+	case "image/bmp":
+		ext = ".bmp"
+	case "image/webp":
+		ext = ".webp"
+	}
+	if bytes.HasPrefix(data, []byte("II\x2a\x00")) || bytes.HasPrefix(data, []byte("MM\x00\x2a")) {
+		ext = ".tif"
+	}
+	if ext == "" {
+		if archive, err := zip.NewReader(bytes.NewReader(data), int64(len(data))); err == nil {
+			for _, f := range archive.File {
+				switch f.Name {
+				case "word/document.xml":
+					ext = ".docx"
+				case "xl/workbook.xml":
+					ext = ".xlsx"
+				case "ppt/presentation.xml":
+					ext = ".pptx"
+				case "mimetype":
+					if f.UncompressedSize64 > 128 {
+						continue
+					}
+					r, err := f.Open()
+					if err != nil {
+						continue
+					}
+					mime, _ := io.ReadAll(io.LimitReader(r, 128))
+					_ = r.Close()
+					switch string(mime) {
+					case "application/vnd.oasis.opendocument.text":
+						ext = ".odt"
+					case "application/vnd.oasis.opendocument.spreadsheet":
+						ext = ".ods"
+					case "application/vnd.oasis.opendocument.presentation":
+						ext = ".odp"
+					}
+				}
+			}
+		}
+	}
+	oldExt := strings.ToLower(filepath.Ext(original))
+	if ext == "" {
+		ext = oldExt
+	}
+	if original != "" && mailinbox.IsSupportedExt(oldExt) {
+		if ext == oldExt || (ext == ".jpg" && oldExt == ".jpeg") || (ext == ".tif" && oldExt == ".tiff") {
+			return original, oldExt
+		}
+		return strings.TrimSuffix(original, filepath.Ext(original)) + ext, ext
+	}
+	label := "Документ"
+	switch ext {
+	case ".jpg", ".png", ".bmp", ".webp", ".tif", ".heic", ".heif":
+		label = "Фото"
+	}
+	return fmt.Sprintf("%s %d%s", label, index, ext), ext
+}
+
+func (s *Service) claimScan(u model.Update, userID int64, now time.Time) bool {
+	if userID == 0 {
+		return false
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, sess := range s.scanSess {
+		if sess.Status != StatusWaiting || !now.Before(sess.Deadline) {
+			continue
+		}
+		matched := u.UpdateType == model.UpdateBotStarted && sess.Token != "" && u.Payload == "scan_"+sess.Token
+		if u.UpdateType == model.UpdateMessageCreated && u.Message != nil {
+			matched = sess.Code != "" && strings.TrimSpace(u.Message.Body.Text) == sess.Code
+		}
+		if matched {
+			sess.UserID = userID
+			sess.Status = StatusFound
+			sess.Error = ""
+			return true
+		}
+	}
+	return false
 }

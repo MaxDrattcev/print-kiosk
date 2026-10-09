@@ -20,6 +20,7 @@ import (
 	"github.com/pdfcpu/pdfcpu/pkg/pdfcpu/types"
 	_ "golang.org/x/image/bmp"
 	_ "golang.org/x/image/tiff"
+	_ "golang.org/x/image/webp"
 )
 
 type ScanOptions struct {
@@ -108,9 +109,22 @@ func ImageToA4PDFOrientation(imgPath, pdfPath string, landscape bool) error {
 		slog.Warn("image pdf params", "error", err)
 		return fmt.Errorf("не удалось подготовить изображение")
 	}
-	if err := api.ImportImagesFile([]string{pngPath}, pdfPath, imp, nil); err != nil {
+	// ImportImagesFile appends pages when the destination already exists.
+	// Rebuild separately so changing orientation replaces the old page.
+	tmp, err := os.CreateTemp(filepath.Dir(pdfPath), "image-pdf-*.pdf")
+	if err != nil {
+		return err
+	}
+	tempPath := tmp.Name()
+	_ = tmp.Close()
+	_ = os.Remove(tempPath)
+	defer os.Remove(tempPath)
+	if err := api.ImportImagesFile([]string{pngPath}, tempPath, imp, nil); err != nil {
 		slog.Warn("image pdf import", "error", err, "image", imgPath)
 		return fmt.Errorf("не удалось подготовить изображение к печати")
+	}
+	if err := os.Rename(tempPath, pdfPath); err != nil {
+		return fmt.Errorf("не удалось сохранить PDF: %w", err)
 	}
 	return nil
 }

@@ -31,23 +31,10 @@
     </header>
 
     <section class="prompt-card">
-      <div class="prompt-icon prompt-icon--max" aria-hidden="true">
-        <svg viewBox="0 0 96 96" fill="none">
-          <rect x="14" y="24" width="68" height="48" rx="10" fill="#18c97a"/>
-          <path d="M18 30l30 22 30-22" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-      </div>
-      <h1>Отправьте документ в MAX</h1>
-      <p>Откройте бота MAX и отправьте файл сообщением:</p>
-      <p class="scan-price delivery-address delivery-address--max kiosk-skeleton-text" id="bot-link" aria-label="Загружаем имя бота">Загружаем бота</p>
-      <ol class="scan-steps">
-        <li>Прикрепите файл в чат с ботом (PDF, Word, Excel, фото)</li>
-        <li>Максимальный размер файла: <strong id="max-size">—</strong></li>
-        <li>Отправьте сообщение боту и нажмите кнопку ниже</li>
-        <li>Ожидание файла на терминале — до 2 минут</li>
-      </ol>
+      <h1>Подключаем MAX…</h1>
+      <p>Готовим QR-код и ожидание вашего файла.</p>
       <p class="error" id="error" hidden></p>
-      <button type="button" class="primary-btn" id="sent-btn" disabled>Я отправил файл в MAX</button>
+      <button type="button" class="primary-btn" id="sent-btn" disabled>Попробовать снова</button>
     </section>
   </div>
 
@@ -64,31 +51,7 @@
       errorEl.hidden = !msg;
     }
 
-    if (params.get('timeout') === '1') {
-      showError('Файл не найден за 2 минуты. Отправьте документ боту ещё раз и нажмите кнопку ниже.');
-    }
-
-    (async () => {
-      try {
-        const res = await fetch('/api/kiosk/max/info');
-        const data = await res.json().catch(() => ({}));
-        document.getElementById('max-size').textContent = (data.max_file_size_mb || '20') + ' МБ';
-        if (!data.enabled) {
-          document.getElementById('bot-link').classList.remove('kiosk-skeleton-text');
-          document.getElementById('bot-link').textContent = 'MAX временно недоступен';
-          showError('Печать через MAX временно недоступна');
-          return;
-        }
-        document.getElementById('bot-link').textContent = data.bot_link || ('@' + (data.bot_username || ''));
-        document.getElementById('bot-link').classList.remove('kiosk-skeleton-text');
-        sentBtn.disabled = false;
-      } catch (e) {
-        document.getElementById('bot-link').classList.remove('kiosk-skeleton-text');
-        showError('Ошибка связи с сервером');
-      }
-    })();
-
-    sentBtn.addEventListener('click', async () => {
+    async function startWaiting() {
       showError('');
       sentBtn.disabled = true;
       try {
@@ -99,12 +62,20 @@
           sentBtn.disabled = false;
           return;
         }
-        location.href = '/print/max/wait/?session=' + encodeURIComponent(data.session.id) + (fromHome ? '&origin=home' : '');
+        location.replace('/print/max/wait/?session=' + encodeURIComponent(data.session.id) + (fromHome ? '&origin=home' : ''));
       } catch (e) {
         showError('Ошибка связи с сервером');
         sentBtn.disabled = false;
       }
-    });
+    }
+    sentBtn.addEventListener('click', startWaiting);
+    if (params.get('timeout') === '1') {
+      document.querySelector('h1').textContent = 'Время ожидания истекло';
+      showError('Нажмите «Попробовать снова», затем отправьте файл боту.');
+      sentBtn.disabled = false;
+    } else {
+      startWaiting();
+    }
   </script>
   <script src="/static/ui.js"></script>
   <script src="/static/idle.js"></script>

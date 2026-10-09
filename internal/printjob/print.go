@@ -54,7 +54,12 @@ func IsPaperJam(err error) bool {
 	return false
 }
 
+type PrintCompletion struct {
+	Confirmed bool
+}
+
 type PrintOptions struct {
+	Completion  *PrintCompletion
 	Color       bool
 	Duplex      bool
 	Copies      int
@@ -64,6 +69,7 @@ type PrintOptions struct {
 }
 
 func (s *Service) Print(job *Job, opt PrintOptions) error {
+	opt.Color = false
 	if job == nil {
 		return fmt.Errorf("job is nil")
 	}
@@ -182,13 +188,13 @@ func (s *Service) printWindows(filePath string, opt PrintOptions) error {
 	}
 
 	if sumatra := resolveSumatra(s.sumatraPath); sumatra != "" {
-		return monitorWindowsPrint(spoolPrinter, abs, func() error {
+		return monitorWindowsPrint(spoolPrinter, abs, opt.Completion, func() error {
 			return printSumatra(sumatra, abs, s.printerName, opt)
 		})
 	}
 
 	slog.Warn("SumatraPDF не найден, печать через ассоциацию Windows (менее надёжно)")
-	if err := monitorWindowsPrint(spoolPrinter, abs, func() error {
+	if err := monitorWindowsPrint(spoolPrinter, abs, opt.Completion, func() error {
 		return printWindowsShell(abs, s.printerName, opt)
 	}); err != nil {
 		slog.Warn("windows shell print failed", "error", err)

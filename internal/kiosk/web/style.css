@@ -107,7 +107,7 @@ body.kiosk-user:not(.kiosk-home) .brand-title::before {
 }
 body.kiosk-user:not(.kiosk-home) .brand-subtitle { font-size: 0; }
 body.kiosk-user:not(.kiosk-home) .brand-subtitle::before {
-  content: "МАГИЯ ЦВЕТНОЙ ПЕЧАТИ";
+  content: "МАГИЯ ПЕЧАТИ";
   color: #6d7890;
   font-size: 10px;
   font-weight: 800;
@@ -7413,3 +7413,81 @@ body.print-setup-page .settings-panel .price-box { padding: 11px 16px; border-ra
 body.print-setup-page .settings-panel .price-line { font-size: 15px; line-height: 1.2; }
 body.print-setup-page .settings-panel .price-line.total { font-size: 20px; }
 body.print-setup-page .settings-panel .pay-btn { min-height: 68px; font-size: 22px; }
+
+/* A single completion action fills the row instead of leaving an empty grid column. */
+body.kiosk-user:not(.kiosk-home) .kiosk-state-dialog .print-magic-actions:not(:has(> :not([hidden]) ~ :not([hidden]))) {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* Keep print configuration within the portrait kiosk viewport. */
+body.kiosk-user.print-setup-page:not(.kiosk-home) .setup-screen {
+  height: 100dvh;
+  min-height: 0;
+  padding: 16px 22px;
+  display: grid;
+  grid-template-rows: 66px auto minmax(0,1fr);
+  gap: 10px;
+  position: relative;
+}
+body.kiosk-user.print-setup-page:not(.kiosk-home) .app-header { margin: 0; padding: 0; min-height: 0; }
+body.kiosk-user.print-setup-page:not(.kiosk-home) .top-nav { position: absolute; top: 18px; right: 22px; width: auto; margin: 0; z-index: 2; }
+body.kiosk-user.print-setup-page:not(.kiosk-home) .back-btn { min-height: 52px; }
+body.kiosk-user.print-setup-page:not(.kiosk-home) .panel-error { margin: 0; grid-row: 2; }
+body.kiosk-user.print-setup-page:not(.kiosk-home) .setup-layout {
+  grid-row: 3;
+  display: grid;
+  grid-template-columns: minmax(0,1fr);
+  grid-template-rows: minmax(150px,1fr) auto;
+  gap: 12px;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+}
+body.kiosk-user.print-setup-page:not(.kiosk-home) .preview-panel {
+  display: flex; flex-direction: column; min-height: 0; padding: 14px; gap: 8px; border-radius: 22px;
+}
+body.kiosk-user.print-setup-page:not(.kiosk-home) .preview-meta { margin: 0; font-size: 17px; flex-shrink: 0; }
+body.kiosk-user.print-setup-page:not(.kiosk-home) .preview-meta strong { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+body.kiosk-user.print-setup-page:not(.kiosk-home) .orientation-visual { display: none; }
+body.kiosk-user.print-setup-page:not(.kiosk-home) .preview-orientation-control { margin: 0; padding: 8px 12px; flex-shrink: 0; }
+body.kiosk-user.print-setup-page:not(.kiosk-home) .orientation-note { margin: 3px 0 0; font-size: 12px; }
+body.kiosk-user.print-setup-page:not(.kiosk-home) .preview-scroll-hint { margin: 0; font-size: 12px; }
+body.kiosk-user.print-setup-page:not(.kiosk-home) .preview-frame,
+body.kiosk-user.print-setup-page:not(.kiosk-home) .preview-frame.image-preview:is(.preview-portrait,.preview-landscape),
+body.kiosk-user.print-setup-page:not(.kiosk-home) .preview-frame.document-preview:is(.preview-portrait,.preview-landscape) {
+  flex: 1; width: 100%; max-width: none; height: auto; min-height: 0; aspect-ratio: auto; margin: 0; padding: 8px; container-type: size;
+}
+body.kiosk-user.print-setup-page:not(.kiosk-home) .preview-frame iframe { width: 100%; height: 100%; min-height: 0; }
+body.kiosk-user.print-setup-page:not(.kiosk-home) .preview-frame.image-preview.preview-portrait img {
+  width: min(94cqw,calc(94cqh * .7071)); height: auto; max-height: 100%; aspect-ratio: 210 / 297;
+}
+body.kiosk-user.print-setup-page:not(.kiosk-home) .preview-frame.image-preview.preview-landscape img {
+  width: min(94cqw,calc(94cqh * 1.4142)); height: auto; max-height: 100%; aspect-ratio: 297 / 210;
+}
+body.kiosk-user.print-setup-page:not(.kiosk-home) .settings-panel {
+  padding: 14px 18px; gap: 8px 12px; border-radius: 22px; grid-template-columns: repeat(2,minmax(0,1fr));
+}
+body.kiosk-user.print-setup-page:not(.kiosk-home) .settings-panel h1 { font-size: 25px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.print-mono-label { font-size: 14px; color: #586c91; font-weight: 750; }
+body.kiosk-user.print-setup-page:not(.kiosk-home) .settings-panel .paper-remaining { margin: 0; font-size: 13px; }
+body.kiosk-user.print-setup-page:not(.kiosk-home) .settings-panel > :is(.print-pages-group,.scale-option-group) { grid-column: auto; }
+body.kiosk-user.print-setup-page:not(.kiosk-home) .settings-panel .option-group { padding: 8px 10px; margin: 0; }
+body.kiosk-user.print-setup-page:not(.kiosk-home) .scale-demo { display: none; }
+body.kiosk-user.print-setup-page:not(.kiosk-home) .settings-panel .price-box { display: grid; grid-template-columns: repeat(3,1fr); gap: 4px 16px; padding: 10px 14px; }
+body.kiosk-user.print-setup-page:not(.kiosk-home) .settings-panel .price-line { font-size: 13px; gap: 8px; }
+body.kiosk-user.print-setup-page:not(.kiosk-home) .settings-panel .price-line.total { grid-column: 1 / -1; font-size: 21px; margin-top: 2px; padding-top: 5px; }
+body.kiosk-user.print-setup-page:not(.kiosk-home) .settings-panel .pay-btn { min-height: 60px; margin: 0; }
+body.kiosk-user.print-setup-page:not(.kiosk-home) .page-range-wrap { margin-top: 5px; }
+body.kiosk-user.print-setup-page:not(.kiosk-home) .page-range-wrap input { min-height: 46px; font-size: 17px; }
+body.kiosk-user.print-setup-page:not(.kiosk-home) .page-range-wrap > p:not(.page-range-error) { display: none; }
+body.kiosk-user.print-setup-page:not(.kiosk-home) .settings-panel .price-box { margin: 0; }
+body.kiosk-user.print-setup-page:not(.kiosk-home) .settings-panel :is(.round-btn,.copies-row input) { height: 56px; min-height: 56px; }
+@media (max-height: 1200px) {
+  body.kiosk-user.print-setup-page:not(.kiosk-home) .setup-screen { padding: 10px 16px; grid-template-rows: 54px auto minmax(0,1fr); gap: 6px; }
+  body.kiosk-user.print-setup-page:not(.kiosk-home) .setup-layout { gap: 8px; }
+  body.kiosk-user.print-setup-page:not(.kiosk-home) .settings-panel { gap: 6px 10px; padding: 10px 14px; }
+  body.kiosk-user.print-setup-page:not(.kiosk-home) .settings-panel .segmented span { min-height: 48px; }
+  body.kiosk-user.print-setup-page:not(.kiosk-home) .settings-panel :is(.round-btn,.copies-row input) { height: 48px; min-height: 48px; }
+  body.kiosk-user.print-setup-page:not(.kiosk-home) .settings-panel .price-box { padding: 7px 12px; }
+  body.kiosk-user.print-setup-page:not(.kiosk-home) .preview-orientation-control .orientation-note { display: none; }
+}

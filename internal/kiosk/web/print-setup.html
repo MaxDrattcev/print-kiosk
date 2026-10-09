@@ -64,7 +64,7 @@
       </section>
 
       <section class="settings-panel card">
-        <h1>Настройки печати</h1>
+        <h1>Настройки печати <span class="print-mono-label">Только чёрно-белая</span></h1>
         <p class="paper-remaining" id="paper-remaining-line">Остаток бумаги: <strong id="paper-remaining">—</strong></p>
 
         <div class="option-group print-pages-group">
@@ -90,14 +90,6 @@
           <p class="duplex-note" id="duplex-note" hidden>Для одного отпечатка доступна только односторонняя печать</p>
         </div>
 
-        <div class="option-group print-option-card" id="color-group">
-          <span class="option-label">Цветность</span>
-          <div class="segmented">
-            <label><input type="radio" name="color" value="false" checked><span>Чёрно-белая</span></label>
-            <label><input type="radio" name="color" value="true"><span>Цветная</span></label>
-          </div>
-          <p class="color-auto-note" id="color-auto-note" hidden></p>
-        </div>
 
         <div class="option-group print-option-card scale-option-group">
           <span class="option-label">Размер на листе</span>
@@ -373,13 +365,13 @@
 
     function settings() {
       const duplexEl = document.querySelector('input[name="duplex"]:checked');
-      const colorEl = document.querySelector('input[name="color"]:checked');
+
       const orientationEl = document.querySelector('input[name="orientation"]:checked');
       const scaleEl = document.querySelector('input[name="scale"]:checked');
       const pagesModeEl = document.querySelector('input[name="pages-mode"]:checked');
       return {
         duplex: duplexEl ? duplexEl.value === 'true' : false,
-        color: colorEl ? colorEl.value === 'true' : false,
+        color: false,
         copies: Math.max(1, Math.min(100, parseInt(document.getElementById('copies').value, 10) || 1)),
         orientation: orientationEl ? orientationEl.value : 'portrait',
         page_range: pagesModeEl && pagesModeEl.value === 'custom'
@@ -550,14 +542,6 @@
       const naturalOrientation = job.natural_orientation === 'landscape' ? 'landscape' : 'portrait';
       const naturalOrientationInput = document.querySelector('input[name="orientation"][value="' + naturalOrientation + '"]');
       if (naturalOrientationInput) naturalOrientationInput.checked = true;
-      const suggestedColor = Boolean(job.suggested_color);
-      const suggestedColorInput = document.querySelector('input[name="color"][value="' + suggestedColor + '"]');
-      if (suggestedColorInput) suggestedColorInput.checked = true;
-      const colorAutoNote = document.getElementById('color-auto-note');
-      colorAutoNote.textContent = suggestedColor
-        ? 'Автоматически выбрана цветная печать: в документе найдены цвета'
-        : 'Автоматически выбрана чёрно-белая печать: документ выглядит монохромным';
-      colorAutoNote.hidden = false;
       document.getElementById('file-name').textContent = job.file_name;
       document.getElementById('page-count').textContent = job.pages + ' стр.';
       updateDuplexAvailability(job.pages, document.getElementById('copies').value);
@@ -581,9 +565,8 @@
       await refreshQuote();
     }
 
-    document.querySelectorAll('input[name="duplex"], input[name="color"], input[name="orientation"], input[name="scale"]').forEach((el) => {
+    document.querySelectorAll('input[name="duplex"], input[name="orientation"], input[name="scale"]').forEach((el) => {
       el.addEventListener('change', () => {
-        if (el.name === 'color') document.getElementById('color-auto-note').hidden = true;
         if (el.name === 'scale') renderPreview();
         else if (el.name === 'orientation') updatePreviewOrientation();
         refreshQuote();
@@ -700,14 +683,20 @@
           }
           const hasMoreFiles = await finishEmailPrintSuccess();
           printCompleted = true;
-          setMagicStage('ready', 'Ваш документ готов!', 'Заберите его из лотка принтера', 'Магия завершена');
+          if (printData.test_mode) {
+            setMagicStage('ready', 'Тестовая печать завершена', 'Документ не отправлялся на принтер', 'Тестовый режим');
+          } else if (printData.output_confirmed) {
+            setMagicStage('ready', 'Ваш документ готов!', 'Заберите его из лотка принтера', 'Магия завершена');
+          } else {
+            setMagicStage('ready', 'Задание передано принтеру', 'Дождитесь выхода всех листов и заберите документ из лотка', 'Принтер не подтвердил завершение');
+          }
           magicProgress.hidden = true;
           successMoreBtn.hidden = !hasMoreFiles;
           successHomeBtn.textContent = isInbox && !hasMoreFiles
             ? 'Выйти в главное меню'
             : 'Завершить печать';
           magicActions.hidden = false;
-          startSuccessCountdown();
+          if (printData.output_confirmed || printData.test_mode) startSuccessCountdown();
         }
       } catch (e) {
         KioskPayment.closeWaiting();

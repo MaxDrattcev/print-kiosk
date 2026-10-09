@@ -2,6 +2,7 @@ package maxsvc
 
 import (
 	"context"
+	"crypto/sha256"
 	"fmt"
 	"log/slog"
 	"os"
@@ -45,6 +46,7 @@ type ScanSession struct {
 	ID        string
 	JobID     string
 	Code      string
+	Token     string
 	Status    Status
 	Error     string
 	UserID    int64
@@ -60,6 +62,7 @@ type Service struct {
 	mu           sync.RWMutex
 	printSess    map[string]*PrintSession
 	scanSess     map[string]*ScanSession
+	adminBinding *AdminBinding
 	updateMarker int64
 	botUsername  string
 	lastPaperN   int
@@ -103,7 +106,7 @@ func (s *Service) api() (*maxbot.Api, error) {
 	if !ok {
 		return nil, fmt.Errorf("MAX не активирован или не настроен")
 	}
-	return maxbot.NewApi(token)
+	return NewAPI(token)
 }
 
 func (s *Service) BotUsername() string {
@@ -118,11 +121,12 @@ func (s *Service) Info(ctx context.Context) (username string, enabled bool, err 
 	if token == "" {
 		return "", false, fmt.Errorf("токен MAX не задан")
 	}
-	api, err := maxbot.NewApi(token)
+	api, err := NewAPI(token)
 	if err != nil {
 		return "", enabled, err
 	}
 	info, err := api.Bots.GetMyInfo(ctx)
+	s.RecordTokenCheck(token, err == nil)
 	if err != nil {
 		return "", enabled, err
 	}
@@ -161,4 +165,28 @@ func (s *Service) refreshBotInfo(ctx context.Context) {
 	if _, _, err := s.Info(ctx); err != nil {
 		slog.Debug("max bot info", "error", err)
 	}
+}
+
+// Store only a fingerprint: the check belongs to the exact token tested.
+func (s *Service) RecordTokenCheck(token string, success bool) {
+	if s.stats == nil {
+		return
+	}
+	state := "failed:"
+	if success {
+		state = "ok:"
+	}
+	fingerprint := sha256.Sum256([]byte(strings.TrimSpace(token)))
+	if err := s.stats.SetKV("max_token_check", fmt.Sprintf("%s%x", state, fingerprint)); err != nil {
+		slog.Warn("save MAX connection check", "error", err)
+	}
+}
+
+func (s *Service) TokenChecked(token string) bool {
+	if s.stats == nil || strings.TrimSpace(token) == "" {
+		return false
+	}
+	value, ok := s.stats.GetKV("max_token_check")
+	fingerprint := sha256.Sum256([]byte(strings.TrimSpace(token)))
+	return ok && value == fmt.Sprintf("ok:%x", fingerprint)
 }

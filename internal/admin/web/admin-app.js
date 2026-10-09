@@ -25,9 +25,7 @@
   const PASSWORD_MASK = "********";
   const DEFAULTS = {
     price_bw: "5",
-    price_color: "15",
     price_copy: "10",
-    price_copy_color: "15",
     price_scan: "10",
     paper_remaining: "500",
     paper_alert_threshold: "50",
@@ -214,6 +212,11 @@
       if (!el) continue;
       if (boolFields.has(key)) {
         el.checked = value === "true";
+      } else if (key === "max_bot_token") {
+        el.value = "";
+        el.dataset.stored = value === PASSWORD_MASK ? "true" : "false";
+        el.placeholder = el.dataset.stored === "true" ? "••••••••••••••••" : "Введите токен бота";
+        el.dataset.revealedStored = "false";
       } else {
         el.value = value;
       }
@@ -243,9 +246,10 @@
   }
 
   function collectForm(form) {
+    const panel = document.getElementById("panel-" + currentSection);
     const data = {};
     for (const el of form.elements) {
-      if (!el.name) continue;
+      if (!el.name || (panel && !panel.contains(el))) continue;
       if (boolFields.has(el.name)) {
         data[el.name] = el.checked ? "true" : "false";
       } else {
@@ -276,7 +280,12 @@
     errorEl.hidden = true;
     successEl.hidden = true;
     const form = document.getElementById("settings-form");
+    const panel = document.getElementById("panel-" + currentSection);
+    for (const field of panel?.querySelectorAll("input, textarea, select") || []) {
+      if (!field.disabled && !field.reportValidity()) return false;
+    }
     const payload = collectForm(form);
+    try {
     const res = await fetch("/api/admin/settings", {
       method: "PUT",
       credentials: "same-origin",
@@ -293,14 +302,23 @@
       form.elements.namedItem("email_password").value = PASSWORD_MASK;
     }
     if (payload.max_bot_token && payload.max_bot_token !== PASSWORD_MASK) {
-      form.elements.namedItem("max_bot_token").value = PASSWORD_MASK;
+      form.elements.namedItem("max_bot_token").value = "";
+      form.elements.namedItem("max_bot_token").dataset.stored = "true";
+      form.elements.namedItem("max_bot_token").placeholder = "••••••••••••••••";
+      form.elements.namedItem("max_bot_token").dataset.revealedStored = "false";
       document.getElementById("max-token-state").textContent = "Токен бота: задан";
+      hideMAXToken();
     }
-    updatePaperStatus(payload.paper_remaining);
+    if (payload.paper_remaining !== undefined) updatePaperStatus(payload.paper_remaining);
     markClean();
     successEl.textContent = "✓ Настройки сохранены";
     successEl.hidden = false;
     return true;
+    } catch (_) {
+      errorEl.textContent = "Не удалось сохранить настройки: нет связи с сервером. Введённое значение сохранено в поле — попробуйте ещё раз.";
+      errorEl.hidden = false;
+      return false;
+    }
   }
 
   async function loadOverview() {
@@ -622,14 +640,14 @@
   });
   const historyDeliveryModal=document.getElementById("history-delivery-modal");
   function historyDeliveryShow(step) {
-    ["name","channel","usb","email","max"].forEach((id)=>{document.getElementById("history-"+id+"-step").hidden=id!==step;});
+    ["name","channel","usb","email","max","max-choice"].forEach((id)=>{document.getElementById("history-"+id+"-step").hidden=id!==step;});
     document.getElementById("history-delivery-success").hidden=true;
     document.getElementById("history-delivery-error").hidden=true;
     document.getElementById("history-delivery-close").hidden=false;
   }
   function historyDeliveryError(message){const el=document.getElementById("history-delivery-error");el.textContent=message;el.hidden=false;}
   function historyFileName(){let name=document.getElementById("history-file-name").value.trim();if(name&&!name.toLowerCase().endsWith(".pdf"))name+=".pdf";return name;}
-  function historyDeliveryDone(message){["name","channel","usb","email","max"].forEach((id)=>document.getElementById("history-"+id+"-step").hidden=true);document.getElementById("history-delivery-title").hidden=true;document.getElementById("history-delivery-error").hidden=true;document.getElementById("history-delivery-close").hidden=true;document.getElementById("history-delivery-success-text").textContent=message;document.getElementById("history-delivery-success").hidden=false;}
+  function historyDeliveryDone(message){["name","channel","usb","email","max","max-choice"].forEach((id)=>document.getElementById("history-"+id+"-step").hidden=true);document.getElementById("history-delivery-title").hidden=true;document.getElementById("history-delivery-error").hidden=true;document.getElementById("history-delivery-close").hidden=true;document.getElementById("history-delivery-success-text").textContent=message;document.getElementById("history-delivery-success").hidden=false;}
   document.getElementById("history-take-btn").addEventListener("click",()=>{document.getElementById("history-print-modal").close();document.getElementById("history-delivery-title").hidden=false;document.getElementById("history-file-name").value=historyDefaultName;historyDeliveryShow("name");historyDeliveryModal.showModal();});
   document.getElementById("history-name-next").addEventListener("click",()=>{if(!historyFileName()){historyDeliveryError("Укажите название файла");return;}document.getElementById("history-delivery-title").textContent="Как забрать отчёт?";historyDeliveryShow("channel");});
   document.querySelectorAll("[data-history-channel]").forEach((btn)=>btn.addEventListener("click",async()=>{
@@ -641,7 +659,18 @@
       if(!res.ok||!(data.drives||[]).length){list.innerHTML="";historyDeliveryError("Флешка не найдена. Вставьте накопитель и попробуйте снова.");return;}
       list.innerHTML="";(data.drives||[]).forEach((drive)=>{const b=document.createElement("button");b.type="button";b.className="admin-btn secondary";b.textContent=drive.label||drive.name;b.addEventListener("click",()=>saveHistoryUSB(drive.path));list.appendChild(b);});return;
     }
-    historyDeliveryShow("max");startHistoryMAX();
+    historyDeliveryShow("max-choice");
+    const adminBtn = document.getElementById("history-max-admin");
+    const hint = document.getElementById("history-max-admin-hint");
+    adminBtn.disabled = true;
+    hint.textContent = "Проверяем настройки…";
+    try {
+      const response = await fetch("/api/admin/history/deliver/max/options", {cache:"no-store"});
+      const options = await response.json();
+      if (!response.ok) throw new Error(options.error || "Не удалось загрузить настройки");
+      adminBtn.disabled = !options.admin_configured;
+      hint.textContent = options.admin_configured ? "Отчёт будет отправлен получателю уведомлений о работе принтера." : "Чтобы отправлять администратору, укажите ID пользователя в Настройки → MAX или привяжите получателя через QR-код.";
+    } catch(error) { hint.textContent = error.message || "Не удалось загрузить настройки"; }
   }));
   async function saveHistoryUSB(drivePath){const res=await fetch("/api/admin/history/deliver/usb",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({report_id:historyReportID,file_name:historyFileName(),drive_path:drivePath})});const data=await res.json().catch(()=>({}));if(!res.ok){historyDeliveryError(userError(data,"Не удалось сохранить отчёт",res.status));return;}historyDeliveryDone("Отчёт «"+historyFileName()+"» сохранён на флешку. Её можно безопасно извлечь.");}
   document.getElementById("history-email-send").addEventListener("click",async()=>{
@@ -657,7 +686,40 @@
     } catch(e) { historyDeliveryError("Ошибка связи с сервером. Повторите попытку после проверки подключения."); }
     finally { historyEmailSending=false;button.disabled=false;button.textContent="Отправить отчёт";status.hidden=true; }
   });
-  async function startHistoryMAX(){const res=await fetch("/api/admin/history/deliver/max",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({report_id:historyReportID,file_name:historyFileName()})});const data=await res.json().catch(()=>({}));if(!res.ok){historyDeliveryError(userError(data,"Не удалось подключить MAX",res.status));return;}historyMaxSession=data.session.id;document.getElementById("history-max-code").textContent=data.session.code;document.getElementById("history-max-bot").textContent=data.bot_username?("Бот: @"+data.bot_username):"Откройте настроенного бота MAX";clearInterval(historyMaxTimer);historyMaxTimer=setInterval(pollHistoryMAX,1800);}
+  document.getElementById("history-max-admin").addEventListener("click", async () => {
+    const button = document.getElementById("history-max-admin");
+    button.disabled = true;
+    document.getElementById("history-delivery-error").hidden = true;
+    try {
+      const res = await fetch("/api/admin/history/deliver/max/admin", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({report_id:historyReportID,file_name:historyFileName(),delivery_id:crypto.randomUUID()})});
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Не удалось отправить отчёт");
+      historyDeliveryDone("Отчёт «" + historyFileName() + "» отправлен администратору в MAX.");
+    } catch(error) { historyDeliveryError(error.message || "Ошибка связи с сервером"); }
+    finally { button.disabled = false; }
+  });
+  document.getElementById("history-max-qr").addEventListener("click", () => {
+    historyDeliveryShow("max");
+    startHistoryMAX().catch(() => historyDeliveryError("Ошибка связи с сервером. Попробуйте снова."));
+  });
+  async function startHistoryMAX() {
+    const qr = document.getElementById("history-max-qr-image");
+    qr.hidden = true; qr.removeAttribute("src");
+    document.getElementById("history-max-fallback").open = false;
+    document.getElementById("history-max-code").textContent = "…";
+    document.getElementById("history-max-status").textContent = "Создаём QR-код…";
+    const res=await fetch("/api/admin/history/deliver/max",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({report_id:historyReportID,file_name:historyFileName()})});
+    const data=await res.json().catch(()=>({}));
+    if(!res.ok){historyDeliveryError(userError(data,"Не удалось подключить MAX",res.status));return;}
+    historyMaxSession=data.session.id;
+    document.getElementById("history-max-code").textContent=data.session.code;
+    document.getElementById("history-max-bot").textContent=data.bot_link || "Откройте настроенного бота MAX";
+    if (data.bot_qr) {qr.src=data.bot_qr;qr.hidden=false;}
+    else document.getElementById("history-max-fallback").open=true;
+    document.getElementById("history-max-status").textContent="Ожидаем получателя… QR-код действует 2 минуты.";
+    clearInterval(historyMaxTimer);
+    historyMaxTimer=setInterval(() => pollHistoryMAX().catch(() => historyDeliveryError("Ошибка связи с сервером")),1800);
+  }
   async function pollHistoryMAX(){if(!historyMaxSession)return;const res=await fetch("/api/admin/history/deliver/max/"+encodeURIComponent(historyMaxSession),{credentials:"same-origin"});const data=await res.json().catch(()=>({}));if(!res.ok)return;const status=data.session&&data.session.status;if(status==="found"){clearInterval(historyMaxTimer);const done=await fetch("/api/admin/history/deliver/max/"+encodeURIComponent(historyMaxSession)+"/complete",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({report_id:historyReportID,file_name:historyFileName()})});const result=await done.json().catch(()=>({}));if(!done.ok){historyDeliveryError(userError(result,"Не удалось отправить отчёт",done.status));return;}historyDeliveryDone("Отчёт «"+historyFileName()+"» уже ждёт вас в MAX.");}else if(status==="timeout"||status==="error"){clearInterval(historyMaxTimer);historyDeliveryError((data.session&&data.session.error)||"Время ожидания истекло");}}
   document.getElementById("history-delivery-close").addEventListener("click",()=>{clearInterval(historyMaxTimer);historyDeliveryModal.close();});
   document.getElementById("history-delivery-more").addEventListener("click",()=>{document.getElementById("history-delivery-title").hidden=false;document.getElementById("history-delivery-title").textContent="Как забрать отчёт?";historyDeliveryShow("channel");});
@@ -852,15 +914,139 @@
     btn.addEventListener("click", () => {
       const el = document.querySelector('input[name="' + btn.dataset.reveal + '"]');
       if (!el) return;
-      el.value = "";
+      if (el.value === PASSWORD_MASK) el.value = "";
       el.focus();
       markDirty();
     });
   });
 
+  let maxBindingId = "";
+  let maxBindingTimer = null;
+  let maxBindingBusy = false;
+  const maxBindBtn = document.getElementById("max-bind-btn");
+  const maxBindPanel = document.getElementById("max-bind-panel");
+  const maxBindResult = document.getElementById("max-bind-result");
+  const maxBindStatus = document.getElementById("max-bind-status");
+  function stopMaxBinding() {
+    clearInterval(maxBindingTimer);
+    maxBindingTimer = null;
+    maxBindBtn.disabled = false;
+    maxBindPanel.hidden = true;
+    document.getElementById("max-bind-qr").removeAttribute("src");
+  }
+  document.getElementById("max-bind-cancel").addEventListener("click", async () => {
+    const id = maxBindingId;
+    maxBindingId = "";
+    stopMaxBinding();
+    maxBindResult.textContent = "QR-код закрыт.";
+    if (id) {
+      try {
+        const res = await fetch("/api/admin/max/binding/" + encodeURIComponent(id), {method: "DELETE"});
+        if (!res.ok) throw new Error("cancel failed");
+        const data = await res.json();
+        if (data.binding?.status === "bound") {
+          document.querySelector('input[name="max_admin_id"]').value = String(data.binding.user_id);
+          maxBindResult.textContent = "Получатель уже привязан: " + (data.binding.name || data.binding.user_id) + ". ID сохранён автоматически.";
+        }
+      }
+      catch (_) { maxBindResult.textContent = "Не удалось отменить на сервере. QR-код истечёт через 2 минуты."; }
+    }
+  });
+  maxBindBtn.addEventListener("click", async () => {
+    maxBindBtn.disabled = true;
+    maxBindResult.textContent = "Создаём QR-код…";
+    try {
+      const res = await fetch("/api/admin/max/binding", {method: "POST"});
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Не удалось начать привязку");
+      maxBindingId = data.binding.id;
+      document.getElementById("max-bind-qr").src = data.qr;
+      maxBindPanel.hidden = false;
+      maxBindResult.textContent = "";
+      const deadline = Date.parse(data.binding.deadline);
+      const pollBinding = async () => {
+        if (maxBindingBusy || !maxBindingId) return;
+        maxBindingBusy = true;
+        const id = maxBindingId;
+        try {
+          const response = await fetch("/api/admin/max/binding/" + encodeURIComponent(id), {cache: "no-store"});
+          const result = await response.json();
+          if (maxBindingId !== id) return;
+          if (!response.ok) throw new Error(result.error || "Ошибка проверки привязки");
+          const binding = result.binding;
+          if (binding.status === "bound") {
+            document.querySelector('input[name="max_admin_id"]').value = String(binding.user_id);
+            maxBindingId = "";
+            stopMaxBinding();
+            maxBindResult.textContent = "Получатель привязан: " + (binding.name || binding.user_id) + ". ID сохранён автоматически.";
+          } else if (binding.status === "timeout") {
+            maxBindingId = "";
+            stopMaxBinding();
+            maxBindResult.textContent = "Время ожидания истекло. Создайте новый QR-код.";
+          } else {
+            maxBindStatus.textContent = "Ожидание: " + Math.max(0, Math.ceil((deadline - Date.now()) / 1000)) + " сек.";
+          }
+        } catch (error) {
+          if (maxBindingId === id) maxBindStatus.textContent = error.message;
+        } finally { maxBindingBusy = false; }
+      };
+      maxBindingTimer = setInterval(pollBinding, 1500);
+      pollBinding();
+    } catch (error) {
+      stopMaxBinding();
+      maxBindResult.textContent = error.message || "Не удалось начать привязку";
+    }
+  });
+
+  const maxTokenInput = document.querySelector('input[name="max_bot_token"]');
+  const maxTokenToggle = document.getElementById("max-token-toggle");
+  function hideMAXToken() {
+    if (maxTokenInput.dataset.revealedStored === "true") {
+      maxTokenInput.value = "";
+      maxTokenInput.dataset.revealedStored = "false";
+    }
+    maxTokenInput.type = "password";
+    maxTokenToggle.textContent = "Показать";
+    maxTokenToggle.setAttribute("aria-pressed", "false");
+    maxTokenToggle.setAttribute("aria-label", "Показать токен бота");
+  }
+  maxTokenInput.addEventListener("input", () => {
+    maxTokenInput.dataset.revealedStored = "false";
+  });
+  maxTokenToggle.addEventListener("click", async () => {
+    if (maxTokenInput.type === "text") {
+      hideMAXToken();
+      return;
+    }
+    maxTokenToggle.disabled = true;
+    const initialValue = maxTokenInput.value;
+    try {
+      if (initialValue === "" && maxTokenInput.dataset.stored === "true") {
+        const res = await fetch("/api/admin/max/token/reveal", {
+          method: "POST", credentials: "same-origin", cache: "no-store",
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(userError(data, "Не удалось показать токен", res.status));
+        // Do not overwrite a new token typed while the request was in flight.
+        if (maxTokenInput.value === initialValue) {
+          maxTokenInput.value = data.token || "";
+          maxTokenInput.dataset.revealedStored = "true";
+        }
+      }
+      maxTokenInput.type = "text";
+      maxTokenToggle.textContent = "Скрыть";
+      maxTokenToggle.setAttribute("aria-pressed", "true");
+      maxTokenToggle.setAttribute("aria-label", "Скрыть токен бота");
+    } catch (error) {
+      document.getElementById("max-test-result").textContent = error.message || "Не удалось показать токен";
+    } finally {
+      maxTokenToggle.disabled = false;
+    }
+  });
+
   document.getElementById("email-test-btn").addEventListener("click", async () => {
     const form = document.getElementById("settings-form");
-    await postTest(
+    const data = await postTest(
       "/api/admin/email/test",
       {
         email_address: form.elements.namedItem("email_address").value,
@@ -869,6 +1055,7 @@
       },
       document.getElementById("email-test-result")
     );
+    if (data && data.ok) await loadOverview();
   });
 
   document.getElementById("max-test-btn").addEventListener("click", async () => {
@@ -882,7 +1069,10 @@
       },
       document.getElementById("max-test-result")
     );
-    if (data && data.bot_username) document.getElementById("max-bot-username").value = "@" + data.bot_username;
+    if (data && data.bot_username) {
+      document.getElementById("max-bot-username").value = "@" + data.bot_username;
+      await loadOverview();
+    }
   });
 
   document.getElementById("max-send-btn").addEventListener("click", async () => {
@@ -896,7 +1086,10 @@
       },
       document.getElementById("max-test-result")
     );
-    if (data && data.bot_username) document.getElementById("max-bot-username").value = "@" + data.bot_username;
+    if (data && data.bot_username) {
+      document.getElementById("max-bot-username").value = "@" + data.bot_username;
+      await loadOverview();
+    }
   });
 
   const dangerModal = document.getElementById("danger-modal");

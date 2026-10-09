@@ -23,6 +23,7 @@ import (
 	"github.com/pdfcpu/pdfcpu/pkg/pdfcpu/types"
 	_ "golang.org/x/image/bmp"
 	_ "golang.org/x/image/tiff"
+	_ "golang.org/x/image/webp"
 
 	"print-kiosk/internal/device"
 	"print-kiosk/internal/libreoffice"
@@ -140,10 +141,6 @@ func (s *Service) PrepareFromLocal(sourcePath, displayName string) (*Job, error)
 		slog.Warn("could not detect document orientation", "file", displayName, "error", orientationErr)
 		naturalOrientation = "portrait"
 	}
-	suggestedColor, colorErr := detectDocumentColor(localSource, previewPath, kind)
-	if colorErr != nil {
-		slog.Warn("could not detect document color", "file", displayName, "error", colorErr)
-	}
 
 	job := &Job{
 		ID:                 id,
@@ -151,7 +148,7 @@ func (s *Service) PrepareFromLocal(sourcePath, displayName string) (*Job, error)
 		Pages:              pages,
 		PreviewKind:        kind,
 		NaturalOrientation: naturalOrientation,
-		SuggestedColor:     suggestedColor,
+		SuggestedColor:     false,
 		CreatedAt:          time.Now(),
 		Dir:                dir,
 		SourcePath:         localSource,
@@ -262,6 +259,7 @@ type Quote struct {
 }
 
 func (s *Service) Quote(job *Job, in QuoteInput, priceBW, priceColor float64) (*Quote, error) {
+	in.Color = false
 	if in.Copies < 1 {
 		in.Copies = 1
 	}
@@ -277,9 +275,6 @@ func (s *Service) Quote(job *Job, in QuoteInput, priceBW, priceColor float64) (*
 		return nil, err
 	}
 	price := priceBW
-	if in.Color {
-		price = priceColor
-	}
 	pageCount := len(selectedPages)
 	// Duplex becomes meaningful as soon as the job contains at least two
 	// impressions, including two copies of a one-page document.
@@ -398,7 +393,7 @@ func (s *Service) LockOptions(job *Job, in QuoteInput) {
 		copies = 1
 	}
 	job.Paid = true
-	job.Color = in.Color
+	job.Color = false
 	selectedPages, _, _ := ParsePageRange(in.PageRange, job.Pages)
 	job.Duplex = in.Duplex && len(selectedPages)*copies > 1
 	job.Copies = copies
@@ -454,7 +449,7 @@ func (s *Service) buildPreview(sourcePath, dir string) (string, PreviewKind, int
 		}
 		return preview, PreviewPDF, pages, nil
 
-	case ".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff":
+	case ".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff", ".webp":
 		preview := filepath.Join(dir, "preview.pdf")
 		if err := device.ImageToA4PDF(sourcePath, preview); err != nil {
 			return "", "", 0, err

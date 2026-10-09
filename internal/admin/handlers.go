@@ -3,6 +3,7 @@ package admin
 import (
 	"log/slog"
 	"net/http"
+	"net/url"
 	"runtime"
 	"strconv"
 	"strings"
@@ -118,6 +119,17 @@ func (h *Handler) GetSettings(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"settings": values})
 }
 
+// RevealMAXToken is available only in the authenticated specialist cabinet.
+func (h *Handler) RevealMAXToken(c *gin.Context) {
+	c.Header("Cache-Control", "no-store")
+	token, err := h.settings.Get(storage.SettingMaxBotToken)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось загрузить токен бота"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"token": token})
+}
+
 func (h *Handler) UpdateSettings(c *gin.Context) {
 	var payload map[string]string
 	if err := c.ShouldBindJSON(&payload); err != nil {
@@ -202,6 +214,8 @@ func (h *Handler) Overview(c *gin.Context) {
 		emailStatus, emailLabel = "off", "Выключен"
 	} else if !emailReady {
 		emailStatus, emailLabel = "warn", "Не настроен"
+	} else if h.emailChecked(values) {
+		emailStatus, emailLabel = "ok", "Подключение проверено"
 	} else {
 		emailStatus, emailLabel = "warn", "Данные заполнены · нужна проверка"
 	}
@@ -215,6 +229,8 @@ func (h *Handler) Overview(c *gin.Context) {
 		maxStatus, maxLabel = "off", "Выключен"
 	case !maxToken:
 		maxStatus, maxLabel = "warn", "Не настроен"
+	case h.max != nil && h.max.TokenChecked(values[storage.SettingMaxBotToken]):
+		maxStatus, maxLabel = "ok", "Подключение проверено"
 	default:
 		maxStatus, maxLabel = "warn", "Токен задан · нужна проверка"
 	}
@@ -496,6 +512,14 @@ func validateSetting(key, value string) error {
 	case storage.SettingTelegramHeartbeatInterval:
 		if value == "" {
 			return errInvalid(key, "значение не может быть пустым")
+		}
+	case storage.SettingMaxBotLink:
+		if value == "" {
+			return nil
+		}
+		u, err := url.Parse(value)
+		if err != nil || u.Scheme != "https" || u.Host != "max.ru" || u.User != nil || strings.Trim(u.Path, "/") == "" || u.RawQuery != "" || u.Fragment != "" {
+			return errInvalid(key, "укажите ссылку на бота вида https://max.ru/имя_бота")
 		}
 	case storage.SettingMaxAdminID:
 		if value == "" {

@@ -12,6 +12,7 @@ import (
 
 	"print-kiosk/internal/mailinbox"
 	"print-kiosk/internal/mailout"
+	"print-kiosk/internal/maxsvc"
 	"print-kiosk/internal/storage"
 )
 
@@ -53,6 +54,8 @@ func (h *Handler) TestEmail(c *gin.Context) {
 		login = addr
 	}
 
+	checked := false
+	defer func() { h.recordEmailCheck(addr, login, pass, checked) }()
 	imapHost, imapPort := mailinbox.ResolveHost(addr)
 	if err := mailinbox.Test(mailinbox.Credentials{
 		Address: addr, Login: login, Password: pass, Host: imapHost, Port: imapPort,
@@ -71,6 +74,7 @@ func (h *Handler) TestEmail(c *gin.Context) {
 		return
 	}
 
+	checked = true
 	c.JSON(http.StatusOK, gin.H{"ok": true, "message": "Подключение успешно"})
 }
 
@@ -106,16 +110,19 @@ func (h *Handler) TestMAX(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 15*time.Second)
 	defer cancel()
 
-	api, err := maxbot.NewApi(token)
+	api, err := maxsvc.NewAPI(token)
 	if err != nil {
 		slog.Warn("admin max test api", "error", err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Не удалось проверить MAX"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": classifyMAXError(err)})
 		return
 	}
 	info, err := api.Bots.GetMyInfo(ctx)
+	if h.max != nil {
+		h.max.RecordTokenCheck(token, err == nil)
+	}
 	if err != nil {
 		slog.Warn("admin max test getme", "error", err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Не удалось проверить MAX"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": classifyMAXError(err)})
 		return
 	}
 	username := strings.TrimPrefix(info.Username, "@")
@@ -164,5 +171,20 @@ func classifyMailError(kind string, err error) string {
 		return "Превышено время ожидания " + kind
 	default:
 		return "Не удалось подключиться к " + kind
+	}
+}
+
+func classifyMAXError(err error) string {
+	if err == nil {
+		return "Не удалось проверить MAX"
+	}
+	message := strings.ToLower(err.Error())
+	switch {
+	case strings.Contains(message, "x509:"), strings.Contains(message, "tls:"):
+		return "Не удалось установить защищённое соединение с MAX: ошибка сертификата. Проверьте дату компьютера и обновите приложение."
+	case strings.Contains(message, "401"), strings.Contains(message, "unauthorized"):
+		return "MAX отклонил токен бота. Проверьте токен и сохраните изменения."
+	default:
+		return "Не удалось связаться с MAX. Проверьте интернет и повторите проверку."
 	}
 }

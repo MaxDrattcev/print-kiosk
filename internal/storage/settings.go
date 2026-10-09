@@ -103,6 +103,7 @@ func IsKnownSetting(key string) bool {
 		SettingTelegramCartridgeAlerts,
 		SettingMaxEnabled,
 		SettingMaxBotToken,
+		SettingMaxBotLink,
 		SettingMaxAdminID,
 		SettingMaxInkAlerts,
 		SettingEmailAddress,

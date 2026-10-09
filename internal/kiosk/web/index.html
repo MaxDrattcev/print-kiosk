@@ -15,7 +15,7 @@
         </div>
         <div>
           <div class="home-logo-name">PRINTUS</div>
-          <div class="home-logo-tag">Магия цветной печати</div>
+          <div class="home-logo-tag">Магия печати</div>
         </div>
       </button>
     </header>
@@ -133,9 +133,7 @@
       <h2>Стоимость услуг</h2>
       <div class="price-rows">
         <div><span>Чёрно-белая печать</span><strong id="price-bw">—</strong></div>
-        <div><span>Цветная печать</span><strong id="price-color">—</strong></div>
         <div><span>Чёрно-белая копия</span><strong id="price-copy">—</strong></div>
-        <div><span>Цветная копия</span><strong id="price-copy-color">—</strong></div>
         <div><span>Сканирование</span><strong id="price-scan">—</strong></div>
       </div>
       <button value="close">Закрыть</button>
@@ -199,9 +197,7 @@
         return;
       }
       document.getElementById('price-bw').textContent = formatPrice(info.price_bw);
-      document.getElementById('price-color').textContent = formatPrice(info.price_color);
       document.getElementById('price-copy').textContent = formatPrice(info.price_copy);
-      document.getElementById('price-copy-color').textContent = formatPrice(info.price_copy_color);
       document.getElementById('price-scan').textContent = formatPrice(info.price_scan);
       document.getElementById('home-price-print').textContent = formatFromPrice(info.price_bw, false);
       document.getElementById('home-price-copy').textContent = formatFromPrice(info.price_copy, false);

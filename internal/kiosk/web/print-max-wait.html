@@ -31,18 +31,11 @@
     </header>
 
     <section class="prompt-card wait-magic-card" id="wait-panel">
-      <div class="wait-magic-art wait-magic-art--max" aria-hidden="true">
-        <span class="wait-magic-glow"></span>
-        <span class="wait-magic-ring wait-magic-ring--one"></span>
-        <span class="wait-magic-ring wait-magic-ring--two"></span>
-        <span class="wait-magic-channel"></span>
-        <span class="wait-magic-page wait-magic-page--one"></span>
-        <span class="wait-magic-page wait-magic-page--two"></span>
-        <span class="wait-magic-page wait-magic-page--three"></span>
-        <span class="wait-magic-sparkles"></span>
-      </div>
-      <p class="wait-magic-kicker">Магический поиск в MAX</p>
-      <h1>Ищем ваш файл…</h1>
+      <h1>Отправьте документ в MAX</h1>
+      <img id="bot-qr" alt="QR-код бота MAX" width="320" height="320" hidden style="max-width:80%;height:auto;background:white;border-radius:16px;margin:16px auto;image-rendering:pixelated">
+      <p id="bot-link">Загружаем ссылку на бота…</p>
+      <p>Наведите камеру телефона на QR-код, откройте бота, нажмите «Начать» и прикрепите файл.</p>
+      <p>PDF, Word, Excel или фото · до <span id="max-size">20</span> МБ</p>
       <p class="wait-magic-phrase" id="status-text">Заглядываем в волшебные сообщения MAX…</p>
       <div class="dots-loader" aria-hidden="true"><span></span><span></span><span></span></div>
       <p class="scan-price" id="countdown" hidden></p>
@@ -57,13 +50,29 @@
       <ul class="scan-steps" id="file-preview"></ul>
       <p class="error" id="confirm-error" hidden></p>
       <button type="button" class="primary-btn" id="yes-btn">Да, это мои файлы</button>
-      <button type="button" class="secondary-btn" id="no-btn" style="margin-top:12px">Нет, ждать другое письмо</button>
+      <button type="button" class="secondary-btn" id="no-btn" style="margin-top:12px">Нет, ждать другой файл</button>
     </section>
   </div>
 
   <script>
     const params = new URLSearchParams(location.search);
     const sessionId = params.get('session');
+    const exitURL = params.get('origin') === 'home' ? '/' : '/print/';
+    document.querySelector('.back-btn').href = exitURL;
+    fetch('/api/kiosk/max/info').then(r => r.json()).then(data => {
+      document.getElementById('bot-link').textContent = data.bot_link || 'Ссылка на бота не задана';
+      document.getElementById('max-size').textContent = data.max_file_size_mb || '20';
+      if (data.bot_qr) {
+        const qr = document.getElementById('bot-qr');
+        qr.src = data.bot_qr;
+        qr.hidden = false;
+      }
+    }).catch(() => showError('Не удалось загрузить QR-код. Вернитесь назад и попробуйте снова.'));
+    function abandon() {
+      stop();
+      navigator.sendBeacon('/api/kiosk/session/end', new Blob([JSON.stringify({max_session_id: sessionId})], {type: 'application/json'}));
+    }
+    document.querySelectorAll('.back-btn, .brand').forEach(link => link.addEventListener('click', abandon));
     const errorEl = document.getElementById('error');
     const confirmErrorEl = document.getElementById('confirm-error');
     const statusText = document.getElementById('status-text');
@@ -205,7 +214,8 @@
 
     document.getElementById('cancel-btn').addEventListener('click', () => {
       stop();
-      location.href = '/print/max/';
+      abandon();
+      location.href = exitURL;
     });
 
     yesBtn.addEventListener('click', async () => {

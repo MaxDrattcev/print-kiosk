@@ -38,13 +38,14 @@ type Quote struct {
 }
 
 type Job struct {
-	ID        string    `json:"id"`
-	Status    Status    `json:"status"`
-	Paid      bool      `json:"paid"`
-	Color     bool      `json:"color"`
-	Duplex    bool      `json:"duplex"`
-	Copies    int       `json:"copies"`
-	CreatedAt time.Time `json:"-"`
+	OutputConfirmed bool      `json:"output_confirmed"`
+	ID              string    `json:"id"`
+	Status          Status    `json:"status"`
+	Paid            bool      `json:"paid"`
+	Color           bool      `json:"color"`
+	Duplex          bool      `json:"duplex"`
+	Copies          int       `json:"copies"`
+	CreatedAt       time.Time `json:"-"`
 }
 
 type Service struct {
@@ -88,6 +89,7 @@ func (s *Service) Get(id string) (*Job, bool) {
 }
 
 func QuotePrice(opt Options, priceBW, priceColor float64) (Quote, error) {
+	opt.Color = false
 	if opt.Copies < 1 {
 		opt.Copies = 1
 	}
@@ -95,9 +97,6 @@ func QuotePrice(opt Options, priceBW, priceColor float64) (Quote, error) {
 		return Quote{}, fmt.Errorf("слишком много копий")
 	}
 	price := priceBW
-	if opt.Color {
-		price = priceColor
-	}
 	effectiveDuplex := opt.Duplex && opt.Copies > 1
 	return Quote{
 		Color:        opt.Color,
@@ -119,7 +118,7 @@ func (s *Service) MarkPaid(id string, opt Options) (*Job, error) {
 	if opt.Copies < 1 {
 		opt.Copies = 1
 	}
-	job.Color = opt.Color
+	job.Color = false
 	job.Duplex = opt.Duplex && opt.Copies > 1
 	job.Copies = opt.Copies
 	job.Paid = true
@@ -159,10 +158,12 @@ func (s *Service) Execute(id string) (*Job, int, error) {
 	if s.printer == nil {
 		return nil, 0, fmt.Errorf("принтер не настроен")
 	}
+	completion := &printjob.PrintCompletion{}
 	if err := s.printer.PrintFile(pdfPath, printjob.PrintOptions{
-		Color:  color,
-		Duplex: duplex,
-		Copies: copies,
+		Completion: completion,
+		Color:      color,
+		Duplex:     duplex,
+		Copies:     copies,
 	}); err != nil {
 		return nil, 0, fmt.Errorf("не удалось отправить на печать: %w", err)
 	}
@@ -171,6 +172,7 @@ func (s *Service) Execute(id string) (*Job, int, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	job.Status = StatusDone
+	job.OutputConfirmed = completion.Confirmed
 	return job, printjob.PaperSheets(1, copies, duplex), nil
 }
 

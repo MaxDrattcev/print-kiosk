@@ -32,19 +32,13 @@
 
     <section class="hero compact">
       <h1>Настройки копирования</h1>
-      <p>Выберите цветность и количество копий</p>
+      <p>Выберите количество копий</p>
     </section>
 
     <section class="settings-panel">
       <p class="paper-remaining" id="paper-remaining-line">Остаток бумаги: <strong id="paper-remaining">—</strong></p>
 
-      <div class="option-group">
-        <span class="option-label">Цветность</span>
-        <div class="segmented">
-          <label><input type="radio" name="color" value="false" checked><span>Чёрно-белая</span></label>
-          <label><input type="radio" name="color" value="true"><span>Цветная</span></label>
-        </div>
-      </div>
+      <div class="option-group"><span class="option-label">Чёрно-белое копирование</span></div>
 
       <div class="option-group" id="copy-duplex-group">
         <span class="option-label">Стороны печати</span>
@@ -211,7 +205,7 @@
 
     function settings() {
       return {
-        color: document.querySelector('input[name="color"]:checked').value === 'true',
+        color: false,
         duplex: document.querySelector('input[name="duplex"]:checked').value === 'true',
         copies: Math.max(1, Math.min(100, parseInt(document.getElementById('copies').value, 10) || 1)),
       };
@@ -269,7 +263,7 @@
       await refreshQuote();
     }
 
-    document.querySelectorAll('input[name="color"], input[name="duplex"]').forEach((el) => {
+    document.querySelectorAll('input[name="duplex"]').forEach((el) => {
       el.addEventListener('change', refreshQuote);
     });
     document.getElementById('copies').addEventListener('change', refreshQuote);
@@ -350,8 +344,14 @@
         if (!copyRes.ok) {
           setCopyStage('error', 'Упс, что-то пошло не так', 'Специалисты уже получили сообщение и устраняют проблему');
         } else {
-          setCopyStage('ready', 'Ваша копия готова!', 'Заберите документ из лотка принтера');
-          KioskUI.startAutoReturn(document.getElementById('copy-magic'), 15);
+          if (copyData.test_mode) {
+            setCopyStage('ready', 'Тестовое копирование завершено', 'Документ не отправлялся на принтер');
+          } else if (copyData.output_confirmed) {
+            setCopyStage('ready', 'Ваша копия готова!', 'Заберите документ из лотка принтера');
+          } else {
+            setCopyStage('ready', 'Задание передано принтеру', 'Дождитесь выхода всех листов и заберите копии из лотка');
+          }
+          if (copyData.output_confirmed || copyData.test_mode) KioskUI.startAutoReturn(document.getElementById('copy-magic'), 15);
           if (copyData.sheets != null) {
             const current = parseInt(String(prices.paper_remaining || '0'), 10);
             if (!Number.isNaN(current)) {

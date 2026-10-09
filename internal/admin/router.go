@@ -43,6 +43,8 @@ func RegisterRoutes(r *gin.Engine, cfg *config.Config, settings *storage.Setting
 			auth.POST("/history/print", h.PrintHistoryReport)
 			auth.POST("/history/deliver/usb", h.SaveHistoryReportUSB)
 			auth.POST("/history/deliver/email", h.SendHistoryReportEmail)
+			auth.GET("/history/deliver/max/options", h.HistoryMAXOptions)
+			auth.POST("/history/deliver/max/admin", h.SendHistoryMAXAdmin)
 			auth.POST("/history/deliver/max", h.StartHistoryReportMAX)
 			auth.GET("/history/deliver/max/:sid", h.GetHistoryReportMAX)
 			auth.POST("/history/deliver/max/:sid/complete", h.CompleteHistoryReportMAX)
@@ -51,6 +53,10 @@ func RegisterRoutes(r *gin.Engine, cfg *config.Config, settings *storage.Setting
 			auth.POST("/printer/unblock", h.UnblockPrinter)
 			auth.POST("/email/test", h.TestEmail)
 			auth.POST("/max/test", h.TestMAX)
+			auth.POST("/max/token/reveal", h.RevealMAXToken)
+			auth.POST("/max/binding", h.StartMAXBinding)
+			auth.GET("/max/binding/:id", h.GetMAXBinding)
+			auth.DELETE("/max/binding/:id", h.CancelMAXBinding)
 			auth.POST("/browser/minimize", func(c *gin.Context) {
 				if err := kioskhost.MinimizeBrowser(); err != nil {
 					c.JSON(http.StatusConflict, gin.H{"error": err.Error()})

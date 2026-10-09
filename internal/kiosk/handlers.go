@@ -81,9 +81,7 @@ func (h *Handler) Info(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"price_bw":             values[storage.SettingPriceBW],
-		"price_color":          values[storage.SettingPriceColor],
 		"price_copy":           values[storage.SettingPriceCopy],
-		"price_copy_color":     values[storage.SettingPriceCopyColor],
 		"price_scan":           values[storage.SettingPriceScan],
 		"support_text":         values[storage.SettingSupportText],
 		"service_print":        storage.SettingEnabled(values, storage.SettingServicePrintEnabled, true),
@@ -344,6 +342,7 @@ func (h *Handler) ExecutePrintJob(c *gin.Context) {
 	if locked, ok := h.jobs.LockedOptions(job); ok {
 		in = locked
 	}
+	in.Color = false
 	if in.Copies < 1 {
 		in.Copies = 1
 	}
@@ -381,6 +380,7 @@ func (h *Handler) ExecutePrintJob(c *gin.Context) {
 		return
 	}
 
+	completion := &printjob.PrintCompletion{}
 	var printErr error
 	if deviceTest {
 		time.Sleep(10 * time.Second)
@@ -390,7 +390,7 @@ func (h *Handler) ExecutePrintJob(c *gin.Context) {
 			printErr = fmt.Errorf("подготовка ориентации изображения: %w", err)
 		} else {
 			printErr = h.jobs.Print(job, printjob.PrintOptions{
-				Color: in.Color, Duplex: in.Duplex, Copies: in.Copies,
+				Completion: completion, Color: in.Color, Duplex: in.Duplex, Copies: in.Copies,
 				Orientation: in.Orientation, PageRange: quote.PageRange, Scale: quote.Scale,
 			})
 		}
@@ -446,12 +446,14 @@ func (h *Handler) ExecutePrintJob(c *gin.Context) {
 	h.jobs.Cleanup(job.ID)
 
 	c.JSON(http.StatusOK, gin.H{
-		"ok":      true,
-		"message": "Печать документа завершена",
-		"sheets":  sheets,
-		"pages":   quote.Pages,
-		"duplex":  in.Duplex,
-		"copies":  in.Copies,
+		"ok":               true,
+		"message":          "Задание передано принтеру",
+		"output_confirmed": completion.Confirmed,
+		"test_mode":        deviceTest,
+		"sheets":           sheets,
+		"pages":            quote.Pages,
+		"duplex":           in.Duplex,
+		"copies":           in.Copies,
 	})
 }
 
@@ -513,10 +515,7 @@ func (h *Handler) pricePair() (gin.H, error) {
 	if err != nil {
 		return nil, err
 	}
-	color, err := strconv.ParseFloat(values[storage.SettingPriceColor], 64)
-	if err != nil {
-		return nil, err
-	}
+	color := bw
 	paper := values[storage.SettingPaperRemaining]
 	return gin.H{
 		"bw":              bw,
@@ -534,9 +533,6 @@ func (h *Handler) priceValues() (float64, float64, error) {
 	if err != nil {
 		return 0, 0, err
 	}
-	color, err := strconv.ParseFloat(values[storage.SettingPriceColor], 64)
-	if err != nil {
-		return 0, 0, err
-	}
+	color := bw
 	return bw, color, nil
 }

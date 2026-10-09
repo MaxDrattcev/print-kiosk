@@ -13,7 +13,7 @@ import (
 
 func scanWindows(destPDF string, opt ScanOptions) error {
 	if path := findNAPS2(); path != "" {
-		if err := scanNAPS2(path, destPDF); err == nil {
+		if err := scanNAPS2(path, destPDF, opt); err == nil {
 			return nil
 		} else {
 			slog.Warn("naps2 scan failed, trying WIA", "error", err)
@@ -41,10 +41,14 @@ func findNAPS2() string {
 	return ""
 }
 
-func scanNAPS2(bin, destPDF string) error {
+func scanNAPS2(bin, destPDF string, opt ScanOptions) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, bin, "-o", destPDF, "--force")
+	bitDepth := "gray"
+	if opt.Color {
+		bitDepth = "color"
+	}
+	cmd := exec.CommandContext(ctx, bin, "-o", destPDF, "--force", "--source", "glass", "--pagesize", "a4", "--dpi", fmt.Sprint(opt.dpi()), "--bitdepth", bitDepth)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("сканирование NAPS2: %w (%s)", err, strings.TrimSpace(string(out)))
@@ -56,7 +60,11 @@ func scanNAPS2(bin, destPDF string) error {
 }
 
 func scanWIA(destPDF string, opt ScanOptions) error {
-	dir := filepath.Dir(destPDF)
+	dir, err := os.MkdirTemp(filepath.Dir(destPDF), "wia-")
+	if err != nil {
+		return fmt.Errorf("временная папка сканера: %w", err)
+	}
+	defer os.RemoveAll(dir)
 	img := filepath.Join(dir, "scan.wia")
 	script := filepath.Join(dir, "wia-scan.ps1")
 	color := "0"
@@ -71,7 +79,7 @@ func scanWIA(destPDF string, opt ScanOptions) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "powershell",
-		"-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
+		"-NoProfile", "-NonInteractive", "-STA", "-ExecutionPolicy", "Bypass",
 		"-File", script,
 		"-Output", img,
 		"-Color", color,
@@ -101,6 +109,7 @@ const wiaScript = `param(
   [int]$Dpi = 200
 )
 $ErrorActionPreference = "Stop"
+[Console]::OutputEncoding = [Text.UTF8Encoding]::new()
 if ($Dpi -lt 75) { $Dpi = 200 }
 
 $wia = New-Object -ComObject WIA.DeviceManager
@@ -116,7 +125,14 @@ if ($device.Items.Count -lt 1) { throw "scanner not found" }
 $item = $device.Items.Item(1)
 
 function Set-WiaProp($obj, $id, $value) {
-  try { $obj.Properties.Item([string]$id).Value = $value } catch {}
+  foreach ($property in $obj.Properties) {
+    if ($property.PropertyID -eq $id) {
+      try { $property.Value = $value } catch {
+        [Console]::Error.WriteLine("WIA property {0}: {1}", $id, $_.Exception.Message)
+      }
+      return
+    }
+  }
 }
 
 if ($Color -eq "1") {
@@ -131,9 +147,16 @@ Set-WiaProp $item 6148 $Dpi
 
 $png = "{B96B3CAF-0728-11D3-9D7B-0000F81EF32E}"
 $jpeg = "{B96B3CAE-0728-11D3-9D7B-0000F81EF32E}"
+$bmp = "{B96B3CAB-0728-11D3-9D7B-0000F81EF32E}"
 $image = $null
-try { $image = $item.Transfer($jpeg) } catch {}
-if ($null -eq $image) { try { $image = $item.Transfer($png) } catch {} }
+foreach ($format in @($bmp, $jpeg, $png)) {
+  try {
+    $image = $item.Transfer($format)
+    if ($null -ne $image) { break }
+  } catch {
+    [Console]::Error.WriteLine("WIA transfer {0}: {1} (HRESULT {2:X8})", $format, $_.Exception.Message, $_.Exception.HResult)
+  }
+}
 if ($null -eq $image) { $image = $item.Transfer() }
 if ($null -eq $image) { throw "scan transfer failed" }
 $image.SaveFile($Output)

@@ -1,6 +1,7 @@
 package printjob
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -82,7 +83,7 @@ func listWindowsPrintJobs(printer string) ([]windowsSpoolJob, error) {
 	return jobs, nil
 }
 
-func monitorWindowsPrint(printer, filePath string, submit func() error) error {
+func monitorWindowsPrint(printer, filePath string, completion *PrintCompletion, submit func() error) error {
 	beforeJobs, err := listWindowsPrintJobs(printer)
 	if err != nil {
 		return err
@@ -105,6 +106,7 @@ func monitorWindowsPrint(printer, filePath string, submit func() error) error {
 	var submitErr error
 	var submitFinished bool
 	queryFailures := 0
+	device := windowsDeviceTracker{}
 
 	for {
 		select {
@@ -123,6 +125,12 @@ func monitorWindowsPrint(printer, filePath string, submit func() error) error {
 				continue
 			}
 			queryFailures = 0
+			deviceState, deviceErr := readWindowsDeviceState(printer)
+			if deviceErr == nil {
+				device.observe(deviceState)
+			} else {
+				device.idleSamples = 0
+			}
 
 			if trackedID == 0 {
 				trackedID = selectNewWindowsJob(jobs, before, document)
@@ -137,7 +145,20 @@ func monitorWindowsPrint(printer, filePath string, submit func() error) error {
 					if !submitFinished {
 						continue
 					}
-					slog.Info("windows print job completed", "printer", printer, "spool_job_id", trackedID)
+					if deviceErr == nil && deviceState.busy() {
+						if time.Now().After(completionDeadline) {
+							return fmt.Errorf("превышено время ожидания принтера Windows")
+						}
+						continue
+					}
+					if device.sawBusy && deviceErr == nil && deviceState.idle() && device.idleSamples < 2 {
+						continue
+					}
+					if completion != nil {
+						// WMI may mirror spooler state rather than physical output.
+						completion.Confirmed = false
+					}
+					slog.Info("windows print job left queue", "printer", printer, "spool_job_id", trackedID, "device_idle_reported", device.confirmed() && deviceErr == nil)
 					return nil
 				}
 				state := normalizeWindowsJobStatus(job.Status)
@@ -150,8 +171,20 @@ func monitorWindowsPrint(printer, filePath string, submit func() error) error {
 				if windowsJobFailed(state) {
 					return fmt.Errorf("задание Windows %d: состояние %s", trackedID, state)
 				}
-				if windowsJobCompleted(state) {
-					slog.Info("windows print job completed", "printer", printer, "spool_job_id", trackedID, "status", state)
+				if windowsJobCompleted(state) && submitFinished {
+					if deviceErr == nil && deviceState.busy() {
+						if time.Now().After(completionDeadline) {
+							return fmt.Errorf("превышено время ожидания принтера Windows")
+						}
+						continue
+					}
+					if device.sawBusy && deviceErr == nil && deviceState.idle() && device.idleSamples < 2 {
+						continue
+					}
+					if completion != nil {
+						// WMI may mirror spooler state rather than physical output.
+						completion.Confirmed = false
+					}
 					return nil
 				}
 			}
@@ -231,4 +264,62 @@ func spoolJobSuffix(id int) string {
 		return ""
 	}
 	return " " + strconv.Itoa(id)
+}
+
+// Queue completion alone only confirms delivery to the device. Require an
+// observed busy -> idle transition before ending the busy screen. This is
+// still not proof of physical output: some drivers only mirror queue state.
+type windowsDeviceState struct {
+	Status   int  `json:"status"`
+	Extended int  `json:"extended"`
+	Offline  bool `json:"offline"`
+	Error    int  `json:"error"`
+}
+
+func (s windowsDeviceState) busy() bool {
+	if s.Offline || (s.Error != 0 && s.Error != 2 && s.Error != 3 && s.Error != 5) {
+		return false
+	}
+	for _, status := range []int{s.Status, s.Extended} {
+		switch status {
+		case 4, 5, 10, 13, 14:
+			return true
+		}
+	}
+	return false
+}
+func (s windowsDeviceState) idle() bool {
+	return !s.Offline && !s.busy() && (s.Error == 0 || s.Error == 2 || s.Error == 3 || s.Error == 5) && (s.Status == 3 || s.Extended == 3)
+}
+
+type windowsDeviceTracker struct {
+	sawBusy     bool
+	idleSamples int
+}
+
+func (t *windowsDeviceTracker) observe(s windowsDeviceState) {
+	if s.busy() {
+		t.sawBusy = true
+	}
+	if s.idle() && t.sawBusy {
+		t.idleSamples++
+	} else {
+		t.idleSamples = 0
+	}
+}
+func (t windowsDeviceTracker) confirmed() bool { return t.sawBusy && t.idleSamples >= 2 }
+func readWindowsDeviceState(printer string) (windowsDeviceState, error) {
+	quoted := strings.ReplaceAll(printer, "'", "''")
+	script := fmt.Sprintf(`$ErrorActionPreference='Stop'; [Console]::OutputEncoding=[Text.UTF8Encoding]::new(); $p=Get-CimInstance Win32_Printer | Where-Object {$_.Name -eq '%s'} | Select-Object -First 1; if (-not $p) { throw 'printer not found' }; [pscustomobject]@{status=[int]$p.PrinterStatus; extended=[int]$p.ExtendedPrinterStatus; offline=[bool]$p.WorkOffline; error=[int]$p.DetectedErrorState} | ConvertTo-Json -Compress`, quoted)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	out, err := exec.CommandContext(ctx, "powershell", "-NoProfile", "-NonInteractive", "-Command", script).CombinedOutput()
+	if err != nil {
+		return windowsDeviceState{}, fmt.Errorf("состояние устройства Windows: %w (%s)", err, strings.TrimSpace(string(out)))
+	}
+	var state windowsDeviceState
+	if err := json.Unmarshal(out, &state); err != nil {
+		return state, err
+	}
+	return state, nil
 }

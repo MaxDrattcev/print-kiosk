@@ -52,13 +52,12 @@ func (s *Service) sendDailyReport(ctx context.Context) {
 		"📊 Ежедневная статистика киоска (%s)\n\n"+
 			"Статус принтера: Активен\n"+
 			"Заработано: %.2f ₽\n"+
-			"Напечатано ч/б страниц: %d\n"+
-			"Напечатано цветных страниц: %d\n"+
+			"Напечатано страниц: %d\n"+
 			"Сканов: %d\n"+
 			"Копий: %d\n"+
 			"Израсходовано листов: %d\n"+
 			"Осталось листов: %d",
-		day, d.Revenue, d.PagesBW, d.PagesColor, d.Scans, d.Copies, d.SheetsUsed, paper,
+		day, d.Revenue, d.PagesBW+d.PagesColor, d.Scans, d.Copies, d.SheetsUsed, paper,
 	)
 	if err := s.sendAdmin(ctx, text); err != nil {
 		slog.Warn("max daily report failed", "error", err)
@@ -127,7 +126,7 @@ func (s *Service) sendAdmin(ctx context.Context, text string) error {
 	if !ok {
 		return fmt.Errorf("max disabled")
 	}
-	api, err := maxbot.NewApi(token)
+	api, err := NewAPI(token)
 	if err != nil {
 		return err
 	}

@@ -1,10 +1,11 @@
 package maxsvc
 
 import (
+	"crypto/rand"
 	"fmt"
+	"math/big"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -170,18 +171,23 @@ func (s *Service) StartScanSession(jobID string, timeout time.Duration) (*ScanSe
 	if timeout < 30*time.Second {
 		timeout = 2 * time.Minute
 	}
-	code := strings.ToUpper(uuid.NewString()[:6])
+	s.mu.Lock()
+	code, err := s.newScanCodeLocked()
+	if err != nil {
+		s.mu.Unlock()
+		return nil, err
+	}
 	id := uuid.NewString()
 	now := time.Now()
 	sess := &ScanSession{
 		ID:        id,
 		JobID:     jobID,
 		Code:      code,
+		Token:     uuid.NewString(),
 		Status:    StatusWaiting,
 		CreatedAt: now,
 		Deadline:  now.Add(timeout),
 	}
-	s.mu.Lock()
 	s.scanSess[id] = sess
 	s.mu.Unlock()
 
@@ -232,4 +238,25 @@ func (s *Service) AbandonScan(id string) {
 	s.mu.Lock()
 	delete(s.scanSess, id)
 	s.mu.Unlock()
+}
+
+// Caller holds s.mu through allocation and insertion.
+func (s *Service) newScanCodeLocked() (string, error) {
+	start, err := rand.Int(rand.Reader, big.NewInt(1000000))
+	if err != nil {
+		return "", err
+	}
+	used := make(map[string]bool)
+	for _, sess := range s.scanSess {
+		if sess.Status == StatusWaiting && time.Now().Before(sess.Deadline) {
+			used[sess.Code] = true
+		}
+	}
+	for i := 0; i < 1000000; i++ {
+		code := fmt.Sprintf("%06d", (int(start.Int64())+i)%1000000)
+		if !used[code] {
+			return code, nil
+		}
+	}
+	return "", fmt.Errorf("слишком много активных сеансов MAX")
 }

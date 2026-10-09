@@ -2060,3 +2060,18 @@ body:has(.auth-page) {
 @media (orientation: portrait) and (max-width: 760px) {
   .admin-shell { grid-template-columns: 1fr; }
 }
+
+/* Reserve the actual keyboard height so fields near the page end can scroll above it. */
+body.admin-app.osk-open .admin-content {
+  padding-bottom: calc(var(--osk-height, 430px) + 140px);
+}
+body.admin-app.osk-open .admin-savebar {
+  bottom: var(--osk-height, 430px);
+}
+
+#history-max-choice-step .history-channel-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+#history-max-choice-step button:disabled { opacity: .45; cursor: not-allowed; box-shadow: none; }
+#history-max-fallback summary { cursor: pointer; padding: 14px 0; font-weight: 750; }
+@media (max-width: 760px) {
+  #history-max-choice-step .history-channel-grid { grid-template-columns: 1fr; }
+}
