@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"print-kiosk/internal/executil"
 	"runtime"
 	"strconv"
 	"strings"
@@ -506,6 +507,7 @@ func (s *Service) convertWithLibreOffice(sourcePath, dir string) (string, error)
 			absSource,
 		}
 		cmd := exec.Command(bin, args...)
+		executil.HideWindow(cmd)
 		cmd.Dir = absDir
 		out, err := cmd.CombinedOutput()
 		lastOut = strings.TrimSpace(string(out))

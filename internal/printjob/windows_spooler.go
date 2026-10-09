@@ -60,20 +60,7 @@ func resolveWindowsPrinter(configured string) (string, error) {
 	if name := strings.TrimSpace(configured); name != "" {
 		return name, nil
 	}
-	script := `$ErrorActionPreference='Stop'; [Console]::OutputEncoding=[Text.UTF8Encoding]::new(); $p=Get-CimInstance Win32_Printer | Where-Object {$_.Default -eq $true} | Select-Object -First 1 -ExpandProperty Name; if (-not $p) { throw 'default printer not found' }; [Console]::Write($p)`
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	cmd := exec.CommandContext(ctx, "powershell", "-NoProfile", "-NonInteractive", "-Command", script)
-	executil.HideWindow(cmd)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return "", fmt.Errorf("не удалось определить принтер Windows: %w (%s)", err, strings.TrimSpace(string(out)))
-	}
-	name := strings.TrimSpace(string(out))
-	if name == "" {
-		return "", fmt.Errorf("принтер Windows по умолчанию не найден")
-	}
-	return name, nil
+	return defaultWindowsPrinter()
 }
 
 func listWindowsPrintJobs(printer string) ([]windowsSpoolJob, error) {

@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"print-kiosk/internal/executil"
 	"regexp"
 	"sort"
 	"strings"
@@ -70,6 +71,7 @@ func installViaWinget() error {
 	slog.Info("installing LibreOffice via winget (UAC may appear)")
 	if err := runElevated(winget, args...); err != nil {
 		cmd := exec.Command(winget, args...)
+		executil.HideWindow(cmd)
 		out, runErr := cmd.CombinedOutput()
 		if runErr != nil {
 			return fmt.Errorf("winget: %w (%s)", err, strings.TrimSpace(string(out)))
@@ -115,6 +117,7 @@ func installViaMSI(msiURL string) error {
 	}
 	if err := runElevated(msiexec, args...); err != nil {
 		cmd := exec.Command(msiexec, args...)
+		executil.HideWindow(cmd)
 		out, runErr := cmd.CombinedOutput()
 		if runErr != nil {
 			return fmt.Errorf("msiexec: %w (%s)", runErr, strings.TrimSpace(string(out)))
@@ -134,6 +137,7 @@ func runElevated(exe string, args ...string) error {
 		strings.Join(quotedArgs, ","),
 	)
 	cmd := exec.Command("powershell", "-NoProfile", "-NonInteractive", "-Command", ps)
+	executil.HideWindow(cmd)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("elevated install: %w (%s)", err, strings.TrimSpace(string(out)))

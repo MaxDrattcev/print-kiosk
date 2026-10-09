@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"print-kiosk/internal/executil"
 	"strconv"
 	"strings"
 	"time"
@@ -85,6 +86,7 @@ func (h *Handler) CreateHistoryReport(c *gin.Context) {
 	soffice, err := libreoffice.Find(h.cfg.Paths.LibreOffice)
 	if err == nil {
 		cmd := exec.CommandContext(c.Request.Context(), soffice, "--headless", "--convert-to", "pdf", "--outdir", h.reportsDir(), htmlPath)
+		executil.HideWindow(cmd)
 		out, runErr := cmd.CombinedOutput()
 		if runErr != nil {
 			err = fmt.Errorf("%w: %s", runErr, strings.TrimSpace(string(out)))

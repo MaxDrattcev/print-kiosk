@@ -3,6 +3,7 @@ package device
 import (
 	"fmt"
 	"os/exec"
+	"print-kiosk/internal/executil"
 	"runtime"
 	"strings"
 )
@@ -12,7 +13,9 @@ import (
 func ProbeScanner() (name string, available bool, err error) {
 	if runtime.GOOS == "windows" {
 		script := `$ErrorActionPreference='Stop'; [Console]::OutputEncoding=[Text.UTF8Encoding]::new(); $m=New-Object -ComObject WIA.DeviceManager; $d=@($m.DeviceInfos | Where-Object {$_.Type -eq 1}) | Select-Object -First 1; if (-not $d) { [Console]::Write(''); exit 0 }; [Console]::Write([string]$d.Properties.Item('Name').Value)`
-		out, cmdErr := exec.Command("powershell", "-NoProfile", "-NonInteractive", "-Command", script).CombinedOutput()
+		cmd := exec.Command("powershell", "-NoProfile", "-NonInteractive", "-Command", script)
+		executil.HideWindow(cmd)
+		out, cmdErr := cmd.CombinedOutput()
 		if cmdErr != nil {
 			return "", false, fmt.Errorf("проверка WIA: %w", cmdErr)
 		}

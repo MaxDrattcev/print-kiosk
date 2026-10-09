@@ -91,6 +91,7 @@ func (s *Service) PrintFile(filePath string, opt PrintOptions) error {
 		return nil
 	}
 
+	slog.Info("print requested", "file", filePath, "copies", opt.Copies, "duplex", opt.Duplex, "pages", opt.PageRange, "printer", s.printerName)
 	prepared, preparedOptions, cleanup, err := prepareSinglePageDuplexCopies(filePath, opt)
 	if err != nil {
 		return err

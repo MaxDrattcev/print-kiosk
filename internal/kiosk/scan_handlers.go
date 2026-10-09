@@ -68,7 +68,9 @@ func (h *Handler) PreviewScanPage(c *gin.Context) {
 		return
 	}
 	if c.Query("format") == "image" {
-		data, err := scanPreviewPNG(path)
+		started := time.Now()
+		data, err := cachedScanPreviewPNG(path)
+		slog.Info("scan preview prepared", "job", c.Param("id"), "page", index, "duration_ms", time.Since(started).Milliseconds(), "bytes", len(data), "error", err)
 		if err != nil {
 			c.Status(http.StatusUnprocessableEntity)
 			return

@@ -424,7 +424,7 @@
       const selected = document.querySelector('input[name="orientation"]:checked');
       const landscape = selected && selected.value === 'landscape';
       const actualScale = document.querySelector('input[name="scale"]:checked')?.value === 'actual';
-      const showOrientationInFile = job.preview_kind === 'image' || Number(job.pages) <= 1;
+      const showOrientationInFile = true;
       previewFrame.classList.toggle('preview-landscape', showOrientationInFile && landscape);
       previewFrame.classList.toggle('preview-portrait', showOrientationInFile && !landscape);
       previewFrame.classList.toggle('preview-scale-actual', actualScale);

@@ -9,6 +9,7 @@
       let pdf;
       let observer;
       let resizeObserver;
+      let orientationObserver;
       let width = 0;
       let height = 0;
       const entries = [];
@@ -29,16 +30,28 @@
         const canvas = document.createElement('canvas');
         canvas.setAttribute('aria-label', 'Страница ' + entry.number);
         entry.box.replaceChildren(canvas);
-        const scale = Math.min(width / entry.base.width, height / entry.base.height);
-        const viewport = entry.page.getViewport({ scale });
+        const landscape = host.classList.contains('preview-landscape');
+        const paperWidth = landscape ? 841.89 : 595.28;
+        const paperHeight = landscape ? 595.28 : 841.89;
+        const sheetScale = Math.min(width / paperWidth, height / paperHeight);
+        const contentScale = host.classList.contains('preview-scale-actual') ? 1
+          : Math.min(paperWidth / entry.base.width, paperHeight / entry.base.height);
+        const viewport = entry.page.getViewport({ scale: sheetScale * contentScale });
         const ratio = Math.min(window.devicePixelRatio || 1, 2);
-        canvas.width = Math.ceil(viewport.width * ratio);
-        canvas.height = Math.ceil(viewport.height * ratio);
-        canvas.style.width = viewport.width + 'px';
-        canvas.style.height = viewport.height + 'px';
+        const sheetWidth = paperWidth * sheetScale;
+        const sheetHeight = paperHeight * sheetScale;
+        canvas.width = Math.ceil(sheetWidth * ratio);
+        canvas.height = Math.ceil(sheetHeight * ratio);
+        canvas.style.width = sheetWidth + 'px';
+        canvas.style.height = sheetHeight + 'px';
+        const context = canvas.getContext('2d');
+        context.fillStyle = '#fff';
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        const offsetX = (sheetWidth - viewport.width) * ratio / 2;
+        const offsetY = (sheetHeight - viewport.height) * ratio / 2;
         try {
-          entry.render = entry.page.render({ canvasContext: canvas.getContext('2d'), viewport,
-            transform: ratio === 1 ? null : [ratio, 0, 0, ratio, 0, 0] });
+          entry.render = entry.page.render({ canvasContext: context, viewport,
+            transform: [ratio, 0, 0, ratio, offsetX, offsetY] });
           await entry.render.promise;
         } catch (error) {
           if (!disposed && generation === entry.generation && error.name !== 'RenderingCancelledException') {
@@ -84,6 +97,10 @@
           }, { root: host });
           resizeObserver = new ResizeObserver(resize);
           resizeObserver.observe(host);
+          orientationObserver = new MutationObserver(() => {
+            for (const entry of entries) if (entry.visible) draw(entry);
+          });
+          orientationObserver.observe(host, { attributes: true, attributeFilter: ['class'] });
           resize();
           for (let number = 1; number <= pdf.numPages && !disposed; number++) {
             const page = await pdf.getPage(number);
@@ -112,6 +129,7 @@
         disposed = true;
         observer?.disconnect();
         resizeObserver?.disconnect();
+        orientationObserver?.disconnect();
         for (const entry of entries) entry.render?.cancel();
         if (task) task.destroy().catch(() => {});
       };

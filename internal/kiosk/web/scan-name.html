@@ -38,6 +38,7 @@
     <main class="scan-review" id="scan-review" hidden>
       <section class="scan-review-preview">
         <div class="scan-review-page-number" id="selected-label">Страница 1</div>
+        <p id="scan-preview-loading" role="status">Подготавливаем изображение…</p>
         <img id="scan-preview-image" alt="Отсканированная страница" hidden>
         <iframe id="preview-frame" title="Предпросмотр выбранной страницы"></iframe>
       </section>
@@ -176,8 +177,10 @@
       document.getElementById('selected-label').textContent = 'Страница ' + (selectedIndex + 1) + ' из ' + pages.length;
       const preview = document.getElementById('preview-frame');
       const scanImage = document.getElementById('scan-preview-image');
-      scanImage.onload = () => { scanImage.hidden = false; preview.hidden = true; preview.removeAttribute('src'); };
-      scanImage.onerror = () => { scanImage.hidden = true; preview.hidden = false; preview.src = pageURL(selectedIndex); };
+      const previewLoading = document.getElementById('scan-preview-loading');
+      previewLoading.hidden = false;
+      scanImage.onload = () => { previewLoading.hidden = true; scanImage.hidden = false; preview.hidden = true; preview.removeAttribute('src'); };
+      scanImage.onerror = () => { previewLoading.hidden = true; scanImage.hidden = true; preview.hidden = false; preview.src = pageURL(selectedIndex); };
       preview.hidden = true;
       scanImage.hidden = true;
       scanImage.src = '/api/kiosk/scan/jobs/' + encodeURIComponent(jobId) + '/pages/' + selectedIndex + '/preview?format=image';
@@ -197,8 +200,10 @@
         button.className = 'scan-page-thumb' + (index === selectedIndex ? ' is-selected' : '');
         button.setAttribute('aria-label', 'Показать страницу ' + (index + 1));
         button.innerHTML = '<span class="scan-page-thumb-number">' + (index + 1) + '</span>' +
-          '<iframe tabindex="-1" title=""></iframe>';
-        button.querySelector('iframe').src = pageURL(index);
+          '<img alt="" loading="lazy" decoding="async">';
+        const thumbnail = button.querySelector('img');
+        thumbnail.src = '/api/kiosk/scan/jobs/' + encodeURIComponent(jobId) + '/pages/' + index + '/preview?format=image';
+        thumbnail.onerror = () => { thumbnail.remove(); };
         button.addEventListener('click', () => { selectedIndex = index; render(); });
         return button;
       }));
