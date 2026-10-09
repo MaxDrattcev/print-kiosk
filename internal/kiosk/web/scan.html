@@ -221,14 +221,11 @@
 
       try {
         const requestBody = replaceIndex == null ? {} : { replace_index: replaceIndex };
-        const [scanRes] = await Promise.all([
-          fetch('/api/kiosk/scan/jobs/' + encodeURIComponent(jobId) + '/scan', {
+        const scanRes = await fetch('/api/kiosk/scan/jobs/' + encodeURIComponent(jobId) + '/scan', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(requestBody),
-          }),
-          new Promise((resolve) => setTimeout(resolve, 6500)),
-        ]);
+          });
         const scanData = await scanRes.json().catch(() => ({}));
         clearTimeout(scanStartStage);
         clearTimeout(scanLineStage);
@@ -242,9 +239,7 @@
         const selected = replaceIndex == null
           ? Math.max(0, Number(scanData.job && scanData.job.page_count || 1) - 1)
           : replaceIndex;
-        setTimeout(() => {
-          location.href = '/scan/name/?job=' + encodeURIComponent(jobId) + '&selected=' + encodeURIComponent(selected);
-        }, 1200);
+        location.href = '/scan/name/?job=' + encodeURIComponent(jobId) + '&selected=' + encodeURIComponent(selected);
       } catch (e) {
         clearTimeout(scanStartStage);
         clearTimeout(scanLineStage);

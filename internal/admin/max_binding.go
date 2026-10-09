@@ -38,7 +38,7 @@ func (h *Handler) StartMAXBinding(c *gin.Context) {
 	query := parsed.Query()
 	query.Set("start", "notify_"+b.Token)
 	parsed.RawQuery = query.Encode()
-	png, err := qrcode.Encode(parsed.String(), qrcode.Medium, 384)
+	png, err := qrcode.Encode(parsed.String(), qrcode.Medium, 768)
 	if err != nil {
 		h.max.CancelAdminBinding(b.ID)
 		c.JSON(500, gin.H{"error": "Не удалось создать QR-код"})

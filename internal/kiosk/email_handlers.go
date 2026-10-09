@@ -1,12 +1,15 @@
 package kiosk
 
 import (
+	"encoding/base64"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/skip2/go-qrcode"
 
 	"print-kiosk/internal/mailinbox"
 	"print-kiosk/internal/storage"
@@ -23,9 +26,16 @@ func (h *Handler) EmailInfo(c *gin.Context) {
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Печать по Email временно недоступна"})
 		return
 	}
+	mailLink := (&url.URL{Scheme: "mailto", Opaque: addr}).String()
+	qr, err := qrcode.Encode(mailLink, qrcode.Medium, 768)
+	if err != nil {
+		c.JSON(500, gin.H{"error": "Не удалось создать QR-код почты"})
+		return
+	}
 	maxMB := values[storage.SettingEmailMaxFileSizeMB]
 	c.JSON(http.StatusOK, gin.H{
 		"email_address":     addr,
+		"email_qr":          "data:image/png;base64," + base64.StdEncoding.EncodeToString(qr),
 		"max_file_size_mb":  maxMB,
 		"poll_interval_sec": values[storage.SettingEmailPollIntervalSec],
 		"supported_hint":    "PDF, Word, Excel, PowerPoint, изображения",

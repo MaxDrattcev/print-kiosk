@@ -31,6 +31,7 @@
     </header>
 
     <section class="hero compact">
+      <p class="print-mode-heading">Черно-белая печать</p>
       <h1>Настройки копирования</h1>
       <p>Выберите количество копий</p>
     </section>
@@ -38,7 +39,7 @@
     <section class="settings-panel">
       <p class="paper-remaining" id="paper-remaining-line">Остаток бумаги: <strong id="paper-remaining">—</strong></p>
 
-      <div class="option-group"><span class="option-label">Чёрно-белое копирование</span></div>
+
 
       <div class="option-group" id="copy-duplex-group">
         <span class="option-label">Стороны печати</span>
@@ -66,6 +67,11 @@
 
       <p class="error" id="error" hidden></p>
       <button type="button" class="primary-btn pay-btn" id="pay-btn">Оплатить</button>
+        <div class="color-print-survey">
+          <p>Хотели бы вы печатать в цвете?</p>
+          <button type="button" class="color-vote-btn" id="color-vote-btn" aria-pressed="false">Да, хочу цветную печать</button>
+          <span id="color-vote-status" role="status" hidden></span>
+        </div>
     </section>
   </div>
 
@@ -332,10 +338,7 @@
         const paperStage = setTimeout(() => setCopyStage('paper', 'Готовим волшебную бумагу', 'Чистые листы уже ждут свою копию'), 6500);
         const quillStage = setTimeout(() => setCopyStage('quill', 'Повторяем всё волшебным пером', 'Переносим каждую строчку и деталь'), 10000);
 
-        const [copyRes] = await Promise.all([
-          fetch('/api/kiosk/copy/jobs/' + encodeURIComponent(jobId) + '/copy', { method: 'POST' }),
-          new Promise((resolve) => setTimeout(resolve, 6500)),
-        ]);
+        const copyRes = await fetch('/api/kiosk/copy/jobs/' + encodeURIComponent(jobId) + '/copy', { method: 'POST' });
         const copyData = await copyRes.json().catch(() => ({}));
         clearTimeout(inspectStage);
         clearTimeout(paperStage);
@@ -382,6 +385,7 @@
 
     loadJob();
   </script>
+  <script src="/static/color-vote.js"></script>
   <script src="/static/idle.js"></script>
 </body>
 </html>

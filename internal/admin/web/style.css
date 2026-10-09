@@ -2075,3 +2075,10 @@ body.admin-app.osk-open .admin-savebar {
 @media (max-width: 760px) {
   #history-max-choice-step .history-channel-grid { grid-template-columns: 1fr; }
 }
+
+#history-max-qr-image,
+#max-bind-qr {
+  width: min(520px, 68vw, 40dvh);
+  height: auto;
+  image-rendering: pixelated;
+}

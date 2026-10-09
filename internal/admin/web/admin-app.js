@@ -335,6 +335,7 @@
     lastOverview = data;
 
     const cards = [];
+    cards.push('<div class="admin-card"><h3>Запрос на цветную печать</h3><div class="admin-metric">' + (data.color_print_votes == null ? '—' : Number(data.color_print_votes)) + '</div><p class="admin-muted">Голосов за появление цветной печати · за всё время</p></div>');
     if (data.paper && data.paper.known) {
       const cap = data.paper.capacity || PAPER_CAPACITY;
       const n = data.paper.remaining;
@@ -1071,6 +1072,10 @@
     );
     if (data && data.bot_username) {
       document.getElementById("max-bot-username").value = "@" + data.bot_username;
+      if (data.bot_link) {
+        form.elements.namedItem("max_bot_link").value = data.bot_link;
+        if (!data.bot_link_saved) markDirty();
+      }
       await loadOverview();
     }
   });
@@ -1088,6 +1093,10 @@
     );
     if (data && data.bot_username) {
       document.getElementById("max-bot-username").value = "@" + data.bot_username;
+      if (data.bot_link) {
+        form.elements.namedItem("max_bot_link").value = data.bot_link;
+        if (!data.bot_link_saved) markDirty();
+      }
       await loadOverview();
     }
   });

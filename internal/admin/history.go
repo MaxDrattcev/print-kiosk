@@ -320,7 +320,7 @@ func (h *Handler) StartHistoryReportMAX(c *gin.Context) {
 	query := parsed.Query()
 	query.Set("start", "scan_"+sess.Token)
 	parsed.RawQuery = query.Encode()
-	png, err := qrcode.Encode(parsed.String(), qrcode.Medium, 384)
+	png, err := qrcode.Encode(parsed.String(), qrcode.Medium, 768)
 	if err != nil {
 		h.max.AbandonScan(sess.ID)
 		c.JSON(500, gin.H{"error": "Не удалось создать QR-код"})

@@ -60,6 +60,7 @@
           <div class="action-title">Email</div>
           <div class="action-description">Отправьте документ на почту терминала</div>
           <div class="source-meta">
+            <img class="email-qr email-qr--card" id="terminal-email-qr" alt="QR-код почты терминала" width="240" height="240" hidden>
             <span class="source-email" id="terminal-email" hidden></span>
           </div>
         </div>
@@ -113,6 +114,11 @@
           const el = document.getElementById('terminal-email');
           el.hidden = false;
           el.textContent = data.email_address;
+          if (data.email_qr) {
+            const qr = document.getElementById('terminal-email-qr');
+            qr.src = data.email_qr;
+            qr.hidden = false;
+          }
         }
       } catch (e) {}
     })();

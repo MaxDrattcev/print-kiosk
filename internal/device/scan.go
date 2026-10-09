@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/pdfcpu/pdfcpu/pkg/api"
 	"github.com/pdfcpu/pdfcpu/pkg/pdfcpu/types"
@@ -49,6 +50,7 @@ func ScanToPDF(destPDF string, opt ScanOptions, dryRun bool) error {
 		return writePlaceholderPDF(destPDF)
 	}
 
+	started := time.Now()
 	slog.Info("scan started", "dest", destPDF, "color", opt.Color, "dpi", opt.dpi(), "os", runtime.GOOS)
 
 	var err error
@@ -62,7 +64,7 @@ func ScanToPDF(destPDF string, opt ScanOptions, dryRun bool) error {
 		slog.Warn("scan failed", "dest", destPDF, "error", err)
 		return err
 	}
-	slog.Info("scan finished", "dest", destPDF)
+	slog.Info("scan finished", "dest", destPDF, "duration_ms", time.Since(started).Milliseconds())
 	return nil
 }
 

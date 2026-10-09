@@ -48,7 +48,7 @@ func scanNAPS2(bin, destPDF string, opt ScanOptions) error {
 	if opt.Color {
 		bitDepth = "color"
 	}
-	cmd := exec.CommandContext(ctx, bin, "-o", destPDF, "--force", "--source", "glass", "--pagesize", "a4", "--dpi", fmt.Sprint(opt.dpi()), "--bitdepth", bitDepth)
+	cmd := exec.CommandContext(ctx, bin, "-o", destPDF, "--force", "--disableocr", "--source", "glass", "--pagesize", "a4", "--dpi", fmt.Sprint(opt.dpi()), "--bitdepth", bitDepth)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("сканирование NAPS2: %w (%s)", err, strings.TrimSpace(string(out)))

@@ -99,6 +99,21 @@
     return String(s).replace(/"/g, "&quot;");
   }
 
+  function keepInputVisible() {
+    if (!activeInput || !root || root.hidden) return;
+    const keyboard = root.getBoundingClientRect();
+    document.body.style.setProperty("--osk-height", keyboard.height + "px");
+    const field = activeInput.getBoundingClientRect();
+    const visibleBottom = keyboard.top - 24;
+    if (field.bottom > visibleBottom) {
+      window.scrollBy({ top: field.bottom - visibleBottom, behavior: "instant" });
+    } else if (field.top < 24) {
+      window.scrollBy({ top: field.top - 24, behavior: "instant" });
+    }
+  }
+
+  window.addEventListener("resize", () => requestAnimationFrame(keepInputVisible));
+
   function show(input) {
     ensureRoot();
     activeInput = input;
@@ -106,13 +121,14 @@
     document.body.classList.add("osk-open");
     document.querySelectorAll(".osk-target").forEach((el) => el.classList.remove("osk-target"));
     input.classList.add("osk-target");
-    input.scrollIntoView({ block: "center", behavior: "smooth" });
+    requestAnimationFrame(keepInputVisible);
   }
 
   function hide() {
     const input = activeInput;
     if (root) root.hidden = true;
     document.body.classList.remove("osk-open");
+    document.body.style.removeProperty("--osk-height");
     document.querySelectorAll(".osk-target").forEach((el) => el.classList.remove("osk-target"));
     activeInput = null;
     if (input && document.activeElement === input) {

@@ -34,6 +34,7 @@
 
     <div class="setup-layout">
       <section class="preview-panel">
+        <p class="print-mode-heading">Черно-белая печать</p>
         <div class="preview-meta">
           <strong id="file-name">Документ</strong>
           <span id="page-count">—</span>
@@ -64,7 +65,7 @@
       </section>
 
       <section class="settings-panel card">
-        <h1>Настройки печати <span class="print-mono-label">Только чёрно-белая</span></h1>
+        <h1>Настройки печати</h1>
         <p class="paper-remaining" id="paper-remaining-line">Остаток бумаги: <strong id="paper-remaining">—</strong></p>
 
         <div class="option-group print-pages-group">
@@ -132,6 +133,11 @@
         </div>
 
         <button type="button" class="primary-btn pay-btn" id="pay-btn">Оплатить</button>
+        <div class="color-print-survey">
+          <p>Хотели бы вы печатать в цвете?</p>
+          <button type="button" class="color-vote-btn" id="color-vote-btn" aria-pressed="false">Да, хочу цветную печать</button>
+          <span id="color-vote-status" role="status" hidden></span>
+        </div>
       </section>
     </div>
   </div>
@@ -658,14 +664,11 @@
         const quillStage = setTimeout(() => {
           setMagicStage('quill', 'Рисуем волшебным пером', 'Буквы и изображения уже появляются на страницах');
         }, 6500);
-        const [printRes] = await Promise.all([
-          fetch('/api/kiosk/print/jobs/' + encodeURIComponent(jobId) + '/print', {
+        const printRes = await fetch('/api/kiosk/print/jobs/' + encodeURIComponent(jobId) + '/print', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(settings()),
-          }),
-          new Promise((resolve) => setTimeout(resolve, 6500)),
-        ]);
+          });
         clearTimeout(paperStage);
         clearTimeout(quillStage);
         const printData = await printRes.json().catch(() => ({}));
@@ -736,6 +739,7 @@
 
     loadJob();
   </script>
+  <script src="/static/color-vote.js"></script>
   <script src="/static/idle.js"></script>
 </body>
 </html>

@@ -90,6 +90,12 @@ func (s *Service) PrintFile(filePath string, opt PrintOptions) error {
 		return nil
 	}
 
+	prepared, preparedOptions, cleanup, err := prepareSinglePageDuplexCopies(filePath, opt)
+	if err != nil {
+		return err
+	}
+	defer cleanup()
+	filePath, opt = prepared, preparedOptions
 	switch runtime.GOOS {
 	case "windows":
 		return s.printWindows(filePath, opt)
@@ -189,13 +195,13 @@ func (s *Service) printWindows(filePath string, opt PrintOptions) error {
 
 	if sumatra := resolveSumatra(s.sumatraPath); sumatra != "" {
 		return monitorWindowsPrint(spoolPrinter, abs, opt.Completion, func() error {
-			return printSumatra(sumatra, abs, s.printerName, opt)
+			return printSumatra(sumatra, abs, spoolPrinter, opt)
 		})
 	}
 
 	slog.Warn("SumatraPDF не найден, печать через ассоциацию Windows (менее надёжно)")
 	if err := monitorWindowsPrint(spoolPrinter, abs, opt.Completion, func() error {
-		return printWindowsShell(abs, s.printerName, opt)
+		return printWindowsShell(abs, spoolPrinter, opt)
 	}); err != nil {
 		slog.Warn("windows shell print failed", "error", err)
 		return fmt.Errorf("не найден SumatraPDF. Скачайте SumatraPDF и положите SumatraPDF.exe в папку с киоском")

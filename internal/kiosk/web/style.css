@@ -107,7 +107,7 @@ body.kiosk-user:not(.kiosk-home) .brand-title::before {
 }
 body.kiosk-user:not(.kiosk-home) .brand-subtitle { font-size: 0; }
 body.kiosk-user:not(.kiosk-home) .brand-subtitle::before {
-  content: "МАГИЯ ПЕЧАТИ";
+  content: "МАГИЯ ЦИФРОВОЙ ПЕЧАТИ";
   color: #6d7890;
   font-size: 10px;
   font-weight: 800;
@@ -7430,7 +7430,7 @@ body.kiosk-user.print-setup-page:not(.kiosk-home) .setup-screen {
   position: relative;
 }
 body.kiosk-user.print-setup-page:not(.kiosk-home) .app-header { margin: 0; padding: 0; min-height: 0; }
-body.kiosk-user.print-setup-page:not(.kiosk-home) .top-nav { position: absolute; top: 18px; right: 22px; width: auto; margin: 0; z-index: 2; }
+body.kiosk-user.print-setup-page:not(.kiosk-home) .top-nav { position: absolute; top: 18px; left: 22px; right: auto; width: auto; margin: 0; z-index: 2; }
 body.kiosk-user.print-setup-page:not(.kiosk-home) .back-btn { min-height: 52px; }
 body.kiosk-user.print-setup-page:not(.kiosk-home) .panel-error { margin: 0; grid-row: 2; }
 body.kiosk-user.print-setup-page:not(.kiosk-home) .setup-layout {
@@ -7490,4 +7490,139 @@ body.kiosk-user.print-setup-page:not(.kiosk-home) .settings-panel :is(.round-btn
   body.kiosk-user.print-setup-page:not(.kiosk-home) .settings-panel :is(.round-btn,.copies-row input) { height: 48px; min-height: 48px; }
   body.kiosk-user.print-setup-page:not(.kiosk-home) .settings-panel .price-box { padding: 7px 12px; }
   body.kiosk-user.print-setup-page:not(.kiosk-home) .preview-orientation-control .orientation-note { display: none; }
+}
+
+/* Large, responsive QR for scanning from the portrait kiosk display. */
+body.kiosk-user #bot-qr {
+  display: block;
+  width: min(560px, 68vw, 38dvh);
+  height: auto;
+  margin: 20px auto;
+  image-rendering: pixelated;
+}
+
+body.kiosk-user:not(.kiosk-home) .delivery-address--email {
+  font-size: clamp(68px, 8.8vw, 96px);
+}
+
+body.kiosk-user:not(.kiosk-home) .print-mode-heading {
+  width: 100%; margin: 0 0 8px; text-align: center; color: #173677;
+  font-size: clamp(25px,3.4vw,38px); font-weight: 900; line-height: 1.15; flex-shrink: 0;
+}
+body.kiosk-user:not(.kiosk-home) .color-print-survey {
+  grid-column: 1 / -1; display: flex; align-items: center; justify-content: center;
+  flex-wrap: wrap; gap: 8px 16px; text-align: center; padding-top: 4px;
+}
+body.kiosk-user:not(.kiosk-home) .color-print-survey p { margin: 0; font-size: 17px; font-weight: 750; }
+.color-vote-btn {
+  min-height: 48px; border: 1px solid #c4d5f0; border-radius: 14px; padding: 10px 18px;
+  background: #edf4ff; color: #254b88; font: inherit; font-weight: 800; cursor: pointer;
+}
+.color-vote-btn.is-voted { background: #149654; border-color: #149654; color: white; opacity: 1; cursor: default; }
+#color-vote-status { width: 100%; font-size: 14px; color: #bd3550; }
+
+body.kiosk-user.copy-setup-page:not(.kiosk-home) .hero.compact .print-mode-heading {
+  font-size: clamp(25px, 3.4vw, 38px);
+  line-height: 1.15;
+  font-weight: 900;
+  margin: 0 0 8px;
+}
+
+body.kiosk-user .email-qr {
+  display: block; width: min(560px, 68vw, 38dvh); height: auto;
+  max-width: 100%; margin: 18px auto; background: white; border-radius: 16px;
+  image-rendering: pixelated;
+}
+body.kiosk-user .email-qr--card { width: min(240px, 32vw); margin: 12px auto; }
+body.kiosk-user #terminal-email { display: block; text-align: center; overflow-wrap: anywhere; }
+
+/* Scan review uses the remaining viewport height for the preview. */
+body.kiosk-user.scan-review-page:not(.kiosk-home) .screen {
+  box-sizing: border-box;
+  height: calc(100dvh - 8px);
+  min-height: 0;
+  padding: 16px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  position: relative;
+}
+body.kiosk-user.scan-review-page:not(.kiosk-home) .app-header {
+  flex: 0 0 66px; min-height: 0; margin: 0; padding: 0;
+}
+body.kiosk-user.scan-review-page:not(.kiosk-home) .top-nav {
+  position: absolute; top: 18px; left: 22px; right: auto; width: auto; margin: 0; z-index: 2;
+}
+body.kiosk-user.scan-review-page:not(.kiosk-home) .scan-review-head {
+  flex: none; margin: 0; padding: 0;
+}
+body.kiosk-user.scan-review-page:not(.kiosk-home) .scan-review-head h1 {
+  margin: 0; font-size: clamp(28px,4vw,44px); line-height: 1.15;
+}
+body.kiosk-user.scan-review-page:not(.kiosk-home) .scan-review-head p {
+  margin: 5px 0 0; font-size: 19px; line-height: 1.25;
+}
+body.kiosk-user.scan-review-page:not(.kiosk-home) .scan-review {
+  flex: 1; min-height: 0; width: min(920px,100%); margin: 0 auto;
+  display: flex; flex-direction: column; gap: 10px;
+}
+body.kiosk-user.scan-review-page:not(.kiosk-home) .scan-review[hidden] { display: none; }
+body.kiosk-user.scan-review-page:not(.kiosk-home) .scan-review-preview {
+  flex: 1; min-height: 140px; width: 100%; aspect-ratio: auto;
+  box-sizing: border-box; padding: 10px; border-radius: 22px;
+}
+body.kiosk-user.scan-review-page:not(.kiosk-home) .scan-review-page-number {
+  top: 18px; left: 18px; padding: 7px 12px; font-size: 16px;
+}
+body.kiosk-user.scan-review-page:not(.kiosk-home) .scan-review-thumbnails {
+  flex: none; margin: 0; padding: 8px 12px; border-radius: 18px;
+}
+body.kiosk-user.scan-review-page:not(.kiosk-home) .scan-review-strip {
+  gap: 12px; padding: 5px 5px 8px;
+}
+body.kiosk-user.scan-review-page:not(.kiosk-home) .scan-page-thumb {
+  flex-basis: 70px; min-width: 70px; padding: 3px; border-width: 3px; border-radius: 12px;
+}
+body.kiosk-user.scan-review-page:not(.kiosk-home) .scan-page-thumb-number {
+  width: 26px; height: 26px; right: 5px; bottom: 5px; font-size: 14px;
+}
+body.kiosk-user.scan-review-page:not(.kiosk-home) .scan-review-page-actions {
+  flex: none; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 10px;
+}
+body.kiosk-user.scan-review-page:not(.kiosk-home) .scan-review-page-actions .scan-review-action {
+  min-height: 88px; padding: 8px; gap: 4px; border-radius: 18px;
+}
+body.kiosk-user.scan-review-page:not(.kiosk-home) .scan-review-action-icon {
+  width: 32px; height: 32px; flex-basis: 32px;
+}
+body.kiosk-user.scan-review-page:not(.kiosk-home) .scan-review-action-icon svg { width: 26px; height: 26px; }
+body.kiosk-user.scan-review-page:not(.kiosk-home) .scan-review-action-label { min-height: 36px; font-size: 16px; }
+body.kiosk-user.scan-review-page:not(.kiosk-home) .scan-review-name {
+  flex: none; margin: 0; padding: 12px 18px; border-radius: 22px;
+}
+body.kiosk-user.scan-review-page:not(.kiosk-home) .scan-review-name label { font-size: 18px; margin: 0 0 6px; }
+body.kiosk-user.scan-review-page:not(.kiosk-home) .scan-review-name input {
+  box-sizing: border-box; min-height: 52px; padding: 10px 14px; font-size: 21px;
+}
+body.kiosk-user.scan-review-page:not(.kiosk-home) .scan-review-name .hint { margin: 6px 0; font-size: 13px; }
+body.kiosk-user.scan-review-page:not(.kiosk-home) .scan-review-total {
+  flex-direction: row; gap: 12px; margin: 8px 0; padding: 10px 14px; font-size: 17px;
+}
+body.kiosk-user.scan-review-page:not(.kiosk-home) .scan-review-total strong { text-align: right; }
+body.kiosk-user.scan-review-page:not(.kiosk-home) #continue-btn { min-height: 60px; margin: 0; font-size: 22px; }
+@media (max-height: 1200px) {
+  body.kiosk-user.scan-review-page:not(.kiosk-home) .screen { padding: 10px 16px 20px; gap: 6px; }
+  body.kiosk-user.scan-review-page:not(.kiosk-home) .app-header { flex-basis: 54px; }
+  body.kiosk-user.scan-review-page:not(.kiosk-home) .top-nav { top: 10px; left: 16px; }
+  body.kiosk-user.scan-review-page:not(.kiosk-home) .scan-review { gap: 6px; }
+  body.kiosk-user.scan-review-page:not(.kiosk-home) .scan-page-thumb { flex-basis: 52px; min-width: 52px; }
+  body.kiosk-user.scan-review-page:not(.kiosk-home) .scan-review-page-actions .scan-review-action { min-height: 76px; }
+  body.kiosk-user.scan-review-page:not(.kiosk-home) .scan-review-name { padding: 10px 14px; }
+}
+
+body.kiosk-user.scan-review-page:not(.kiosk-home) { display: flex; flex-direction: column; }
+
+/* Reserve scroll space while editing pages in the fixed-height print layout. */
+body.kiosk-user.print-setup-page.osk-open {
+  padding-bottom: calc(var(--osk-height, 430px) + 24px);
 }

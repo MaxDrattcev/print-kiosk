@@ -63,7 +63,7 @@ func (h *Handler) MaxInfo(c *gin.Context) {
 	}
 	out["bot_link"] = botLink
 	if botLink != "" {
-		if png, qrErr := qrcode.Encode(botLink, qrcode.Medium, 384); qrErr == nil {
+		if png, qrErr := qrcode.Encode(botLink, qrcode.Medium, 768); qrErr == nil {
 			out["bot_qr"] = "data:image/png;base64," + base64.StdEncoding.EncodeToString(png)
 		}
 	}
@@ -207,7 +207,7 @@ func (h *Handler) StartMaxScanSession(c *gin.Context) {
 	}
 	deepLink := botLink + "?start=" + url.QueryEscape("scan_"+sess.Token)
 	out := gin.H{"session": maxsvc.ScanSessionJSON(sess), "bot_username": username, "bot_link": botLink}
-	if png, err := qrcode.Encode(deepLink, qrcode.Medium, 384); err == nil {
+	if png, err := qrcode.Encode(deepLink, qrcode.Medium, 768); err == nil {
 		out["bot_qr"] = "data:image/png;base64," + base64.StdEncoding.EncodeToString(png)
 	}
 	c.JSON(http.StatusOK, out)

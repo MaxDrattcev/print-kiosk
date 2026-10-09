@@ -38,7 +38,8 @@
         </svg>
       </div>
       <h1>Отправьте документ на почту</h1>
-      <p>С телефона или компьютера отправьте письмо с вложением на адрес:</p>
+      <p>Отсканируйте QR-код, чтобы открыть письмо с адресом получателя. Затем прикрепите файл и отправьте письмо.</p>
+      <img class="email-qr" id="email-qr" alt="QR-код адреса почты терминала" width="560" height="560" hidden>
       <p class="scan-price source-email delivery-address delivery-address--email kiosk-skeleton-text" id="email-address" aria-label="Загружаем адрес почты">Загружаем адрес</p>
       <ol class="scan-steps">
         <li>Прикрепите файл к письму (PDF, Word, Excel, фото)</li>
@@ -79,6 +80,11 @@
           return;
         }
         document.getElementById('email-address').textContent = data.email_address;
+        if (data.email_qr) {
+          const qr = document.getElementById('email-qr');
+          qr.src = data.email_qr;
+          qr.hidden = false;
+        }
         document.getElementById('email-address').classList.remove('kiosk-skeleton-text');
         document.getElementById('max-size').textContent = data.max_file_size_mb + ' МБ';
         sentBtn.disabled = false;

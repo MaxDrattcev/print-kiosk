@@ -125,13 +125,20 @@ func (h *Handler) TestMAX(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": classifyMAXError(err)})
 		return
 	}
-	username := strings.TrimPrefix(info.Username, "@")
+	username := strings.TrimPrefix(strings.TrimSpace(info.Username), "@")
+	botLink, linkSaved, err := h.syncMAXBotLink(token, username)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "MAX подключён, но не удалось сохранить ссылку на бота"})
+		return
+	}
 
 	if !req.SendMessage {
 		c.JSON(http.StatusOK, gin.H{
-			"ok":           true,
-			"message":      "Подключение успешно",
-			"bot_username": username,
+			"ok":             true,
+			"message":        "Подключение успешно",
+			"bot_username":   username,
+			"bot_link":       botLink,
+			"bot_link_saved": linkSaved,
 		})
 		return
 	}
@@ -148,9 +155,11 @@ func (h *Handler) TestMAX(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{
-		"ok":           true,
-		"message":      "Тестовое сообщение отправлено",
-		"bot_username": username,
+		"ok":             true,
+		"message":        "Тестовое сообщение отправлено",
+		"bot_username":   username,
+		"bot_link":       botLink,
+		"bot_link_saved": linkSaved,
 	})
 }
 
@@ -187,4 +196,22 @@ func classifyMAXError(err error) string {
 	default:
 		return "Не удалось связаться с MAX. Проверьте интернет и повторите проверку."
 	}
+}
+
+// Only persist a derived link when it belongs to the saved token. A new,
+// unsaved token and its link are saved together through the settings form.
+func (h *Handler) syncMAXBotLink(token, username string) (string, bool, error) {
+	if username == "" {
+		return "", false, nil
+	}
+	link := "https://max.ru/" + username
+	saved, err := h.settings.Get(storage.SettingMaxBotToken)
+	if err != nil {
+		return "", false, err
+	}
+	if strings.TrimSpace(saved) != strings.TrimSpace(token) {
+		return link, false, nil
+	}
+	err = h.settings.SetMany(map[string]string{storage.SettingMaxBotLink: link})
+	return link, err == nil, err
 }

@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"os"
 	"strconv"
-	"strings"
 	"time"
 
 	maxbot "github.com/max-messenger/max-bot-api-client-go/v2"
@@ -155,27 +154,26 @@ func (s *Service) SendFileToUser(ctx context.Context, userID int64, filePath, fi
 	if fileName == "" {
 		fileName = st.Name()
 	}
+	uploadStarted := time.Now()
 	token, err := api.Upload.Upload(ctx, model.UploadFile, f, fileName, st.Size())
 	if err != nil {
 		return fmt.Errorf("upload to MAX: %w", err)
 	}
-	time.Sleep(1500 * time.Millisecond)
+	slog.Info("max file uploaded", "bytes", st.Size(), "duration_ms", time.Since(uploadStarted).Milliseconds())
 	msg := maxbot.NewMessage().
 		SetUser(userID).
 		SetText(caption).
 		AddAttachByToken(token, model.AttachFile)
-	var lastErr error
-	for attempt := 0; attempt < 4; attempt++ {
-		_, lastErr = api.Messages.Send(ctx, msg)
-		if lastErr == nil {
-			return nil
-		}
-		if !strings.Contains(lastErr.Error(), "not.ready") && !strings.Contains(lastErr.Error(), "not processed") {
-			break
-		}
-		time.Sleep(time.Duration(attempt+1) * 2 * time.Second)
+	// Messages.Send already retries attachment.not.ready with backoff.
+	// A second retry loop multiplies that wait and delays reporting failures.
+	sendStarted := time.Now()
+	_, err = api.Messages.Send(ctx, msg)
+	if err != nil {
+		slog.Warn("max file message failed", "duration_ms", time.Since(sendStarted).Milliseconds(), "error", err)
+		return err
 	}
-	return lastErr
+	slog.Info("max file message sent", "duration_ms", time.Since(sendStarted).Milliseconds())
+	return nil
 }
 
 func (s *Service) sendUserText(ctx context.Context, userID int64, text string) error {

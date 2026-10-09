@@ -329,9 +329,16 @@ func (h *Handler) Overview(c *gin.Context) {
 		smtpHost, smtpPort = mailcfg.SMTPHost(values[storage.SettingEmailAddress])
 	}
 
+	var colorVotes any
+	if h.stats != nil {
+		if count, err := h.stats.ColorPrintVotes(); err == nil {
+			colorVotes = count
+		}
+	}
 	c.JSON(http.StatusOK, gin.H{
-		"backend": gin.H{"known": true, "ok": true},
-		"usb":     usbCard,
+		"color_print_votes": colorVotes,
+		"backend":           gin.H{"known": true, "ok": true},
+		"usb":               usbCard,
 		"paper": gin.H{
 			"known":     true,
 			"remaining": paper,

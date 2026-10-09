@@ -60,6 +60,7 @@ func RegisterRoutes(r *gin.Engine, cfg *config.Config, settings *storage.Setting
 	h := NewHandler(cfg, settings, jobs, scans, copies, mail, maxSvc, st, history)
 
 	r.GET("/api/kiosk/info", h.Info)
+	r.POST("/api/kiosk/color-print/vote", h.VoteColorPrint)
 	r.POST("/api/kiosk/session/end", h.EndSession)
 	r.GET("/api/kiosk/usb/drives", h.ListUSBDrives)
 	r.GET("/api/kiosk/usb/browse", h.BrowseUSB)
