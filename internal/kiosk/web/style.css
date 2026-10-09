@@ -7850,7 +7850,7 @@ body.kiosk-user.scan-review-page #scan-preview-loading {
 body.kiosk-user.scan-review-page #scan-preview-loading[hidden] { display: none; }
 
 /* Center illustrated instructions in the space beneath the kiosk header. */
-body.kiosk-user:not(.kiosk-home):not(.print-setup-page):not(.scan-review-page) .screen > .prompt-card:has(.prompt-icon),
+body.kiosk-user:not(.kiosk-home):not(.print-setup-page):not(.scan-review-page) .screen > .prompt-card:has(.prompt-icon,.prompt-usb-art),
 body.kiosk-user:not(.kiosk-home):not(.print-setup-page):not(.scan-review-page) .screen > .prepare-screen {
   margin-block: auto;
   flex-shrink: 0;
