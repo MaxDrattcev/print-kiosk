@@ -38,7 +38,7 @@
     <main class="scan-review" id="scan-review" hidden>
       <section class="scan-review-preview">
         <div class="scan-review-page-number" id="selected-label">Страница 1</div>
-        <div id="scan-preview-loading" role="status"><div class="dots-loader" aria-hidden="true"><span></span><span></span><span></span></div><strong>Подготавливаем изображение…</strong><span>Скан получен. Подождите, пока он появится на экране.</span></div>
+        <div id="scan-preview-loading" role="status"><div class="dots-loader" aria-hidden="true"><span></span><span></span><span></span></div><strong>Подготавливаем изображение…</strong><span class="scan-preview-loading-message">Скан получен. Подождите, пока он появится на экране.</span></div>
         <img id="scan-preview-image" alt="Отсканированная страница" hidden>
         <iframe id="preview-frame" title="Предпросмотр выбранной страницы" hidden></iframe>
       </section>
@@ -193,10 +193,10 @@
         scanImage.hidden = true;
         preview.hidden = true;
         previewLoading.querySelector('strong').textContent = 'Не удалось загрузить изображение';
-        previewLoading.querySelector('span:last-child').textContent = 'Скан сохранён. Выберите страницу повторно, чтобы загрузить просмотр.';
+        previewLoading.querySelector('.scan-preview-loading-message').textContent = 'Скан сохранён. Выберите страницу повторно, чтобы загрузить просмотр.';
       };
       previewLoading.querySelector('strong').textContent = 'Подготавливаем изображение…';
-      previewLoading.querySelector('span:last-child').textContent = 'Скан получен. Подождите, пока он появится на экране.';
+      previewLoading.querySelector('.scan-preview-loading-message').textContent = 'Скан получен. Подождите, пока он появится на экране.';
       preview.hidden = true;
       scanImage.hidden = true;
       scanImage.src = imageURL;

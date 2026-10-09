@@ -7848,3 +7848,19 @@ body.kiosk-user.scan-review-page #scan-preview-loading {
   font-size: clamp(18px, 2.5vw, 26px);
 }
 body.kiosk-user.scan-review-page #scan-preview-loading[hidden] { display: none; }
+
+/* Center illustrated instructions in the space beneath the kiosk header. */
+body.kiosk-user:not(.kiosk-home):not(.print-setup-page):not(.scan-review-page) .screen > .prompt-card:has(.prompt-icon),
+body.kiosk-user:not(.kiosk-home):not(.print-setup-page):not(.scan-review-page) .screen > .prepare-screen {
+  margin-block: auto;
+  flex-shrink: 0;
+}
+
+/* Preview images are display-only: browser image-hover tools must not capture input. */
+body.kiosk-user .scan-review-preview > img,
+body.kiosk-user .scan-page-thumb > img,
+body.kiosk-user .preview-frame.image-preview > img {
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
