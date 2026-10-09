@@ -7784,3 +7784,67 @@ body.print-setup-page .preview-frame.document-preview { display: block; overflow
 .pdf-preview-page canvas { display: block; background: #fff; box-shadow: 0 2px 8px #0003; }
 .pdf-preview-status { text-align: center; margin: 20px; }
 .pdf-preview-fallback { min-height: 100%; flex: 1; }
+
+/* MAX upload instructions stay inside the card at every viewport width. */
+body.kiosk-user:not(.kiosk-home) .max-upload-card {
+  box-sizing: border-box;
+  padding-inline: clamp(20px, 4vw, 44px);
+}
+body.kiosk-user:not(.kiosk-home) .max-upload-card #bot-link {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  margin: 12px auto 18px;
+}
+body.kiosk-user:not(.kiosk-home) .max-upload-steps {
+  list-style: none;
+  counter-reset: max-step;
+  padding: 16px 20px;
+  margin: 16px auto;
+  width: 100%;
+  max-width: 680px;
+  box-sizing: border-box;
+  border: 1px solid #ddd5fa;
+  border-radius: 20px;
+  background: rgba(242,237,255,.8);
+  text-align: left;
+  color: #344b7b;
+}
+body.kiosk-user:not(.kiosk-home) .max-upload-steps li {
+  counter-increment: max-step;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 10px 0;
+  font-size: clamp(18px, 2.3vw, 24px);
+  line-height: 1.35;
+  font-weight: 650;
+}
+body.kiosk-user:not(.kiosk-home) .max-upload-steps li::before {
+  content: counter(max-step);
+  flex: 0 0 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #7954df;
+  color: white;
+  font-weight: 850;
+}
+
+body.kiosk-user.scan-review-page .scan-review-preview { position: relative; }
+body.kiosk-user.scan-review-page #scan-preview-loading {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+  padding: 24px;
+  text-align: center;
+  background: #edf2fb;
+  color: #344b7b;
+  font-size: clamp(18px, 2.5vw, 26px);
+}
+body.kiosk-user.scan-review-page #scan-preview-loading[hidden] { display: none; }

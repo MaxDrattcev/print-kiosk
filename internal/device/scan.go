@@ -64,7 +64,12 @@ func ScanToPDF(destPDF string, opt ScanOptions, dryRun bool) error {
 		slog.Warn("scan failed", "dest", destPDF, "error", err)
 		return err
 	}
-	slog.Info("scan finished", "dest", destPDF, "duration_ms", time.Since(started).Milliseconds())
+	info, _ := os.Stat(destPDF)
+	var size int64
+	if info != nil {
+		size = info.Size()
+	}
+	slog.Info("scan finished", "dest", destPDF, "duration_ms", time.Since(started).Milliseconds(), "bytes", size)
 	return nil
 }
 
@@ -88,6 +93,7 @@ func ImageToA4PDF(imgPath, pdfPath string) error {
 
 // ImageToA4PDFOrientation centers an image on a portrait or landscape A4 page.
 func ImageToA4PDFOrientation(imgPath, pdfPath string, landscape bool) error {
+
 	if pdfPath == "" {
 		return fmt.Errorf("не задан файл PDF")
 	}

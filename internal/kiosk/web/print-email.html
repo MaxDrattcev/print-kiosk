@@ -41,12 +41,13 @@
       <p>Отсканируйте QR-код, чтобы открыть письмо с адресом получателя. Затем прикрепите файл и отправьте письмо.</p>
       <img class="email-qr" id="email-qr" alt="QR-код адреса почты терминала" width="560" height="560" hidden>
       <p class="scan-price source-email delivery-address delivery-address--email kiosk-skeleton-text" id="email-address" aria-label="Загружаем адрес почты">Загружаем адрес</p>
-      <ol class="scan-steps">
-        <li>Прикрепите файл к письму (PDF, Word, Excel, фото)</li>
-        <li>Максимальный размер файла: <strong id="max-size">—</strong></li>
-        <li>Отправьте письмо и нажмите кнопку ниже</li>
-        <li>Ожидание письма на терминале — до 2 минут</li>
+      <ol class="max-upload-steps" aria-label="Как отправить документ по почте">
+        <li>Отсканируйте QR-код, чтобы открыть письмо</li>
+        <li>Прикрепите документ и отправьте письмо</li>
+        <li>Нажмите «Я отправил письмо на email»</li>
       </ol>
+      <p>PDF, Word, Excel или фото · до <span id="max-size">—</span> МБ</p>
+      <p>Ожидание письма — до 2 минут</p>
       <p class="error" id="error" hidden></p>
       <button type="button" class="primary-btn" id="sent-btn" disabled>Я отправил письмо на email</button>
     </section>
@@ -86,7 +87,7 @@
           qr.hidden = false;
         }
         document.getElementById('email-address').classList.remove('kiosk-skeleton-text');
-        document.getElementById('max-size').textContent = data.max_file_size_mb + ' МБ';
+        document.getElementById('max-size').textContent = data.max_file_size_mb;
         sentBtn.disabled = false;
       } catch (e) {
         document.getElementById('email-address').classList.remove('kiosk-skeleton-text');

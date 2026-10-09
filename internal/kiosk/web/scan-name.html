@@ -38,9 +38,9 @@
     <main class="scan-review" id="scan-review" hidden>
       <section class="scan-review-preview">
         <div class="scan-review-page-number" id="selected-label">Страница 1</div>
-        <p id="scan-preview-loading" role="status">Подготавливаем изображение…</p>
+        <div id="scan-preview-loading" role="status"><div class="dots-loader" aria-hidden="true"><span></span><span></span><span></span></div><strong>Подготавливаем изображение…</strong><span>Скан получен. Подождите, пока он появится на экране.</span></div>
         <img id="scan-preview-image" alt="Отсканированная страница" hidden>
-        <iframe id="preview-frame" title="Предпросмотр выбранной страницы"></iframe>
+        <iframe id="preview-frame" title="Предпросмотр выбранной страницы" hidden></iframe>
       </section>
 
       <section class="scan-review-thumbnails" aria-label="Страницы документа">
@@ -179,11 +179,27 @@
       const scanImage = document.getElementById('scan-preview-image');
       const previewLoading = document.getElementById('scan-preview-loading');
       previewLoading.hidden = false;
-      scanImage.onload = () => { previewLoading.hidden = true; scanImage.hidden = false; preview.hidden = true; preview.removeAttribute('src'); };
-      scanImage.onerror = () => { previewLoading.hidden = true; scanImage.hidden = true; preview.hidden = false; preview.src = pageURL(selectedIndex); };
+      const imageURL = '/api/kiosk/scan/jobs/' + encodeURIComponent(jobId) + '/pages/' + selectedIndex + '/preview?format=image';
+      const expectedURL = new URL(imageURL, location.href).href;
+      scanImage.onload = async () => {
+        try { await scanImage.decode(); } catch (e) { return; }
+        if (scanImage.src !== expectedURL) return;
+        scanImage.hidden = false;
+        preview.hidden = true;
+        preview.removeAttribute('src');
+        previewLoading.hidden = true;
+      };
+      scanImage.onerror = () => {
+        scanImage.hidden = true;
+        preview.hidden = true;
+        previewLoading.querySelector('strong').textContent = 'Не удалось загрузить изображение';
+        previewLoading.querySelector('span:last-child').textContent = 'Скан сохранён. Выберите страницу повторно, чтобы загрузить просмотр.';
+      };
+      previewLoading.querySelector('strong').textContent = 'Подготавливаем изображение…';
+      previewLoading.querySelector('span:last-child').textContent = 'Скан получен. Подождите, пока он появится на экране.';
       preview.hidden = true;
       scanImage.hidden = true;
-      scanImage.src = '/api/kiosk/scan/jobs/' + encodeURIComponent(jobId) + '/pages/' + selectedIndex + '/preview?format=image';
+      scanImage.src = imageURL;
       document.getElementById('rescan-page').href = '/scan/?job=' + encodeURIComponent(jobId) + '&replace=' + selectedIndex;
       document.getElementById('total-pages').textContent = 'В документе: ' + pagesLabel(pages.length);
 

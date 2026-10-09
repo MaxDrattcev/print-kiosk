@@ -43,6 +43,7 @@ func findNAPS2() string {
 }
 
 func scanNAPS2(bin, destPDF string, opt ScanOptions) error {
+	started := time.Now()
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 	bitDepth := "gray"
@@ -55,6 +56,7 @@ func scanNAPS2(bin, destPDF string, opt ScanOptions) error {
 	if err != nil {
 		return fmt.Errorf("сканирование NAPS2: %w (%s)", err, strings.TrimSpace(string(out)))
 	}
+	slog.Info("scan acquisition finished", "backend", "naps2", "duration_ms", time.Since(started).Milliseconds())
 	if st, err := os.Stat(destPDF); err != nil || st.Size() == 0 {
 		return fmt.Errorf("сканер не вернул файл")
 	}
@@ -88,7 +90,9 @@ func scanWIA(destPDF string, opt ScanOptions) error {
 		"-Dpi", fmt.Sprintf("%d", opt.dpi()),
 	)
 	executil.HideWindow(cmd)
+	started := time.Now()
 	out, err := cmd.CombinedOutput()
+	slog.Info("scan acquisition finished", "backend", "wia", "duration_ms", time.Since(started).Milliseconds(), "error", err)
 	if err != nil {
 		msg := strings.TrimSpace(string(out))
 		if strings.Contains(strings.ToLower(msg), "scanner not found") {

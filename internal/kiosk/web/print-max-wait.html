@@ -30,11 +30,15 @@
       </a>
     </header>
 
-    <section class="prompt-card wait-magic-card" id="wait-panel">
+    <section class="prompt-card wait-magic-card max-upload-card" id="wait-panel">
       <h1>Отправьте документ в MAX</h1>
       <img id="bot-qr" alt="QR-код бота MAX" width="320" height="320" hidden style="max-width:80%;height:auto;background:white;border-radius:16px;margin:16px auto;image-rendering:pixelated">
       <p id="bot-link">Загружаем ссылку на бота…</p>
-      <p>Наведите камеру телефона на QR-код, откройте бота, нажмите «Начать» и прикрепите файл.</p>
+      <ol class="max-upload-steps" aria-label="Как отправить документ">
+        <li>Отсканируйте QR-код камерой телефона</li>
+        <li>Откройте бота в MAX и нажмите «Начать»</li>
+        <li>Прикрепите документ и отправьте его боту</li>
+      </ol>
       <p>PDF, Word, Excel или фото · до <span id="max-size">20</span> МБ</p>
       <p class="wait-magic-phrase" id="status-text">Заглядываем в волшебные сообщения MAX…</p>
       <div class="dots-loader" aria-hidden="true"><span></span><span></span><span></span></div>
