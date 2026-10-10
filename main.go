@@ -99,6 +99,8 @@ func main() {
 		slog.Error("failed to register kiosk routes", "error", err)
 		os.Exit(1)
 	}
+	defer printerSvc.Close()
+	printerSvc.WarmOffice()
 	if err := admin.RegisterRoutes(r, cfg, settingsRepo, statsRepo, historyRepo, printerSvc, maxSvc); err != nil {
 		slog.Error("failed to register admin routes", "error", err)
 		os.Exit(1)

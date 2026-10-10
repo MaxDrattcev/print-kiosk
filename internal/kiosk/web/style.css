@@ -7151,7 +7151,7 @@ body.print-setup-page .print-pages-mode span {
   border-radius: 14px;
   font-size: 16px;
 }
-body.print-setup-page .print-pages-mode input[value="custom"]:not(:checked) + span {
+body.print-setup-page .print-pages-mode input:not(:checked) + span {
   color: #2458bd;
   border: 2px solid rgba(39,108,245,.42);
   background: linear-gradient(145deg,#e8f1ff,#eeeaff);
@@ -8300,7 +8300,12 @@ body.kiosk-user.scan-email-page .scan-email-content .hero > .prompt-icon--mail {
 }
 
 /* SBP shares the kiosk payment dialog and reserves its QR geometry. */
-.payment-method--sbp { display: flex; flex-direction: column; gap: 12px; margin-top: 16px; }
+.payment-methods { display: grid; grid-auto-rows: 1fr; gap: 16px; }
+.payment-methods .payment-method { height: 100%; box-sizing: border-box; border: 2px solid rgba(255,255,255,.55); gap: 18px; margin: 0; }
+.payment-methods .payment-method__hint { flex: 1; border: 1px solid rgba(255,255,255,.22); }
+.payment-methods .payment-method--sbp { background: linear-gradient(135deg, #16834c, #08653e); box-shadow: 0 16px 36px rgba(8,101,62,.22); }
+.payment-methods .payment-method:focus:not(:focus-visible) { outline: none; }
+.payment-methods .payment-method:focus-visible { outline: 3px solid #79aaff; outline-offset: 3px; }
 .payment-method--sbp[hidden], #qr-payment-modal [hidden] { display: none !important; }
 .payment-card--sbp { text-align: center; }
 .sbp-qr-frame { position: relative; width: min(440px,58vw,34dvh); aspect-ratio: 1; margin: 20px auto; padding: 12px; box-sizing: border-box; background: #fff; border: 2px solid #a9c8ff; border-radius: 20px; display: grid; place-items: center; }
@@ -8324,3 +8329,79 @@ body.kiosk-user #qr-payment-modal :is(#qr-payment-status,#qr-payment-countdown,#
   line-height: 1.4;
 }
 body.kiosk-user #qr-payment-modal #qr-payment-test { color: #704900; }
+
+/* SBP payment keeps its own green palette throughout the dialog. */
+body.kiosk-user #qr-payment-modal {
+  background: #f1faf5;
+}
+body.kiosk-user #qr-payment-modal .payment-card--sbp {
+  background: #f1faf5;
+}
+body.kiosk-user #qr-payment-modal .sbp-qr-frame {
+  width: min(540px, 74vw, 43dvh);
+  padding: 6px;
+  border-color: #91cfac;
+}
+body.kiosk-user #qr-payment-modal #qr-payment-confirm {
+  background: linear-gradient(135deg, #16834c, #08653e);
+  color: #fff;
+  border: 0;
+  box-shadow: 0 12px 28px rgba(8,101,62,.18);
+}
+body.kiosk-user #qr-payment-modal #qr-payment-cancel {
+  background: linear-gradient(135deg, #d83949, #bb2537);
+  color: #fff;
+  border: 0;
+  box-shadow: 0 10px 24px rgba(187,37,55,.16);
+  outline: none;
+}
+body.kiosk-user #qr-payment-modal #qr-payment-cancel:focus-visible {
+  outline: 3px solid #a91f30;
+  outline-offset: 3px;
+}
+
+/* QR cancellation confirmation: separate text and equal-sized actions. */
+body.kiosk-user #qr-cancel-confirm .payment-card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+body.kiosk-user #qr-cancel-confirm .payment-title {
+  margin: 0 0 8px;
+}
+body.kiosk-user #qr-cancel-confirm .payment-card > p {
+  margin: 0 0 12px;
+  text-align: center;
+  line-height: 1.5;
+  color: #526682;
+}
+body.kiosk-user #qr-cancel-confirm :is(#qr-keep-paying, #qr-confirm-cancel) {
+  width: 100%;
+  min-height: 80px;
+  margin: 0;
+  padding: 18px 24px;
+  box-sizing: border-box;
+  border: 0;
+  border-radius: 24px;
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1.3;
+  color: #fff;
+  outline: none;
+}
+body.kiosk-user #qr-cancel-confirm #qr-keep-paying {
+  background: linear-gradient(135deg, #16834c, #08653e);
+  box-shadow: 0 10px 24px rgba(8,101,62,.16);
+}
+body.kiosk-user #qr-cancel-confirm #qr-confirm-cancel {
+  background: linear-gradient(135deg, #d83949, #bb2537);
+  box-shadow: 0 10px 24px rgba(187,37,55,.16);
+}
+body.kiosk-user #qr-cancel-confirm #qr-keep-paying:focus-visible {
+  outline: 3px solid #075534;
+  outline-offset: 3px;
+}
+body.kiosk-user #qr-cancel-confirm #qr-confirm-cancel:focus-visible {
+  outline: 3px solid #a91f30;
+  outline-offset: 3px;
+}

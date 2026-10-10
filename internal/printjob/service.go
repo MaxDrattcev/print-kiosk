@@ -10,9 +10,7 @@ import (
 	"log/slog"
 	"net/url"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"print-kiosk/internal/executil"
 	"runtime"
 	"strconv"
 	"strings"
@@ -69,6 +67,7 @@ type Service struct {
 	dryRun          bool
 	mu              sync.RWMutex
 	jobs            map[string]*Job
+	office          officeWorker
 }
 
 type Options struct {
@@ -471,76 +470,14 @@ func (s *Service) buildPreview(sourcePath, dir string) (string, PreviewKind, int
 }
 
 func (s *Service) convertWithLibreOffice(sourcePath, dir string) (string, error) {
-	bin, err := resolveLibreOffice(s.libreOfficePath)
-	if err != nil {
-		return "", err
-	}
-
-	absSource, err := filepath.Abs(sourcePath)
-	if err != nil {
-		return "", fmt.Errorf("resolve source: %w", err)
-	}
-	absDir, err := filepath.Abs(dir)
-	if err != nil {
-		return "", fmt.Errorf("resolve outdir: %w", err)
-	}
-
-	preview := filepath.Join(absDir, "preview.pdf")
-	var lastOut string
-	for attempt := 1; attempt <= 2; attempt++ {
-		profileDir, err := os.MkdirTemp("", "lo-profile-*")
-		if err != nil {
-			return "", fmt.Errorf("create libreoffice profile: %w", err)
-		}
-
-		profileURL := fileURL(profileDir)
-		args := []string{
-			"-env:UserInstallation=" + profileURL,
-			"--headless",
-			"--nologo",
-			"--nofirststartwizard",
-			"--nolockcheck",
-			"--nodefault",
-			"--norestore",
-			"--convert-to", convertFilter(absSource),
-			"--outdir", absDir,
-			absSource,
-		}
-		cmd := exec.Command(bin, args...)
-		executil.HideWindow(cmd)
-		cmd.Dir = absDir
-		out, err := cmd.CombinedOutput()
-		lastOut = strings.TrimSpace(string(out))
-		_ = os.RemoveAll(profileDir)
-
-		if err != nil {
-			return "", fmt.Errorf("конвертация LibreOffice: %w (%s)", err, lastOut)
-		}
-
-		if pdfPath, ok := findConvertedPDF(absDir, absSource); ok {
-			if pdfPath != preview {
-				if err := os.Rename(pdfPath, preview); err != nil {
-					// Same filesystem copy fallback.
-					if copyErr := copyFile(pdfPath, preview); copyErr != nil {
-						return "", fmt.Errorf("save preview pdf: %v / %v", err, copyErr)
-					}
-					_ = os.Remove(pdfPath)
-				}
-			}
-			return preview, nil
-		}
-
-		// LibreOffice sometimes exits 0 when another instance holds the default profile.
-		time.Sleep(500 * time.Millisecond)
-	}
-
-	entries, _ := os.ReadDir(absDir)
-	names := make([]string, 0, len(entries))
-	for _, e := range entries {
-		names = append(names, e.Name())
-	}
-	return "", fmt.Errorf("pdf после конвертации не найден (файлы: %s; libreoffice: %s)", strings.Join(names, ", "), lastOut)
+	return s.office.convert(s.libreOfficePath, sourcePath, dir)
 }
+
+// WarmOffice starts the dedicated office process without delaying the kiosk startup.
+func (s *Service) WarmOffice() { go s.office.warm(s.libreOfficePath) }
+
+// Close releases the owned LibreOffice process and cancels an active conversion.
+func (s *Service) Close() { s.office.close() }
 
 func fileURL(path string) string {
 	abs, err := filepath.Abs(path)

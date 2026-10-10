@@ -71,7 +71,7 @@
       </div>
 
       <div class="price-card price-card--skeleton preparation-price-card" id="price-card">
-        <div class="price-card-label">Стоимость одного сканирования</div>
+        <div class="price-card-label">Стоимость одной страницы</div>
         <div class="price-card-value price-card-value--bar" id="price-line"></div>
       </div>
 
@@ -267,6 +267,7 @@
         const payData = await payRes.json().catch(() => ({}));
         KioskPayment.closeWaiting();
         if (!payRes.ok) {
+          if (await KioskPayment.resumeAfterCancel()) { busy = false; readyBtn.disabled = false; return; }
           if (window.KioskStages) window.KioskStages.reset();
           showError(payData.error || 'Ошибка оплаты');
           busy = false;

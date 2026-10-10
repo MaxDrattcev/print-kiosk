@@ -31,6 +31,17 @@
   function unsaved(job) {
     return job && !job.refund_required && (job.page_count > 0 || job.paid) && !job.saved_path && !job.sent_to_email;
   }
+  let emptyPaidExit = false;
+  function showDiscard(empty) {
+    emptyPaidExit = empty;
+    confirmExit.querySelector('h2').textContent = empty ? 'Выйти из сканирования?' : 'Завершить без сохранения?';
+    confirmExit.querySelector('p').textContent = empty
+      ? 'Все отсканированные страницы удалены. Вы можете продолжить сканирование. Если выйти сейчас, оплата за выполненное сканирование не возвращается — деньги на карту не вернутся.'
+      : 'Отсканированный документ будет удалён. Оплата за выполненное сканирование не возвращается — деньги на карту не вернутся.';
+    confirmExit.querySelector('#scan-discard-back').textContent = empty ? 'Продолжить сканирование' : 'Вернуться к документу';
+    confirmExit.querySelector('#scan-discard-confirm').textContent = empty ? 'Да, выйти без возврата денежных средств' : 'Всё равно завершить';
+    if (!confirmExit.open) confirmExit.showModal();
+  }
   function finish() {
     navigator.sendBeacon('/api/kiosk/session/end', new Blob([JSON.stringify({scan_job_id: scanID})], {type:'application/json'}));
     bypass = true;
@@ -50,6 +61,7 @@
     try {
       const job = await refresh();
       if (!unsaved(job)) { finish(); return; }
+      if (Number(job.page_count || 0) === 0 && job.paid) { showDiscard(true); return; }
       if (!dialog.open) dialog.showModal();
     } catch (_) {
       // A failed state check must not silently discard the visitor's scan.
@@ -62,11 +74,12 @@
   });
   dialog.querySelector('#scan-exit-leave').addEventListener('click', () => {
     dialog.close();
-    if (!confirmExit.open) confirmExit.showModal();
+    showDiscard(false);
   });
   confirmExit.querySelector('#scan-discard-back').addEventListener('click', () => {
     confirmExit.close();
     pendingLink = null;
+    if (emptyPaidExit) location.href = '/scan/?job=' + encodeURIComponent(scanID);
   });
   confirmExit.querySelector('#scan-discard-confirm').addEventListener('click', finish);
   confirmExit.addEventListener('cancel', event => {

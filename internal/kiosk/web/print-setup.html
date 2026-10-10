@@ -635,6 +635,7 @@
         KioskPayment.closeWaiting();
 
         if (!payRes.ok) {
+          if (await KioskPayment.resumeAfterCancel()) { busy = false; document.getElementById('pay-btn').disabled = false; return; }
           if (window.KioskStages) window.KioskStages.reset();
           if (payData.code === 'paper_insufficient') {
             if (payData.paper_remaining != null) {

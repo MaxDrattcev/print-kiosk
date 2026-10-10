@@ -18,12 +18,15 @@
     '<circle cx="12" cy="16.4" r="1.15" fill="currentColor" stroke="none"/>' +
     "</svg>";
 
+  const QR_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="6" height="6" rx="1"/><rect x="15" y="3" width="6" height="6" rx="1"/><rect x="3" y="15" width="6" height="6" rx="1"/><path d="M15 15h3v3h3v3h-6v-3h-3v-3M12 3v6M3 12h6M12 12h6M21 12v3"/></svg>';
+
   const METHOD_HTML =
     '<dialog class="modal payment-screen" id="method-modal">' +
     '<div class="payment-card">' +
     '<h2 class="payment-title">Выберите способ оплаты</h2>' +
     '<p class="payment-due-label">К оплате:</p>' +
     '<p class="payment-amount" id="pay-sum">—</p>' +
+    '<div class="payment-methods">' +
     '<button type="button" class="payment-method" id="pay-terminal-btn">' +
     '<span class="payment-method__top">' +
     '<span class="payment-method__icon">' +
@@ -41,7 +44,13 @@
     "После нажатия приложите карту или телефон к терминалу" +
     "</span>" +
     "</button>" +
-    '<button type="button" class="payment-method payment-method--sbp" id="pay-qr-btn" hidden><span class="payment-method__title">Оплатить по QR-коду СБП</span><span class="payment-method__subtitle">Отсканируйте код телефоном и оплатите в приложении банка</span></button>' +
+    '<button type="button" class="payment-method payment-method--sbp" id="pay-qr-btn" hidden>' +
+    '<span class="payment-method__top"><span class="payment-method__icon">' + QR_ICON + '</span>' +
+    '<span class="payment-method__copy"><span class="payment-method__title">Оплатить по QR-коду СБП</span>' +
+    '<span class="payment-method__subtitle">Нажмите, чтобы перейти к оплате</span></span></span>' +
+    '<span class="payment-method__hint"><span class="payment-method__hint-icon">' + QR_ICON + '</span>' +
+    'Отсканируйте код телефоном и оплатите в приложении банка</span></button>' +
+    '</div>' +
     '<button type="button" class="payment-cancel" id="method-cancel">← Отмена</button>' +
     '<p class="payment-secure"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="5" y="10" width="14" height="10" rx="3"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/><path d="m10 15 1.5 1.5L15 13"/></svg>Безопасная оплата</p>' +
     "</div>" +
@@ -136,7 +145,11 @@
     if (!$('qr-payment-modal')) {
       document.body.insertAdjacentHTML('beforeend', QR_HTML);
       $('qr-payment-modal').addEventListener('cancel', e => e.preventDefault());
-      $('qr-payment-cancel').addEventListener('click', () => {
+      document.body.insertAdjacentHTML('beforeend', '<dialog class="modal payment-screen" id="qr-cancel-confirm"><div class="payment-card"><h2 class="payment-title">Отменить оплату?</h2><p>Вы вернётесь к выбору способа оплаты.</p><button type="button" class="primary-btn" id="qr-keep-paying">Продолжить оплату</button><button type="button" class="payment-cancel" id="qr-confirm-cancel">Да, отменить оплату</button></div></dialog>');
+      $('qr-payment-cancel').addEventListener('click', () => $('qr-cancel-confirm').showModal());
+      $('qr-keep-paying').addEventListener('click', () => $('qr-cancel-confirm').close());
+      $('qr-confirm-cancel').addEventListener('click', () => {
+        $('qr-cancel-confirm').close();
         cancelRequested = true; $('qr-payment-cancel').disabled = true;
         $('qr-payment-image').hidden = true; $('qr-payment-confirm').hidden = true;
         pollQR(qrGeneration);
@@ -197,6 +210,7 @@
   }
 
   function closeWaiting() {
+    const confirmation = $('qr-cancel-confirm'); if (confirmation?.open) confirmation.close();
     ++qrGeneration; if (qrTimer) clearInterval(qrTimer); qrTimer = null;
     const qrDialog = $('qr-payment-modal'); if (qrDialog && qrDialog.open) qrDialog.close();
     const d = $("terminal-modal");
@@ -209,7 +223,20 @@
   if (document.body) mount();
   else document.addEventListener("DOMContentLoaded", mount);
 
+  async function resumeAfterCancel() {
+    if (!cancelRequested || !qrAttempt) return false;
+    try {
+      const response = await fetch('/api/kiosk/payment/qr/' + qrAttempt);
+      const data = await response.json();
+      if (!response.ok || data.state !== 'cancelled') return false;
+      cancelRequested = false;
+      open();
+      return true;
+    } catch (_) { return false; }
+  }
+
   window.KioskPayment = {
+    resumeAfterCancel: resumeAfterCancel,
     method: () => selectedMethod,
     mount: mount,
     setAmount: setAmount,

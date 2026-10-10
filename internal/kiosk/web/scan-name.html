@@ -282,6 +282,7 @@
         });
         const data = await res.json().catch(() => ({}));
         KioskPayment.closeWaiting();
+        if (!res.ok && await KioskPayment.resumeAfterCancel()) { busy = false; continueBtn.disabled = false; return; }
         if (!res.ok) throw new Error(data.error || 'Не удалось выполнить доплату');
         job = data.job;
         paidModal.showModal();

@@ -314,6 +314,7 @@
         KioskPayment.closeWaiting();
 
         if (!payRes.ok) {
+          if (await KioskPayment.resumeAfterCancel()) { busy = false; payBtn.disabled = false; return; }
           if (window.KioskStages) window.KioskStages.reset();
           if (payData.code === 'paper_insufficient') {
             if (payData.paper_remaining != null) {
