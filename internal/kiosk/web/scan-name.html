@@ -278,7 +278,7 @@
         const res = await fetch('/api/kiosk/scan/jobs/' + encodeURIComponent(jobId) + '/pay', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ method: 'terminal' }),
+          body: JSON.stringify({ method: KioskPayment.method() }),
         });
         const data = await res.json().catch(() => ({}));
         KioskPayment.closeWaiting();
@@ -338,8 +338,8 @@
       if (!leaveScanModal.open) leaveScanModal.showModal();
     }
 
-    document.getElementById('back-btn').addEventListener('click', protectUnsavedExit);
-    document.getElementById('home-link').addEventListener('click', protectUnsavedExit);
+
+
     document.getElementById('leave-scan-cancel').addEventListener('click', () => {
       if (job && Number(job.page_count || 0) === 0) {
         location.href = '/scan/?job=' + encodeURIComponent(jobId);
@@ -357,6 +357,7 @@
       continueBtn.disabled = true;
     });
   </script>
+  <script src="/static/scan-exit.js"></script>
   <script src="/static/idle.js"></script>
 </body>
 </html>

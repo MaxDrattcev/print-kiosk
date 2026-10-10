@@ -6,7 +6,7 @@
   <title>Печать с Email — PrintStart</title>
   <link rel="stylesheet" href="/static/style.css">
 </head>
-<body class="kiosk-user">
+<body class="kiosk-user email-upload-page">
   <div class="screen">
     <header class="app-header app-header--inner">
       <a class="brand" href="/">
@@ -30,7 +30,7 @@
       </a>
     </header>
 
-    <section class="prompt-card">
+    <section class="prompt-card upload-instructions-card">
       <div class="prompt-icon prompt-icon--mail" aria-hidden="true">
         <svg viewBox="0 0 96 96" fill="none">
           <rect x="14" y="24" width="68" height="48" rx="10" fill="#18c97a"/>
@@ -38,16 +38,19 @@
         </svg>
       </div>
       <h1>Отправьте документ на почту</h1>
-      <p>Отсканируйте QR-код, чтобы открыть письмо с адресом получателя. Затем прикрепите файл и отправьте письмо.</p>
-      <img class="email-qr" id="email-qr" alt="QR-код адреса почты терминала" width="560" height="560" hidden>
+      <p class="upload-intro">Отсканируйте QR-код, чтобы открыть письмо с адресом получателя. Прикрепите файл, отправьте письмо и нажмите «Я отправил письмо на email».</p>
+      <div id="email-qr-slot" aria-busy="true">
+        <div id="email-qr-loading" role="status"><div class="spinner" aria-hidden="true"></div><span>Готовим QR-код…</span></div>
+        <img class="email-qr" id="email-qr" alt="QR-код адреса почты терминала" width="560" height="560">
+      </div>
       <p class="scan-price source-email delivery-address delivery-address--email kiosk-skeleton-text" id="email-address" aria-label="Загружаем адрес почты">Загружаем адрес</p>
       <ol class="max-upload-steps" aria-label="Как отправить документ по почте">
         <li>Отсканируйте QR-код, чтобы открыть письмо</li>
-        <li>Прикрепите документ и отправьте письмо</li>
+        <li>Прикрепите файл и отправьте письмо</li>
         <li>Нажмите «Я отправил письмо на email»</li>
       </ol>
-      <p>PDF, Word, Excel или фото · до <span id="max-size">—</span> МБ</p>
-      <p>Ожидание письма — до 2 минут</p>
+      <div class="upload-file-info"><span>PDF · Word · Excel · Фото</span><strong>До <span id="max-size">—</span> МБ на файл</strong></div>
+      <p class="upload-wait-note">Ожидание письма — до 2 минут</p>
       <p class="error" id="error" hidden></p>
       <button type="button" class="primary-btn" id="sent-btn" disabled>Я отправил письмо на email</button>
     </section>
@@ -77,6 +80,8 @@
         if (!res.ok) {
           document.getElementById('email-address').classList.remove('kiosk-skeleton-text');
           document.getElementById('email-address').textContent = 'Почта временно недоступна';
+          document.getElementById('email-qr-slot').setAttribute('aria-busy', 'false');
+          document.getElementById('email-qr-loading').textContent = 'QR-код недоступен';
           showError(data.error || 'Печать по Email временно недоступна');
           return;
         }
@@ -84,12 +89,18 @@
         if (data.email_qr) {
           const qr = document.getElementById('email-qr');
           qr.src = data.email_qr;
-          qr.hidden = false;
+          await qr.decode();
+          qr.classList.add('is-ready');
+          document.getElementById('email-qr-loading').hidden = true;
         }
         document.getElementById('email-address').classList.remove('kiosk-skeleton-text');
+        document.getElementById('email-qr-slot').setAttribute('aria-busy', 'false');
+        if (!data.email_qr) document.getElementById('email-qr-loading').textContent = 'QR-код недоступен';
         document.getElementById('max-size').textContent = data.max_file_size_mb;
         sentBtn.disabled = false;
       } catch (e) {
+        document.getElementById('email-qr-slot').setAttribute('aria-busy', 'false');
+        document.getElementById('email-qr-loading').textContent = 'QR-код недоступен';
         document.getElementById('email-address').classList.remove('kiosk-skeleton-text');
         showError('Ошибка связи с сервером');
       }

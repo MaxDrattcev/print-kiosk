@@ -2,6 +2,11 @@ package storage
 
 // Setting keys stored in the settings table.
 const (
+	SettingPaymasterToken            = "paymaster_token"
+	SettingPaymasterMerchant         = "paymaster_merchant_id"
+	SettingVendistaToken             = "vendista_token"
+	SettingVendistaTerminalID        = "vendista_terminal_id"
+	SettingVendistaTimeout           = "vendista_timeout_sec"
 	SettingPriceBW                   = "price_bw"
 	SettingPriceColor                = "price_color"
 	SettingPriceCopy                 = "price_copy"

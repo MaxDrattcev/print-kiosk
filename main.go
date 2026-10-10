@@ -155,7 +155,6 @@ func ensureDirs(cfg *config.Config) error {
 	dirs := []string{
 		filepath.Dir(cfg.Database.Path),
 		filepath.Dir(cfg.Logging.Path),
-		cfg.Paths.Uploads,
 		cfg.Paths.PrintJobs,
 		cfg.ScanJobsDir(),
 		cfg.EmailInboxDir(),

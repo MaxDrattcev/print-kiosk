@@ -624,7 +624,7 @@
       KioskPayment.showWaiting();
       showError('');
 
-      const body = { ...settings(), method: 'terminal' };
+      const body = { ...settings(), method: KioskPayment.method() };
       try {
         const payRes = await fetch('/api/kiosk/print/jobs/' + encodeURIComponent(jobId) + '/pay', {
           method: 'POST',

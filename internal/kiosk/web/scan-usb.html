@@ -6,7 +6,7 @@
   <title>Сохранить на USB — PrintStart</title>
   <link rel="stylesheet" href="/static/style.css">
 </head>
-<body class="kiosk-user">
+<body class="kiosk-user usb-insert-page">
   <div class="screen">
     <header class="app-header app-header--inner">
       <a class="brand" href="/">
@@ -30,21 +30,15 @@
       </a>
     </header>
 
+    <main class="usb-insert-stage">
     <section class="prompt-card">
-      <div class="prompt-icon prompt-icon--usb" aria-hidden="true">
-        <svg viewBox="0 0 96 96" fill="none">
-          <rect x="34" y="12" width="28" height="28" rx="6" fill="#3d7eff"/>
-          <rect x="22" y="36" width="52" height="42" rx="10" fill="#5b9bff"/>
-          <rect x="34" y="48" width="28" height="8" rx="4" fill="#fff"/>
-          <rect x="34" y="62" width="28" height="8" rx="4" fill="#fff"/>
-          <circle cx="48" cy="22" r="4" fill="#fff"/>
-        </svg>
-      </div>
+      <span class="prompt-usb-art" aria-hidden="true"></span>
       <h1>Вставьте флешку в USB-разъём</h1>
-      <p id="file-hint">После подключения нажмите «Сохранить», и скан скопируется на флешку</p>
+      <p id="file-hint">После подключения нажмите «Сохранить на флешку», и скан скопируется на флешку</p>
       <p class="error" id="error" hidden></p>
       <button type="button" class="primary-btn" id="save-btn">Сохранить на флешку</button>
     </section>
+    </main>
   </div>
 
   <dialog class="modal" id="drives-modal">
@@ -170,6 +164,7 @@
         setLoading(false);
         if (!res.ok) {
           showError(data.error || 'Не удалось сохранить на флешку');
+          window.ScanDeliveryRecovery?.show();
           saveBtn.disabled = false;
           return;
         }
@@ -180,6 +175,7 @@
       } catch (e) {
         setLoading(false);
         showError('Ошибка связи с сервером');
+        window.ScanDeliveryRecovery?.show();
         saveBtn.disabled = false;
       }
     }
@@ -225,6 +221,7 @@
         showDrivePicker(drives);
       } catch (e) {
         showError('Ошибка связи с сервером');
+        window.ScanDeliveryRecovery?.show();
         saveBtn.disabled = false;
       }
     });
@@ -240,6 +237,7 @@
     loadJob();
   </script>
   <script src="/static/ui.js"></script>
+  <script src="/static/scan-exit.js"></script>
   <script src="/static/idle.js"></script>
 </body>
 </html>

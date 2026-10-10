@@ -47,7 +47,7 @@ func (s *Service) pollOnce(ctx context.Context) {
 			s.handleIncoming(ctx, u)
 			continue
 		}
-		if u.UpdateType != model.UpdateMessageCreated || u.Message == nil {
+		if u.UpdateType != model.UpdateMessageCallback && (u.UpdateType != model.UpdateMessageCreated || u.Message == nil) {
 			continue
 		}
 		s.handleIncoming(ctx, u)
@@ -75,6 +75,10 @@ func (s *Service) handleIncoming(ctx context.Context, u model.Update) {
 	}
 	if s.claimScan(u, userID, time.Now()) {
 		_ = s.sendUserText(ctx, userID, "Готовим документ к отправке…")
+		return
+	}
+
+	if s.handleAdminCommand(ctx, u) {
 		return
 	}
 

@@ -6,7 +6,7 @@
   <title>Отправить в MAX — PrintStart</title>
   <link rel="stylesheet" href="/static/style.css">
 </head>
-<body class="kiosk-user">
+<body class="kiosk-user max-upload-page scan-max-page">
   <div class="screen">
     <header class="app-header app-header--inner">
       <a class="brand" href="/">
@@ -30,25 +30,30 @@
       </a>
     </header>
 
-    <section class="hero compact">
-      <h1>Отправить в MAX</h1>
-      <p id="file-hint">Наведите камеру телефона на QR-код и откройте бота</p>
-    </section>
-
-    <div class="name-form">
-      <img id="bot-qr" alt="QR-код для получения вашего скана в MAX" width="300" height="300" hidden style="display:block;max-width:100%;height:auto;margin:0 auto 16px;border-radius:16px">
-      <p class="hint">Откройте ссылку в MAX и, если появится кнопка «Начать», нажмите её. Скан отправится автоматически.</p>
-      <p class="scan-price" id="bot-link">…</p>
+    <section class="prompt-card max-upload-card upload-instructions-card">
+      <div class="prompt-icon prompt-icon--max" aria-hidden="true"></div>
+      <h1>Получите документ в MAX</h1>
+      <p class="upload-intro">Отсканируйте QR-код, чтобы открыть бота в MAX. Если появится кнопка «Начать», нажмите её — скан отправится автоматически.</p>
+      <div id="max-qr-slot" aria-busy="true">
+        <div id="max-qr-loading" role="status"><div class="spinner" aria-hidden="true"></div><span>Готовим QR-код…</span></div>
+        <img id="bot-qr" alt="QR-код для получения вашего скана в MAX" width="768" height="768">
+      </div>
+      <p class="delivery-address delivery-address--max" id="bot-link">Загружаем ссылку на бота…</p>
+      <ol class="max-upload-steps" aria-label="Как получить скан в MAX">
+        <li>Отсканируйте QR-код камерой телефона</li>
+        <li>Откройте бота в MAX и нажмите «Начать», если кнопка появится</li>
+        <li>Дождитесь PDF-документа в чате с ботом</li>
+      </ol>
       <details id="code-fallback">
         <summary style="cursor:pointer;padding:16px 0;font-weight:700">Не получилось открыть QR-код?</summary>
         <p class="muted">Откройте бота по ссылке выше и отправьте эти 6 цифр одним сообщением:</p>
         <p class="code-block" id="code">…</p>
       </details>
-      <p class="hint">Ожидание до 2 минут. После открытия бота скан придёт вам в MAX.</p>
+      <p class="upload-wait-note">Ожидание документа — до 2 минут</p>
       <p class="error" id="error" hidden></p>
       <p class="scan-price" id="countdown" hidden></p>
       <button type="button" class="secondary-btn" id="cancel-btn">Отмена</button>
-    </div>
+    </section>
   </div>
 
   <div class="loading-overlay" id="loading-overlay" hidden>
@@ -134,6 +139,7 @@
         loadingOverlay.hidden = true;
         if (!res.ok) {
           showError(data.error || 'Не удалось отправить скан');
+          window.ScanDeliveryRecovery?.show();
           completing = false;
           return;
         }
@@ -142,6 +148,7 @@
       } catch (e) {
         loadingOverlay.hidden = true;
         showError('Ошибка связи с сервером');
+        window.ScanDeliveryRecovery?.show();
         completing = false;
       }
     }
@@ -165,6 +172,7 @@
         if (sess.status === 'timeout' || sess.status === 'error') {
           clearInterval(timer);
           showError(sess.error || 'Время ожидания истекло');
+          window.ScanDeliveryRecovery?.show();
         }
       } catch (e) {}
     }
@@ -188,8 +196,20 @@
         if (data.bot_qr) {
           const qr = document.getElementById('bot-qr');
           qr.src = data.bot_qr;
-          qr.hidden = false;
-        } else { document.getElementById('code-fallback').open = true; }
+          qr.decode().then(() => {
+            qr.classList.add('is-ready');
+            document.getElementById('max-qr-loading').hidden = true;
+            document.getElementById('max-qr-slot').setAttribute('aria-busy', 'false');
+          }).catch(() => {
+            document.getElementById('max-qr-loading').textContent = 'Откройте бота по ссылке ниже';
+            document.getElementById('max-qr-slot').setAttribute('aria-busy', 'false');
+            document.getElementById('code-fallback').open = true;
+          });
+        } else {
+          document.getElementById('max-qr-slot').setAttribute('aria-busy', 'false');
+          document.getElementById('max-qr-loading').textContent = 'Откройте бота по ссылке ниже';
+          document.getElementById('code-fallback').open = true;
+        }
         botLinkEl.textContent = data.bot_link || ('@' + (data.bot_username || ''));
         if (data.session.deadline_ms) deadlineMs = data.session.deadline_ms;
         timer = setInterval(() => { tick(); poll(); }, 1500);
@@ -197,10 +217,12 @@
         poll();
       } catch (e) {
         showError('Ошибка связи с сервером');
+        window.ScanDeliveryRecovery?.show();
       }
     })();
   </script>
   <script src="/static/ui.js"></script>
+  <script src="/static/scan-exit.js"></script>
   <script src="/static/idle.js"></script>
 </body>
 </html>

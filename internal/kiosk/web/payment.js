@@ -41,6 +41,7 @@
     "После нажатия приложите карту или телефон к терминалу" +
     "</span>" +
     "</button>" +
+    '<button type="button" class="payment-method payment-method--sbp" id="pay-qr-btn" hidden><span class="payment-method__title">Оплатить по QR-коду СБП</span><span class="payment-method__subtitle">Отсканируйте код телефоном и оплатите в приложении банка</span></button>' +
     '<button type="button" class="payment-cancel" id="method-cancel">← Отмена</button>' +
     '<p class="payment-secure"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="5" y="10" width="14" height="10" rx="3"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/><path d="m10 15 1.5 1.5L15 13"/></svg>Безопасная оплата</p>' +
     "</div>" +
@@ -63,6 +64,64 @@
     "</div>" +
     "</dialog>";
 
+  const QR_HTML = '<dialog class="modal payment-screen" id="qr-payment-modal"><div class="payment-card payment-card--sbp">' +
+    '<h2 class="payment-title">Оплата по QR-коду СБП</h2><p class="payment-amount" id="qr-payment-amount">—</p>' +
+    '<div class="sbp-qr-frame"><img id="qr-payment-image" alt="QR-код для оплаты СБП" width="768" height="768" hidden><p id="qr-payment-loading">Готовим QR-код…</p></div>' +
+    '<p id="qr-payment-status" aria-live="polite">Отсканируйте код камерой телефона и подтвердите оплату в приложении банка</p>' +
+    '<p id="qr-payment-countdown"></p><p id="qr-payment-test" hidden>Тестовый режим — деньги не списываются. Этот QR-код не предназначен для оплаты.</p>' +
+    '<button type="button" class="primary-btn" id="qr-payment-confirm" hidden>Подтвердить тестовую оплату</button>' +
+    '<button type="button" class="payment-cancel" id="qr-payment-cancel">Отменить оплату</button></div></dialog>';
+  let selectedMethod = 'terminal';
+  let qrAttempt = '';
+  let qrTimer = null;
+  let cancelRequested = false;
+  let qrGeneration = 0;
+  let qrBusy = false;
+
+  async function pollQR(generation) {
+    if (generation !== qrGeneration || qrBusy || !qrAttempt) return;
+    qrBusy = true;
+    try {
+      const attempt = qrAttempt;
+      if (cancelRequested) await fetch('/api/kiosk/payment/qr/' + attempt + '/cancel', {method:'POST'});
+      const res = await fetch('/api/kiosk/payment/qr/' + attempt, {cache:'no-store'});
+      if (!res.ok) return;
+      const data = await res.json();
+      if (generation !== qrGeneration) return;
+      $('qr-payment-test').hidden = !data.test;
+      $('qr-payment-confirm').hidden = !data.test || data.state !== 'pending' || cancelRequested;
+      $('qr-payment-amount').textContent = Number(data.amount).toLocaleString('ru-RU') + ' ₽';
+      const left = Math.max(0, data.expires - Math.floor(Date.now()/1000));
+      $('qr-payment-countdown').textContent = 'Осталось ' + Math.floor(left/60) + ':' + String(left%60).padStart(2,'0');
+      const image = $('qr-payment-image');
+      if (data.qr && !cancelRequested && image.dataset.ready !== attempt) {
+        image.src = data.qr;
+        await image.decode();
+        if (generation !== qrGeneration || cancelRequested) return;
+        image.dataset.ready = attempt; image.hidden = false; $('qr-payment-loading').hidden = true;
+      }
+      if (data.state !== 'pending' || cancelRequested || left === 0) {
+        image.hidden = true; $('qr-payment-loading').hidden = false;
+        $('qr-payment-loading').textContent = data.state === 'paid' ? 'Оплата получена' : 'Проверяем результат…';
+        $('qr-payment-status').textContent = cancelRequested ? 'Проверяем отмену. Дождитесь ответа, чтобы избежать повторной оплаты.' : 'Проверяем результат оплаты…';
+      }
+    } catch (_) {
+      if (generation === qrGeneration) $('qr-payment-status').textContent = 'Проверяем связь и результат оплаты…';
+    } finally { qrBusy = false; }
+  }
+  function showQR() {
+    cancelRequested = false;
+    const generation = ++qrGeneration;
+    const image = $('qr-payment-image'); image.hidden = true; image.removeAttribute('src'); image.dataset.ready = '';
+    $('qr-payment-loading').hidden = false; $('qr-payment-loading').textContent = 'Готовим QR-код…';
+    $('qr-payment-status').textContent = 'Отсканируйте код камерой телефона и подтвердите оплату в приложении банка';
+    $('qr-payment-confirm').hidden = true; $('qr-payment-test').hidden = true;
+    $('qr-payment-cancel').disabled = false; $('qr-payment-countdown').textContent = '';
+    $('qr-payment-amount').textContent = $('pay-sum').textContent;
+    $('qr-payment-modal').showModal();
+    qrTimer = setInterval(() => pollQR(generation),1000);
+  }
+
   function $(id) {
     return document.getElementById(id);
   }
@@ -73,6 +132,28 @@
     }
     if (!$("terminal-modal")) {
       document.body.insertAdjacentHTML("beforeend", WAIT_HTML);
+    }
+    if (!$('qr-payment-modal')) {
+      document.body.insertAdjacentHTML('beforeend', QR_HTML);
+      $('qr-payment-modal').addEventListener('cancel', e => e.preventDefault());
+      $('qr-payment-cancel').addEventListener('click', () => {
+        cancelRequested = true; $('qr-payment-cancel').disabled = true;
+        $('qr-payment-image').hidden = true; $('qr-payment-confirm').hidden = true;
+        pollQR(qrGeneration);
+      });
+      $('qr-payment-confirm').addEventListener('click', async () => {
+        $('qr-payment-confirm').disabled = true;
+        try { await fetch('/api/kiosk/payment/qr/' + qrAttempt + '/test-confirm',{method:'POST'}); }
+        finally { $('qr-payment-confirm').disabled = false; }
+      });
+      $('pay-qr-btn').addEventListener('click', () => {
+        qrAttempt = crypto.randomUUID(); selectedMethod = 'qr:' + qrAttempt;
+        $('pay-terminal-btn').click();
+      });
+      $('pay-terminal-btn').addEventListener('click', e => {
+        if (e.isTrusted) { selectedMethod = 'terminal'; qrAttempt = ''; }
+      }, true);
+      fetch('/api/kiosk/info').then(r => r.json()).then(info => { $('pay-qr-btn').hidden = !info.payment_qr; }).catch(() => {});
     }
     const cancel = $("method-cancel");
     const method = $("method-modal");
@@ -96,6 +177,7 @@
   }
 
   function open(amountText) {
+    selectedMethod = "terminal"; qrAttempt = "";
     if (amountText != null && amountText !== "") setAmount(amountText);
     if (window.KioskStages) window.KioskStages.payment();
     const d = $("method-modal");
@@ -109,19 +191,26 @@
 
   function showWaiting() {
     close();
+    if (selectedMethod.startsWith("qr:")) { showQR(); return; }
     const d = $("terminal-modal");
     if (d && typeof d.showModal === "function" && !d.open) d.showModal();
   }
 
   function closeWaiting() {
+    ++qrGeneration; if (qrTimer) clearInterval(qrTimer); qrTimer = null;
+    const qrDialog = $('qr-payment-modal'); if (qrDialog && qrDialog.open) qrDialog.close();
     const d = $("terminal-modal");
     if (d && d.open) d.close();
   }
 
+  window.addEventListener('pagehide', () => {
+    if (qrAttempt && $('qr-payment-modal')?.open) navigator.sendBeacon('/api/kiosk/payment/qr/' + qrAttempt + '/cancel');
+  });
   if (document.body) mount();
   else document.addEventListener("DOMContentLoaded", mount);
 
   window.KioskPayment = {
+    method: () => selectedMethod,
     mount: mount,
     setAmount: setAmount,
     open: open,

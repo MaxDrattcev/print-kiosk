@@ -58,8 +58,12 @@ func RegisterRoutes(r *gin.Engine, cfg *config.Config, settings *storage.Setting
 	}
 
 	h := NewHandler(cfg, settings, jobs, scans, copies, mail, maxSvc, st, history)
+	go h.scanRefundWorker()
 
 	r.GET("/api/kiosk/info", h.Info)
+	r.GET("/api/kiosk/payment/qr/:attempt", h.SBPStatus)
+	r.POST("/api/kiosk/payment/qr/:attempt/cancel", h.SBPCancel)
+	r.POST("/api/kiosk/payment/qr/:attempt/test-confirm", h.SBPTestConfirm)
 	r.POST("/api/kiosk/color-print/vote", h.VoteColorPrint)
 	r.POST("/api/kiosk/session/end", h.EndSession)
 	r.GET("/api/kiosk/usb/drives", h.ListUSBDrives)
@@ -100,6 +104,7 @@ func RegisterRoutes(r *gin.Engine, cfg *config.Config, settings *storage.Setting
 	r.POST("/api/kiosk/scan/jobs/:id/name", h.NameScanJob)
 	r.POST("/api/kiosk/scan/jobs/:id/save-usb", h.SaveScanToUSB)
 	r.POST("/api/kiosk/scan/jobs/:id/send-email", h.SendScanEmail)
+	r.POST("/api/kiosk/scan/jobs/:id/cancel-refund", h.CancelScanWithRefund)
 
 	r.POST("/api/kiosk/copy/jobs", h.CreateCopyJob)
 	r.GET("/api/kiosk/copy/jobs/:id", h.GetCopyJob)
@@ -161,7 +166,7 @@ func RegisterRoutes(r *gin.Engine, cfg *config.Config, settings *storage.Setting
 		serveFile(c, static, "print-email-files.html")
 	})
 	r.GET("/print/max/", func(c *gin.Context) {
-		serveFile(c, static, "print-max.html")
+		serveFile(c, static, "print-max-wait.html")
 	})
 	r.GET("/print/max/wait/", func(c *gin.Context) {
 		serveFile(c, static, "print-max-wait.html")

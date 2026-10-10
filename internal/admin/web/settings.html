@@ -310,7 +310,7 @@
             <div class="admin-section-head">
               <p class="admin-eyebrow">Приём платежей</p>
               <h2>Платёжный терминал</h2>
-              <p>Тестовый режим переключается сразу. Адрес драйвера задаётся в config.yaml.</p>
+              <p>Vendista через SIM-карту. Сохраните настройки перед проверкой подключения.</p>
             </div>
             <div class="admin-card">
               <div class="admin-row">
@@ -320,11 +320,41 @@
                 </div>
                 <label class="admin-toggle"><input type="checkbox" name="test_payment_mode" value="true"><span class="admin-toggle-ui"></span></label>
               </div>
-              <p class="admin-muted" style="margin-top:12px">Если режим выключен, запрос отправляется в драйвер из <code>payment.driver_url</code>.</p>
-              <label class="admin-field">Адрес платёжного драйвера
-                <input type="text" id="payment-driver-url" readonly>
-                <span class="admin-help">Фактическая связь проверяется при проведении оплаты.</span>
+              <div class="admin-row">
+                <div><h3 style="margin:0">Включить СБП</h3><p class="admin-muted" style="margin:0">QR-код на экране киоска. Оплата через PayMaster, независимо от Vendista.</p></div>
+                <label class="admin-toggle"><input type="checkbox" name="payment_qr_enabled" value="true"><span class="admin-toggle-ui"></span></label>
+              </div>
+              <label class="admin-field">ID магазина PayMaster (merchantId)
+                <input type="text" name="paymaster_merchant_id" autocomplete="off">
               </label>
+              <label class="admin-field">API-токен PayMaster
+                <input type="password" name="paymaster_token" autocomplete="new-password">
+                <span class="admin-help">Отдельный токен PayMaster с доступом к платежам и возвратам. В магазине должен быть подключён СБП. В тестовом режиме реквизиты не требуются, деньги не списываются.</span>
+              </label>
+              <button type="button" class="admin-btn secondary" id="sbp-test-btn">Проверить PayMaster / СБП</button>
+              <p class="admin-muted" id="sbp-test-result"></p>
+              <label class="admin-field">ID терминала Vendista
+                <input type="text" name="vendista_terminal_id" inputmode="numeric" pattern="[0-9]+">
+              </label>
+              <label class="admin-field">API-токен Vendista
+                <input type="password" name="vendista_token" autocomplete="new-password">
+                <span class="admin-help">Токен клиента из API Vendista. Терминал должен быть переведён в режим Retail.</span>
+              </label>
+              <label class="admin-field">Время проверки оплаты, секунд
+                <input type="number" name="vendista_timeout_sec" min="70" max="180" value="90">
+              </label>
+              <p class="admin-muted">Проверка связи не списывает деньги. Статус основан на времени последнего выхода терминала на связь; свежим считается обращение за последние 5 минут.</p>
+              <p class="admin-muted" id="payment-test-result"></p>
+              <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <button type="button" class="admin-btn secondary" id="payment-test-btn">Проверить Vendista</button>
+                <button type="button" class="admin-btn secondary" id="payment-reconcile-btn">Проверить незавершённую оплату</button>
+              </div>
+              <p class="admin-muted">Если клиент не приложил карту, а результат остался неизвестным: сначала выполните сверку. Если через 3 минуты результата нет, проверьте отсутствие списания в кабинете эквайринга.</p>
+              <label><input type="checkbox" id="payment-no-charge-confirm"> Я проверил: деньги не списаны</label>
+              <div style="margin-top:12px">
+                <button type="button" class="admin-btn secondary" id="payment-resolve-btn">Закрыть несостоявшуюся оплату картой</button>
+                <button type="button" class="admin-btn secondary" id="sbp-resolve-btn">Закрыть СБП без списания</button>
+              </div>
             </div>
           </section>
 

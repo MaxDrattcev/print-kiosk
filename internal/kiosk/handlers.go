@@ -90,7 +90,7 @@ func (h *Handler) Info(c *gin.Context) {
 		"source_usb":           storage.SettingEnabled(values, storage.SettingSourceUSBEnabled, true),
 		"source_email":         emailOn,
 		"source_max":           storage.MaxKioskReady(values),
-		"payment_qr":           false,
+		"payment_qr":           storage.SettingEnabled(values, storage.SettingPaymentQREnabled, false),
 		"session_timeout_sec":  timeoutSec,
 		"paper_remaining":      values[storage.SettingPaperRemaining],
 		"printer_blocked":      storage.SettingEnabled(values, storage.SettingPrinterFaultBlocked, false),
@@ -316,7 +316,7 @@ func (h *Handler) PayPrintJob(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"ok":      true,
 		"paid":    true,
-		"method":  "terminal",
+		"method":  paymentMethod(in.Method),
 		"message": "Оплата прошла успешно",
 		"quote":   quote,
 		"job_id":  job.ID,

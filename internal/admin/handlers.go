@@ -22,6 +22,7 @@ import (
 	"print-kiosk/internal/stats"
 	"print-kiosk/internal/storage"
 	"print-kiosk/internal/usb"
+	"print-kiosk/internal/vendista"
 )
 
 type Handler struct {
@@ -39,7 +40,7 @@ type Handler struct {
 }
 
 func NewHandler(cfg *config.Config, sessions *SessionStore, settings *storage.SettingsRepo, st *stats.Repo, history *ophistory.Repo, printer *printjob.Service, max *maxsvc.Service) *Handler {
-	return &Handler{
+	handler := &Handler{
 		cfg:        cfg,
 		sessions:   sessions,
 		settings:   settings,
@@ -51,6 +52,11 @@ func NewHandler(cfg *config.Config, sessions *SessionStore, settings *storage.Se
 		delivered:  make(map[string]bool),
 		startedAt:  time.Now(),
 	}
+	if max != nil {
+		max.SetStatusReporter(handler.EquipmentReport)
+		max.SetHistoryExporter(handler.SendBotHistory)
+	}
+	return handler
 }
 
 type loginRequest struct {
@@ -153,6 +159,21 @@ func (h *Handler) UpdateSettings(c *gin.Context) {
 		updates[key] = strings.TrimSpace(value)
 	}
 
+	values, err := h.settings.GetAll()
+	if err != nil {
+		c.JSON(500, gin.H{"error": "Не удалось загрузить настройки"})
+		return
+	}
+	for key, value := range updates {
+		values[key] = value
+	}
+	if !storage.SettingEnabled(values, storage.SettingTestPaymentMode, true) {
+		if _, err := vendista.FromSettings(values); err != nil {
+			c.JSON(400, gin.H{"error": err.Error()})
+			return
+		}
+	}
+
 	if err := h.settings.SetMany(updates); err != nil {
 		slog.Error("admin settings save", "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось сохранить настройки"})
@@ -240,7 +261,6 @@ func (h *Handler) Overview(c *gin.Context) {
 		printerName = "принтер по умолчанию"
 	}
 	deviceTest := h.cfg.Printer.DryRun || storage.SettingEnabled(values, storage.SettingTestDeviceMode, true)
-	paymentTest := storage.SettingEnabled(values, storage.SettingTestPaymentMode, true)
 	printer := gin.H{
 		"known":          true,
 		"dry_run":        deviceTest,
@@ -369,22 +389,15 @@ func (h *Handler) Overview(c *gin.Context) {
 		"libreoffice_found": loErr == nil,
 		"scanner":           scanner,
 		"copy":              copyDev,
-		"payment": gin.H{
-			"known":      true,
-			"stub":       paymentTest,
-			"delay_sec":  5,
-			"status":     "warn",
-			"label":      map[bool]string{true: "Тестовый режим", false: "Реальный режим · проверка при оплате"}[paymentTest],
-			"driver_url": h.cfg.Payment.DriverURL,
-		},
-		"kiosk_name":     values[storage.SettingKioskName],
-		"kiosk_id":       values[storage.SettingKioskID],
-		"kiosk_location": values[storage.SettingKioskLocation],
-		"listen_addr":    h.cfg.Server.Addr,
-		"log_path":       h.cfg.Logging.Path,
-		"uptime_sec":     int(time.Since(h.startedAt).Seconds()),
-		"username":       username,
-		"today":          today,
+		"payment":           h.paymentStatus(c.Request.Context(), values),
+		"kiosk_name":        values[storage.SettingKioskName],
+		"kiosk_id":          values[storage.SettingKioskID],
+		"kiosk_location":    values[storage.SettingKioskLocation],
+		"listen_addr":       h.cfg.Server.Addr,
+		"log_path":          h.cfg.Logging.Path,
+		"uptime_sec":        int(time.Since(h.startedAt).Seconds()),
+		"username":          username,
+		"today":             today,
 	})
 }
 
@@ -492,6 +505,18 @@ func validateSetting(key, value string) error {
 	value = strings.TrimSpace(value)
 
 	switch key {
+	case storage.SettingVendistaTerminalID:
+		if value != "" {
+			n, e := strconv.ParseInt(value, 10, 64)
+			if e != nil || n <= 0 {
+				return errInvalid(key, "ожидается положительный ID терминала")
+			}
+		}
+	case storage.SettingVendistaTimeout:
+		n, e := strconv.Atoi(value)
+		if e != nil || n < 70 || n > 180 {
+			return errInvalid(key, "ожидается от 70 до 180 секунд")
+		}
 	case storage.SettingPriceBW, storage.SettingPriceColor, storage.SettingPriceCopy, storage.SettingPriceCopyColor, storage.SettingPriceScan:
 		if _, err := strconv.ParseFloat(value, 64); err != nil {
 			return errInvalid(key, "ожидается число")

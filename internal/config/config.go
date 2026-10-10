@@ -13,8 +13,6 @@ type Config struct {
 	Admin    AdminConfig    `yaml:"admin"`
 	Database DatabaseConfig `yaml:"database"`
 	Logging  LoggingConfig  `yaml:"logging"`
-	Telegram TelegramConfig `yaml:"telegram"`
-	Payment  PaymentConfig  `yaml:"payment"`
 	Printer  PrinterConfig  `yaml:"printer"`
 	Paths    PathsConfig    `yaml:"paths"`
 }
@@ -47,15 +45,6 @@ type LoggingConfig struct {
 	Level string `yaml:"level"`
 }
 
-type TelegramConfig struct {
-	BotToken string `yaml:"bot_token"`
-	ChatID   string `yaml:"chat_id"`
-}
-
-type PaymentConfig struct {
-	DriverURL string `yaml:"driver_url"`
-}
-
 type PrinterConfig struct {
 	// Name of Windows printer queue. Empty = system default.
 	Name string `yaml:"name"`
@@ -71,7 +60,6 @@ type PathsConfig struct {
 	// nil = default true on Windows.
 	LibreOfficeAutoInstall *bool  `yaml:"libreoffice_auto_install"`
 	LibreOfficeMSIURL      string `yaml:"libreoffice_msi_url"`
-	Uploads                string `yaml:"uploads"`
 	PrintJobs              string `yaml:"print_jobs"`
 }
 
@@ -114,14 +102,8 @@ func (c *Config) applyDefaults() {
 	if c.Logging.Level == "" {
 		c.Logging.Level = "info"
 	}
-	if c.Payment.DriverURL == "" {
-		c.Payment.DriverURL = "http://localhost:8081"
-	}
 	if c.Paths.LibreOffice == "" {
 		c.Paths.LibreOffice = "soffice"
-	}
-	if c.Paths.Uploads == "" {
-		c.Paths.Uploads = "data/uploads"
 	}
 	if c.Paths.PrintJobs == "" {
 		c.Paths.PrintJobs = "data/print-jobs"

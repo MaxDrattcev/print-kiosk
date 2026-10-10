@@ -28,19 +28,25 @@ const (
 )
 
 type Job struct {
-	ID             string  `json:"id"`
-	Status         Status  `json:"status"`
-	Paid           bool    `json:"paid"`
-	FileName       string  `json:"file_name"`
-	ScanPath       string  `json:"-"`
-	SavedPath      string  `json:"saved_path,omitempty"`
-	SentToEmail    string  `json:"sent_to_email,omitempty"`
-	PricePerScan   float64 `json:"price"`
-	Pages          []Page  `json:"pages"`
-	PaidPages      int     `json:"paid_pages"`
-	PaidAmount     float64 `json:"paid_amount"`
-	paymentPending int
-	CreatedAt      time.Time
+	ID                string  `json:"id"`
+	Status            Status  `json:"status"`
+	Paid              bool    `json:"paid"`
+	FileName          string  `json:"file_name"`
+	ScanPath          string  `json:"-"`
+	SavedPath         string  `json:"saved_path,omitempty"`
+	SentToEmail       string  `json:"sent_to_email,omitempty"`
+	PricePerScan      float64 `json:"price"`
+	Pages             []Page  `json:"pages"`
+	PaidPages         int     `json:"paid_pages"`
+	PaidAmount        float64 `json:"paid_amount"`
+	deliveryBusy      bool
+	deliverySucceeded bool
+	DeliveryFailed    bool `json:"delivery_failed"`
+	successfulScans   int
+	scanning          bool
+	RefundRequired    bool `json:"refund_required"`
+	paymentPending    int
+	CreatedAt         time.Time
 }
 
 type Page struct {
@@ -134,6 +140,12 @@ func (s *Service) ReservePayment(id string) (PaymentReservation, error) {
 	if !ok {
 		return PaymentReservation{}, fmt.Errorf("заказ не найден")
 	}
+	if job.deliveryBusy || job.scanning {
+		return PaymentReservation{}, fmt.Errorf("Дождитесь завершения текущей операции")
+	}
+	if job.RefundRequired {
+		return PaymentReservation{}, fmt.Errorf("За этот скан оформляется возврат. Начните новое сканирование")
+	}
 	if job.paymentPending > 0 {
 		return PaymentReservation{}, fmt.Errorf("оплата уже выполняется")
 	}
@@ -185,8 +197,37 @@ func (s *Service) ScanTest(id string) (*Job, error) {
 	return s.scan(id, -1, true)
 }
 
+// AcquisitionError distinguishes device/file failures from invalid requests.
+type AcquisitionError struct{ Err error }
+
+func (e *AcquisitionError) Error() string { return e.Err.Error() }
+func (e *AcquisitionError) Unwrap() error { return e.Err }
 func (s *Service) ScanPage(id string, replaceIndex int, dryRun bool) (*Job, error) {
-	return s.scan(id, replaceIndex, dryRun)
+	s.mu.Lock()
+	job, ok := s.jobs[id]
+	if !ok {
+		s.mu.Unlock()
+		return nil, fmt.Errorf("заказ не найден")
+	}
+	if job.scanning || job.deliveryBusy || job.paymentPending > 0 {
+		s.mu.Unlock()
+		return nil, fmt.Errorf("сканирование уже выполняется")
+	}
+	if job.RefundRequired {
+		s.mu.Unlock()
+		return nil, fmt.Errorf("За этот скан оформляется возврат. Начните новое сканирование")
+	}
+	job.scanning = true
+	s.mu.Unlock()
+	result, err := s.scan(id, replaceIndex, dryRun)
+	s.mu.Lock()
+	job.scanning = false
+	if _, failed := err.(*AcquisitionError); failed && job.successfulScans == 0 && job.PaidPages == 1 {
+		job.RefundRequired = true
+		job.Paid = false
+	}
+	s.mu.Unlock()
+	return result, err
 }
 
 func (s *Service) scan(id string, replaceIndex int, dryRun bool) (*Job, error) {
@@ -207,12 +248,12 @@ func (s *Service) scan(id string, replaceIndex int, dryRun bool) (*Job, error) {
 	dir := filepath.Join(s.jobsDir, id)
 	pagesDir := filepath.Join(dir, "pages")
 	if err := os.MkdirAll(pagesDir, 0o755); err != nil {
-		return nil, err
+		return nil, &AcquisitionError{Err: err}
 	}
 	pageID := uuid.NewString()
 	out := filepath.Join(pagesDir, pageID+".pdf")
 	if err := performScan(out, dryRun); err != nil {
-		return nil, err
+		return nil, &AcquisitionError{Err: err}
 	}
 
 	s.mu.Lock()
@@ -229,12 +270,13 @@ func (s *Service) scan(id string, replaceIndex int, dryRun bool) (*Job, error) {
 	if err := s.rebuildPDF(job); err != nil {
 		job.Pages = oldPages
 		_ = os.Remove(out)
-		return nil, err
+		return nil, &AcquisitionError{Err: err}
 	}
 	if replacedPath != "" {
 		_ = os.Remove(replacedPath)
 	}
 	job.Status = StatusScanned
+	job.successfulScans++
 	return job, nil
 }
 
@@ -244,6 +286,9 @@ func (s *Service) DeletePage(id string, index int) (*Job, error) {
 	job, ok := s.jobs[id]
 	if !ok {
 		return nil, fmt.Errorf("заказ не найден")
+	}
+	if job.deliveryBusy || job.scanning || job.RefundRequired {
+		return nil, fmt.Errorf("Дождитесь завершения текущей операции")
 	}
 	if index < 0 || index >= len(job.Pages) {
 		return nil, fmt.Errorf("страница не найдена")
@@ -472,4 +517,72 @@ func sanitizeFileName(name string) (string, error) {
 		name = base + ".pdf"
 	}
 	return name, nil
+}
+
+// BeginDelivery serializes sending, saving and cancellation for a scan session.
+func (s *Service) BeginDelivery(id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	job, ok := s.jobs[id]
+	if !ok {
+		return fmt.Errorf("заказ не найден")
+	}
+	if job.RefundRequired {
+		return fmt.Errorf("Операция отменена, оформляется возврат")
+	}
+	if job.deliveryBusy || job.scanning || job.paymentPending > 0 {
+		return fmt.Errorf("Дождитесь завершения текущей операции")
+	}
+	if job.deliverySucceeded || job.SavedPath != "" || job.SentToEmail != "" {
+		return fmt.Errorf("Документ уже получен")
+	}
+	job.deliveryBusy = true
+	return nil
+}
+func (s *Service) EndDelivery(id string, success bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if job, ok := s.jobs[id]; ok {
+		job.deliveryBusy = false
+		job.DeliveryFailed = !success
+		job.deliverySucceeded = success
+	}
+}
+func (s *Service) BeginCancelDelivery(id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	job, ok := s.jobs[id]
+	if !ok {
+		return fmt.Errorf("заказ не найден")
+	}
+	if job.deliveryBusy || job.scanning || job.paymentPending > 0 {
+		return fmt.Errorf("Дождитесь завершения текущей операции")
+	}
+	if job.deliverySucceeded || job.SavedPath != "" || job.SentToEmail != "" {
+		return fmt.Errorf("Документ уже получен: отмена недоступна")
+	}
+	if !job.DeliveryFailed {
+		return fmt.Errorf("Отмена с возвратом доступна после ошибки отправки")
+	}
+	job.deliveryBusy = true
+	return nil
+}
+func (s *Service) EndCancelDelivery(id string, success bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if job, ok := s.jobs[id]; ok {
+		job.deliveryBusy = false
+		if success {
+			job.RefundRequired = true
+			job.Paid = false
+		}
+	}
+}
+
+func (s *Service) NoteDeliveryFailure(id string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if job, ok := s.jobs[id]; ok && !job.deliveryBusy && !job.deliverySucceeded && job.SavedPath == "" && job.SentToEmail == "" {
+		job.DeliveryFailed = true
+	}
 }

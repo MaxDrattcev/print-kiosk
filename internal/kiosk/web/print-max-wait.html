@@ -6,7 +6,7 @@
   <title>Ожидание файла MAX — PrintStart</title>
   <link rel="stylesheet" href="/static/style.css">
 </head>
-<body class="kiosk-user">
+<body class="kiosk-user max-upload-page">
   <div class="screen">
     <header class="app-header app-header--inner">
       <a class="brand" href="/">
@@ -30,16 +30,22 @@
       </a>
     </header>
 
-    <section class="prompt-card wait-magic-card max-upload-card" id="wait-panel">
+    <section class="prompt-card wait-magic-card max-upload-card upload-instructions-card" id="wait-panel">
+      <div class="prompt-icon prompt-icon--max" aria-hidden="true"></div>
       <h1>Отправьте документ в MAX</h1>
-      <img id="bot-qr" alt="QR-код бота MAX" width="320" height="320" hidden style="max-width:80%;height:auto;background:white;border-radius:16px;margin:16px auto;image-rendering:pixelated">
-      <p id="bot-link">Загружаем ссылку на бота…</p>
+      <p class="upload-intro">Отсканируйте QR-код, чтобы открыть бота в MAX. Нажмите «Начать», прикрепите файл и отправьте его боту.</p>
+      <div id="max-qr-slot" aria-busy="true">
+        <div id="max-qr-loading" role="status"><div class="spinner" aria-hidden="true"></div><span>Готовим QR-код…</span></div>
+        <img id="bot-qr" alt="QR-код бота MAX" width="768" height="768">
+      </div>
+      <p class="delivery-address delivery-address--max" id="bot-link">Загружаем ссылку на бота…</p>
       <ol class="max-upload-steps" aria-label="Как отправить документ">
         <li>Отсканируйте QR-код камерой телефона</li>
         <li>Откройте бота в MAX и нажмите «Начать»</li>
         <li>Прикрепите документ и отправьте его боту</li>
       </ol>
-      <p>PDF, Word, Excel или фото · до <span id="max-size">20</span> МБ</p>
+      <div class="upload-file-info"><span>PDF · Word · Excel · Фото</span><strong>До <span id="max-size">20</span> МБ на файл</strong></div>
+      <p class="upload-wait-note">Ожидание файла — до 2 минут</p>
       <p class="wait-magic-phrase" id="status-text">Заглядываем в волшебные сообщения MAX…</p>
       <div class="dots-loader" aria-hidden="true"><span></span><span></span><span></span></div>
       <p class="scan-price" id="countdown" hidden></p>
@@ -60,18 +66,27 @@
 
   <script>
     const params = new URLSearchParams(location.search);
-    const sessionId = params.get('session');
+    let sessionId = params.get('session');
     const exitURL = params.get('origin') === 'home' ? '/' : '/print/';
     document.querySelector('.back-btn').href = exitURL;
-    fetch('/api/kiosk/max/info').then(r => r.json()).then(data => {
+    fetch('/api/kiosk/max/info').then(r => { if (!r.ok) throw new Error('MAX info unavailable'); return r.json(); }).then(async data => {
       document.getElementById('bot-link').textContent = data.bot_link || 'Ссылка на бота не задана';
       document.getElementById('max-size').textContent = data.max_file_size_mb || '20';
       if (data.bot_qr) {
         const qr = document.getElementById('bot-qr');
         qr.src = data.bot_qr;
-        qr.hidden = false;
+        await qr.decode();
+        qr.classList.add('is-ready');
+        document.getElementById('max-qr-loading').hidden = true;
+        document.getElementById('max-qr-slot').setAttribute('aria-busy', 'false');
+      } else {
+        throw new Error('QR unavailable');
       }
-    }).catch(() => showError('Не удалось загрузить QR-код. Вернитесь назад и попробуйте снова.'));
+    }).catch(() => {
+      document.getElementById('max-qr-slot').setAttribute('aria-busy', 'false');
+      document.getElementById('max-qr-loading').textContent = 'QR-код недоступен';
+      showError('Не удалось загрузить QR-код. Вернитесь назад и попробуйте снова.');
+    });
     function abandon() {
       stop();
       navigator.sendBeacon('/api/kiosk/session/end', new Blob([JSON.stringify({max_session_id: sessionId})], {type: 'application/json'}));
@@ -287,14 +302,32 @@
       }
     });
 
-    if (!sessionId) {
-      showError('Сессия не указана');
-    } else {
+    (async () => {
+      if (!sessionId) {
+        try {
+          const res = await fetch('/api/kiosk/max/print/sessions', {method: 'POST'});
+          const data = await res.json();
+          if (!res.ok || !data.session?.id) throw new Error(data.error || 'Не удалось подключить MAX');
+          if (stopped) {
+            navigator.sendBeacon('/api/kiosk/session/end', new Blob([JSON.stringify({max_session_id:data.session.id})], {type:'application/json'}));
+            return;
+          }
+          sessionId = data.session.id;
+          const current = new URL(location.href);
+          current.searchParams.set('session', sessionId);
+          history.replaceState(null, '', current);
+        } catch (error) {
+          showError(error.message || 'Не удалось подключить MAX');
+          statusText.textContent = 'Вернитесь назад и попробуйте снова';
+          return;
+        }
+      }
+      if (stopped) return;
       poll();
       timer = setInterval(poll, 2000);
       countdownTimer = setInterval(tickCountdown, 1000);
       phraseTimer = setInterval(rotateMagicPhrase, 4000);
-    }
+    })();
   </script>
   <script src="/static/ui.js"></script>
   <script src="/static/idle.js"></script>

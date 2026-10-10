@@ -32,9 +32,9 @@
     </header>
 
     <section class="prepare-screen">
-      <div class="page-head">
+      <div class="page-head" id="scanner-prepare-heading">
         <h1 class="page-title">Подготовьте документ</h1>
-        <p class="page-subtitle">Положите документ на стекло сканера</p>
+        <p class="page-subtitle">Положите документ на стекло сканера текстом вниз</p>
       </div>
 
       <div class="steps">
@@ -70,8 +70,8 @@
         </div>
       </div>
 
-      <div class="price-card price-card--skeleton" id="price-card">
-        <div class="price-card-label">Стоимость сканирования</div>
+      <div class="price-card price-card--skeleton preparation-price-card" id="price-card">
+        <div class="price-card-label">Стоимость одного сканирования</div>
         <div class="price-card-value price-card-value--bar" id="price-line"></div>
       </div>
 
@@ -156,8 +156,8 @@
       if (continuingSession) {
         document.getElementById('back-btn').href = '/scan/name/?job=' + encodeURIComponent(jobId);
         document.querySelector('.page-subtitle').textContent = replaceIndex == null
-          ? 'Замените оригинал на следующий лист'
-          : 'Положите страницу, которую хотите отсканировать заново';
+          ? 'Положите следующий документ на стекло сканера текстом вниз'
+          : 'Положите документ на стекло сканера текстом вниз для повторного сканирования';
         document.querySelector('.price-card-label').textContent = replaceIndex == null
           ? 'Доплата за новый лист'
           : 'Пересканирование страницы';
@@ -262,7 +262,7 @@
         const payRes = await fetch('/api/kiosk/scan/jobs/' + encodeURIComponent(jobId) + '/pay', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ method: 'terminal' }),
+          body: JSON.stringify({ method: KioskPayment.method() }),
         });
         const payData = await payRes.json().catch(() => ({}));
         KioskPayment.closeWaiting();
@@ -291,6 +291,7 @@
       showPriceError(e.message || 'Не удалось загрузить стоимость сканирования');
     });
   </script>
+  <script src="/static/scan-exit.js"></script>
   <script src="/static/idle.js"></script>
 </body>
 </html>

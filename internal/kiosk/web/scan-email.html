@@ -6,7 +6,7 @@
   <title>Отправить скан на Email — PrintStart</title>
   <link rel="stylesheet" href="/static/style.css">
 </head>
-<body class="kiosk-user">
+<body class="kiosk-user scan-email-page">
   <div class="screen">
     <header class="app-header app-header--inner">
       <a class="brand" href="/">
@@ -30,7 +30,9 @@
       </a>
     </header>
 
+    <main class="scan-email-stage"><div class="scan-email-content">
     <section class="hero compact">
+      <div class="prompt-icon prompt-icon--mail" aria-hidden="true"></div>
       <h1>Отправить на Email</h1>
       <p id="file-hint">Введите адрес почты, куда отправить скан</p>
     </section>
@@ -42,6 +44,7 @@
       <p class="error" id="error" hidden></p>
       <button type="button" class="primary-btn" id="send-btn">Отправить</button>
     </div>
+    </div></main>
   </div>
 
   <div class="loading-overlay" id="loading-overlay" hidden>
@@ -123,7 +126,6 @@
         sendBtn.disabled = true;
         return;
       }
-      emailInput.focus();
     }
 
     sendBtn.addEventListener('click', async () => {
@@ -145,6 +147,7 @@
         setLoading(false);
         if (!res.ok) {
           showError(data.error || 'Не удалось отправить письмо');
+          window.ScanDeliveryRecovery?.show();
           sendBtn.disabled = false;
           return;
         }
@@ -154,6 +157,7 @@
       } catch (e) {
         setLoading(false);
         showError('Ошибка связи с сервером');
+        window.ScanDeliveryRecovery?.show();
         sendBtn.disabled = false;
       }
     });
@@ -168,6 +172,7 @@
     loadJob();
   </script>
   <script src="/static/ui.js"></script>
+  <script src="/static/scan-exit.js"></script>
   <script src="/static/idle.js"></script>
 </body>
 </html>

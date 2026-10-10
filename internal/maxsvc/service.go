@@ -55,9 +55,11 @@ type ScanSession struct {
 }
 
 type Service struct {
-	settings *storage.SettingsRepo
-	stats    *stats.Repo
-	rootDir  string
+	statusReporter  func(context.Context) string
+	historyExporter func(context.Context, int64, int) error
+	settings        *storage.SettingsRepo
+	stats           *stats.Repo
+	rootDir         string
 
 	mu           sync.RWMutex
 	printSess    map[string]*PrintSession
@@ -189,4 +191,17 @@ func (s *Service) TokenChecked(token string) bool {
 	value, ok := s.stats.GetKV("max_token_check")
 	fingerprint := sha256.Sum256([]byte(strings.TrimSpace(token)))
 	return ok && value == fmt.Sprintf("ok:%x", fingerprint)
+}
+
+// SetStatusReporter installs the application equipment checker before polling starts.
+func (s *Service) SetStatusReporter(fn func(context.Context) string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.statusReporter = fn
+}
+
+func (s *Service) SetHistoryExporter(fn func(context.Context, int64, int) error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.historyExporter = fn
 }

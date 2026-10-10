@@ -52,7 +52,7 @@
     overlay.setAttribute("aria-live", "assertive");
     overlay.innerHTML =
       '<div class="idle-card" role="document">' +
-      "<h2>Сессия скоро завершится</h2>" +
+      '<h2 id="idle-title">Сессия скоро завершится</h2>' +
       '<p class="idle-count"><span id="idle-seconds">15</span></p>' +
       '<p class="muted">Нет действий. Возврат на главную через несколько секунд.</p>' +
       '<button type="button" class="primary-btn" id="idle-stay-btn">Остаться</button>' +
@@ -82,12 +82,20 @@
   }
 
   function isPaused() {
-    if (document.querySelector(".loading-overlay:not([hidden])")) return true;
+    if (document.querySelector(".loading-overlay:not([hidden]), #terminal-modal[open], #qr-payment-modal[open]")) return true;
     return false;
   }
 
   function showWarn(secondsLeft) {
     ensureUI();
+    if (!warnVisible && window.ScanDeliveryRecovery) {
+      window.ScanDeliveryRecovery.refresh().then(() => {
+        if (window.ScanDeliveryRecovery.unsaved()) {
+          overlay.querySelector('#idle-title').textContent = 'Вы ещё не сохранили документ';
+          overlay.querySelector('.muted').textContent = 'Нажмите «Остаться», чтобы забрать скан. После завершения сессии документ будет удалён.';
+        }
+      }).catch(() => {});
+    }
     warnVisible = true;
     document.body.classList.add("idle-warn");
     if (secondsEl) secondsEl.textContent = String(Math.max(1, secondsLeft));

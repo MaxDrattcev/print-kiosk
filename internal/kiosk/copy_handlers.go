@@ -143,7 +143,7 @@ func (h *Handler) PayCopyJob(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"ok":      true,
 		"paid":    true,
-		"method":  "terminal",
+		"method":  paymentMethod(in.Method),
 		"message": "Оплата прошла успешно",
 		"quote":   quote,
 		"job":     copyJobJSON(job),

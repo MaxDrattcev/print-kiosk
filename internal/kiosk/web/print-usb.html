@@ -6,7 +6,7 @@
   <title>Печать с USB</title>
   <link rel="stylesheet" href="/static/style.css">
 </head>
-<body class="kiosk-user">
+<body class="kiosk-user usb-insert-page">
   <div class="screen">
     <header class="app-header app-header--inner">
       <a class="brand" href="/">
@@ -30,6 +30,7 @@
       </a>
     </header>
 
+    <main class="usb-insert-stage">
     <section class="prompt-card">
       <span class="prompt-usb-art" aria-hidden="true"></span>
       <h1>Вставьте флешку в USB-разъём</h1>
@@ -37,6 +38,8 @@
       <p class="error" id="error" hidden></p>
       <button type="button" class="primary-btn" id="continue-btn">Продолжить</button>
     </section>
+
+    </main>
 
     <div class="wave" aria-hidden="true"></div>
   </div>

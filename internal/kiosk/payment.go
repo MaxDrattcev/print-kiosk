@@ -1,41 +1,53 @@
 package kiosk
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
-	"net/http"
 	"strings"
 	"time"
 
 	"print-kiosk/internal/storage"
+	"print-kiosk/internal/vendista"
 )
 
 func (h *Handler) processPayment(ctx context.Context, method string, amount float64, orderID string) error {
-	if strings.EqualFold(strings.TrimSpace(method), "qr") {
-		return errPaymentQR
+	if !kioskPaymentMu.TryLock() {
+		return fmt.Errorf("уже выполняется оплата")
 	}
-	if h.testPaymentMode() {
-		time.Sleep(5 * time.Second)
-		return nil
-	}
-	endpoint := strings.TrimRight(strings.TrimSpace(h.cfg.Payment.DriverURL), "/") + "/pay"
-	payload, _ := json.Marshal(map[string]any{"amount": amount, "currency": "RUB", "order_id": orderID})
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(payload))
+	defer kioskPaymentMu.Unlock()
+	values, err := h.settings.GetAll()
 	if err != nil {
-		return fmt.Errorf("запрос оплаты: %w", err)
+		return fmt.Errorf("настройки оплаты: %w", err)
 	}
-	req.Header.Set("Content-Type", "application/json")
-	res, err := (&http.Client{Timeout: 2 * time.Minute}).Do(req)
+	if strings.HasPrefix(method, "qr:") {
+		return h.paySBP(ctx, strings.TrimPrefix(method, "qr:"), amount, orderID, values)
+	}
+	if method != "terminal" {
+		return fmt.Errorf("неизвестный способ оплаты")
+	}
+	if blocked, e := h.settings.SBPBlocked(); e != nil || blocked {
+		return fmt.Errorf("результат предыдущей оплаты СБП уточняется")
+	}
+	if p, e := h.settings.SBPOrder(orderID); e == nil && p.State != "cancelled" {
+		return fmt.Errorf("по этому заказу уже есть платёж СБП")
+	} else if e != nil && !storage.IsNoPayment(e) {
+		return e
+	}
+	if storage.SettingEnabled(values, storage.SettingTestPaymentMode, true) {
+		timer := time.NewTimer(5 * time.Second)
+		defer timer.Stop()
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-timer.C:
+			return nil
+		}
+	}
+	client, err := vendista.FromSettings(values)
 	if err != nil {
-		return fmt.Errorf("платёжный терминал: %w", err)
+		return err
 	}
-	defer res.Body.Close()
-	if res.StatusCode < 200 || res.StatusCode >= 300 {
-		return fmt.Errorf("платёжный терминал вернул HTTP %d", res.StatusCode)
-	}
-	return nil
+	return client.Pay(ctx, h.settings, orderID, amount)
 }
 
 func (h *Handler) testPaymentMode() bool {

@@ -90,7 +90,7 @@ func (r *SettingsRepo) SetMany(values map[string]string) error {
 
 func IsKnownSetting(key string) bool {
 	switch key {
-	case SettingPriceBW,
+	case SettingPaymasterToken, SettingPaymasterMerchant, SettingVendistaToken, SettingVendistaTerminalID, SettingVendistaTimeout, SettingPriceBW,
 		SettingPriceColor,
 		SettingPriceCopy,
 		SettingPriceCopyColor,
@@ -133,7 +133,7 @@ func IsKnownSetting(key string) bool {
 
 // SensitiveSettings are masked in API responses.
 func IsSensitiveSetting(key string) bool {
-	return key == SettingEmailPassword || key == SettingMaxBotToken
+	return key == SettingPaymasterToken || key == SettingVendistaToken || key == SettingEmailPassword || key == SettingMaxBotToken
 }
 
 // SettingEnabled reads a boolean setting. Missing/empty values use defaultOn.

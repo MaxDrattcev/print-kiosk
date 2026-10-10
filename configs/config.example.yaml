@@ -15,9 +15,6 @@ logging:
   path: logs/kiosk.log
   level: info
 
-payment:
-  driver_url: "http://localhost:8081"
-
 # Windows target machine settings
 printer:
   # Exact printer queue name from Windows (Settings → Printers). Empty = default.
@@ -37,5 +34,4 @@ paths:
   # libreoffice_auto_install: true
   # Optional fixed MSI URL (otherwise latest stable is resolved):
   # libreoffice_msi_url: ""
-  uploads: data/uploads
   print_jobs: data/print-jobs

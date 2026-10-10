@@ -2,6 +2,7 @@ package kiosk
 
 import (
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -101,7 +102,7 @@ func (h *Handler) PayScanJob(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	if err := h.processPayment(c.Request.Context(), in.Method, reservation.Amount, existingJob.ID); err != nil {
+	if err := h.processPayment(c.Request.Context(), in.Method, reservation.Amount, fmt.Sprintf("%s:scan:%d", existingJob.ID, existingJob.PaidPages)); err != nil {
 		h.scans.CancelPayment(c.Param("id"))
 		if errors.Is(err, errPaymentQR) {
 			c.JSON(http.StatusNotImplemented, gin.H{"error": err.Error()})
@@ -116,6 +117,9 @@ func (h *Handler) PayScanJob(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	if paymentMethod(in.Method) == "qr" && !h.testPaymentMode() {
+		_ = h.settings.AccountSBP(fmt.Sprintf("%s:scan:%d", existingJob.ID, existingJob.PaidPages))
+	}
 	paidAmount := reservation.Amount
 	if h.testPaymentMode() {
 		paidAmount = 0
@@ -129,7 +133,7 @@ func (h *Handler) PayScanJob(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"ok":         true,
 		"paid":       true,
-		"method":     "terminal",
+		"method":     paymentMethod(in.Method),
 		"message":    "Оплата прошла успешно",
 		"paid_pages": reservation.Pages,
 		"amount":     reservation.Amount,
@@ -159,7 +163,17 @@ func (h *Handler) ExecuteScanJob(c *gin.Context) {
 	if err != nil {
 		h.notifyErr(err)
 		h.recordOperation(c.Request.Context(), ophistory.Entry{Operation: "scan", JobID: c.Param("id"), Success: false, ErrorText: err.Error()})
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		message := err.Error()
+		if failedJob, ok := h.scans.Get(c.Param("id")); ok && failedJob.RefundRequired {
+			if refundErr := h.settings.QueueScanRefund(c.Param("id") + ":scan:0"); refundErr != nil {
+				slog.Error("queue scan refund", "job_id", c.Param("id"), "error", refundErr)
+				message += ". Не удалось оформить возврат автоматически. Обратитесь к администратору"
+			} else {
+				message += ". Сканирование не выполнено. Возврат поставлен на проверку; начните новое сканирование"
+				go h.processScanRefunds()
+			}
+		}
+		c.JSON(http.StatusBadRequest, gin.H{"error": message})
 		return
 	}
 	if h.stats != nil {
@@ -217,6 +231,13 @@ func (h *Handler) SaveScanToUSB(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "укажите флешку"})
 		return
 	}
+	if err := h.scans.BeginDelivery(c.Param("id")); err != nil {
+		c.JSON(409, gin.H{"error": err.Error()})
+		return
+	}
+	deliveryOK := false
+	defer func() { h.scans.EndDelivery(c.Param("id"), deliveryOK) }()
+
 	job, err := h.scans.SaveToUSB(c.Param("id"), in.DrivePath)
 	if err != nil {
 		msg := err.Error()
@@ -227,6 +248,8 @@ func (h *Handler) SaveScanToUSB(c *gin.Context) {
 		c.JSON(status, gin.H{"error": msg})
 		return
 	}
+	deliveryOK = true
+
 	c.JSON(http.StatusOK, gin.H{
 		"ok":         true,
 		"message":    "Скан сохранён на флешку",
@@ -245,6 +268,13 @@ func (h *Handler) SendScanEmail(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "укажите email получателя"})
 		return
 	}
+
+	if err := h.scans.BeginDelivery(c.Param("id")); err != nil {
+		c.JSON(409, gin.H{"error": err.Error()})
+		return
+	}
+	deliveryOK := false
+	defer func() { h.scans.EndDelivery(c.Param("id"), deliveryOK) }()
 
 	scanPath, fileName, err := h.scans.ReadyForDelivery(c.Param("id"))
 	if err != nil {
@@ -273,6 +303,8 @@ func (h *Handler) SendScanEmail(c *gin.Context) {
 		c.JSON(http.StatusBadGateway, gin.H{"error": "не удалось отправить письмо: " + err.Error()})
 		return
 	}
+
+	deliveryOK = true
 
 	job, err := h.scans.MarkSentEmail(c.Param("id"), in.Email)
 	if err != nil {
@@ -339,20 +371,22 @@ func scanJobJSON(job *scanjob.Job) gin.H {
 		})
 	}
 	return gin.H{
-		"id":            job.ID,
-		"status":        job.Status,
-		"paid":          job.Paid,
-		"file_name":     job.FileName,
-		"price":         job.PricePerScan,
-		"pages":         pages,
-		"page_count":    len(job.Pages),
-		"paid_pages":    job.PaidPages,
-		"unpaid_pages":  max(0, len(job.Pages)-job.PaidPages),
-		"paid_amount":   job.PaidAmount,
-		"fully_paid":    len(job.Pages) > 0 && job.PaidPages >= len(job.Pages),
-		"max_pages":     scanjob.MaxPages,
-		"preview_url":   preview,
-		"saved_path":    job.SavedPath,
-		"sent_to_email": job.SentToEmail,
+		"id":              job.ID,
+		"delivery_failed": job.DeliveryFailed,
+		"refund_required": job.RefundRequired,
+		"status":          job.Status,
+		"paid":            job.Paid,
+		"file_name":       job.FileName,
+		"price":           job.PricePerScan,
+		"pages":           pages,
+		"page_count":      len(job.Pages),
+		"paid_pages":      job.PaidPages,
+		"unpaid_pages":    max(0, len(job.Pages)-job.PaidPages),
+		"paid_amount":     job.PaidAmount,
+		"fully_paid":      len(job.Pages) > 0 && job.PaidPages >= len(job.Pages),
+		"max_pages":       scanjob.MaxPages,
+		"preview_url":     preview,
+		"saved_path":      job.SavedPath,
+		"sent_to_email":   job.SentToEmail,
 	}
 }

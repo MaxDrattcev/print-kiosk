@@ -35,6 +35,7 @@ jobs:
           cp deploy/windows/install-autostart.bat dist/windows/install-autostart.bat
           cp deploy/windows/uninstall-autostart.bat dist/windows/uninstall-autostart.bat
           cp deploy/windows/README.txt dist/windows/README.txt
+          cp deploy/windows/INSTALL-RU.txt dist/windows/INSTALL-RU.txt
 
       - name: Pack zip
         run: |
@@ -46,7 +47,8 @@ jobs:
             run-kiosk.vbs \
             install-autostart.bat \
             uninstall-autostart.bat \
-            README.txt
+            README.txt \
+            INSTALL-RU.txt
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

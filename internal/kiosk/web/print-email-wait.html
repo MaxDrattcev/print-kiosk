@@ -6,7 +6,7 @@
   <title>Ожидание письма — PrintStart</title>
   <link rel="stylesheet" href="/static/style.css">
 </head>
-<body class="kiosk-user">
+<body class="kiosk-user email-wait-page">
   <div class="screen">
     <header class="app-header app-header--inner">
       <a class="brand" href="/">
@@ -30,8 +30,10 @@
       </a>
     </header>
 
+    <main class="email-wait-stage">
     <section class="prompt-card wait-magic-card" id="wait-panel">
       <div class="wait-magic-art wait-magic-art--email" aria-hidden="true">
+        <div class="wait-magic-scene">
         <span class="wait-magic-glow"></span>
         <span class="wait-magic-ring wait-magic-ring--one"></span>
         <span class="wait-magic-ring wait-magic-ring--two"></span>
@@ -40,6 +42,7 @@
         <span class="wait-magic-page wait-magic-page--two"></span>
         <span class="wait-magic-page wait-magic-page--three"></span>
         <span class="wait-magic-sparkles"></span>
+        </div>
       </div>
       <p class="wait-magic-kicker">Почтовая магия работает</p>
       <h1>Ищем ваше письмо…</h1>
@@ -59,6 +62,7 @@
       <button type="button" class="primary-btn" id="yes-btn">Да, это мои файлы</button>
       <button type="button" class="secondary-btn" id="no-btn" style="margin-top:12px">Нет, ждать другое письмо</button>
     </section>
+    </main>
   </div>
 
   <script>

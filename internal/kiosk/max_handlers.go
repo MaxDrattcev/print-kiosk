@@ -177,6 +177,7 @@ func (h *Handler) PrepareMaxPrint(c *gin.Context) {
 
 func (h *Handler) StartMaxScanSession(c *gin.Context) {
 	if !h.requireMax(c, true) {
+		h.scans.NoteDeliveryFailure(c.Param("id"))
 		return
 	}
 	jobID := c.Param("id")
@@ -222,6 +223,10 @@ func (h *Handler) GetMaxScanSession(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "сессия не найдена"})
 		return
 	}
+	if sess.Status == maxsvc.StatusTimeout || sess.Status == maxsvc.StatusError {
+		h.scans.NoteDeliveryFailure(sess.JobID)
+	}
+
 	c.JSON(http.StatusOK, gin.H{"session": maxsvc.ScanSessionJSON(sess)})
 }
 
@@ -238,6 +243,13 @@ func (h *Handler) CompleteMaxScanSession(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "пользователь ещё не подтвердил код"})
 		return
 	}
+	if err := h.scans.BeginDelivery(sess.JobID); err != nil {
+		c.JSON(409, gin.H{"error": err.Error()})
+		return
+	}
+	deliveryOK := false
+	defer func() { h.scans.EndDelivery(sess.JobID, deliveryOK) }()
+
 	scanPath, fileName, err := h.scans.ReadyForDelivery(sess.JobID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -249,6 +261,8 @@ func (h *Handler) CompleteMaxScanSession(c *gin.Context) {
 		c.JSON(http.StatusBadGateway, gin.H{"error": "не удалось отправить в MAX: " + err.Error()})
 		return
 	}
+	deliveryOK = true
+
 	job, err := h.scans.MarkDelivered(sess.JobID, "max:"+strconv.FormatInt(sess.UserID, 10))
 	if err != nil {
 		h.scans.CleanupFiles(sess.JobID)

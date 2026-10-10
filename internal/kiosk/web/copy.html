@@ -32,9 +32,9 @@
     </header>
 
     <section class="prepare-screen">
-      <div class="page-head">
+      <div class="page-head" id="scanner-prepare-heading">
         <h1 class="page-title">Подготовьте документ</h1>
-        <p class="page-subtitle">Положите оригинал на стекло сканера</p>
+        <p class="page-subtitle">Положите документ на стекло сканера текстом вниз</p>
       </div>
 
       <div class="steps">
@@ -70,7 +70,7 @@
         </div>
       </div>
 
-      <div class="price-card price-card--skeleton copy-price-card" id="copy-price-card" aria-live="polite">
+      <div class="price-card price-card--skeleton preparation-price-card" id="copy-price-card" aria-live="polite">
         <div class="price-card-label">Стоимость одной копии</div>
         <div class="price-card-value price-card-value--bar" id="copy-price-line"></div>
       </div>
@@ -97,14 +97,11 @@
     const copyPriceCard = document.getElementById('copy-price-card');
     const copyPriceLine = document.getElementById('copy-price-line');
 
-    function fromPrice(value) {
-      const amount = Number(String(value == null ? '' : value).replace(',', '.'));
+    function money(value) {
+      if (value == null || String(value).trim() === '') return 'Цена уточняется';
+      const amount = Number(String(value).replace(',', '.'));
       if (!Number.isFinite(amount)) return 'Цена уточняется';
-      const formatted = amount.toLocaleString('ru-RU', { maximumFractionDigits: 2 });
-      const whole = Number.isInteger(amount);
-      const abs = Math.abs(Math.trunc(amount));
-      const rubles = whole && abs % 10 === 1 && abs % 100 !== 11 ? 'рубля' : 'рублей';
-      return 'от ' + formatted + ' ' + rubles;
+      return amount.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) + ' ₽';
     }
 
     async function loadCopyPrice() {
@@ -112,7 +109,7 @@
         const res = await fetch('/api/kiosk/info');
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error('price unavailable');
-        copyPriceLine.textContent = fromPrice(data.price_copy);
+        copyPriceLine.textContent = money(data.price_copy);
       } catch (_) {
         copyPriceLine.textContent = 'Цена уточняется';
       } finally {

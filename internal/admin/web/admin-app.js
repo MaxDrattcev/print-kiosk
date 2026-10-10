@@ -13,6 +13,7 @@
   const SAVE_SECTIONS = new Set(["prices", "paper", "print", "email", "max", "payment", "system"]);
   const PAPER_CAPACITY = 500;
   const boolFields = new Set([
+ "payment_qr_enabled",
     "max_enabled",
     "service_print_enabled",
     "service_copy_enabled",
@@ -23,7 +24,20 @@
     "test_payment_mode",
   ]);
   const PASSWORD_MASK = "********";
+
+  document.getElementById('sbp-test-btn')?.addEventListener('click', async (event) => {
+    const button=event.currentTarget, output=document.getElementById('sbp-test-result');
+    button.disabled=true; output.textContent='Проверяем доступ к PayMaster…';
+    try {
+      if (!await saveSettings()) { output.textContent='Сначала сохраните корректные настройки'; return; }
+      const response=await fetch('/api/admin/payment/sbp-test',{method:'POST',credentials:'same-origin'});
+      const data=await response.json(); output.textContent=data.message || data.error || 'Не удалось проверить СБП';
+    } catch (_) { output.textContent='Не удалось связаться с приложением'; }
+    finally { button.disabled=false; }
+  });
   const DEFAULTS = {
+    vendista_terminal_id: "",
+    vendista_timeout_sec: "90",
     price_bw: "5",
     price_copy: "10",
     price_scan: "10",
@@ -57,6 +71,33 @@
   let historyEmailSending = false;
 
   KioskKeyboard.bind(document);
+  for (const [id, endpoint] of [["payment-test-btn", "test"], ["payment-reconcile-btn", "reconcile"], ["payment-resolve-btn", "resolve"], ["sbp-resolve-btn", "sbp-resolve"]]) {
+    document.getElementById(id)?.addEventListener("click", async () => {
+      if (endpoint.endsWith("resolve") && !document.getElementById("payment-no-charge-confirm").checked) {
+        document.getElementById("payment-test-result").textContent = "Сначала проверьте отсутствие списания в кабинете эквайринга и отметьте подтверждение";
+        return;
+      }
+      if (!(await saveSettings())) return;
+      const button = document.getElementById(id);
+      const result = document.getElementById("payment-test-result");
+      button.disabled = true;
+      result.textContent = "Проверяем…";
+      try {
+        const res = await fetch("/api/admin/payment/" + endpoint, {method: "POST", credentials: "same-origin", headers: {"Content-Type": "application/json"}, body: JSON.stringify({confirmed_no_charge: endpoint.endsWith("resolve")})});
+        const data = await res.json();
+        result.textContent = data.error || data.message || data.label || "Проверка завершена";
+        if (Object.hasOwn(data, "last_operation_time")) result.textContent += " · Последняя операция: " + (data.last_operation_time || "операций нет");
+        if (data.last_operation_error) result.textContent += " · Последнюю операцию проверить не удалось";
+        if (data.last_online_time) result.textContent += " · Последняя связь: " + data.last_online_time;
+        if (data.refunds?.length) {
+          const states = {queued: "в очереди", sending: "результат проверяется", sent: "запрошен", unknown: "нужна проверка в Vendista", confirmed: "подтверждён"};
+          result.textContent += " · Возвраты: " + data.refunds.map(r => (r.amount_kopecks / 100) + " ₽ — " + (states[r.state] || r.state) + (r.error ? " (" + r.error + ")" : "")).join("; ");
+        }
+      } catch (_) { result.textContent = "Не удалось выполнить проверку"; }
+      finally { button.disabled = false; }
+    });
+  }
+
 
   document.querySelectorAll(".admin-field input[readonly], .admin-field textarea[readonly]").forEach((field) => {
     field.closest(".admin-field")?.classList.add("admin-field--readonly");
@@ -298,6 +339,10 @@
       errorEl.hidden = false;
       return false;
     }
+    if (payload.paymaster_token && payload.paymaster_token !== PASSWORD_MASK) form.elements.namedItem("paymaster_token").value = PASSWORD_MASK;
+    if (payload.vendista_token && payload.vendista_token !== PASSWORD_MASK) {
+      form.elements.namedItem("vendista_token").value = PASSWORD_MASK;
+    }
     if (payload.email_password && payload.email_password !== PASSWORD_MASK) {
       form.elements.namedItem("email_password").value = PASSWORD_MASK;
     }
@@ -465,7 +510,6 @@
     }
     setDeviceStatus("scan-device-status", data.scanner);
     setDeviceStatus("copy-device-status", data.copy);
-    if (data.payment) setVal("payment-driver-url", data.payment.driver_url || "—");
     const listen = document.getElementById("listen-addr");
     if (listen) listen.textContent = "Адрес API: " + (data.listen_addr || "—");
     if (data.email) {

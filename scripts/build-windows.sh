@@ -18,6 +18,7 @@ cp "${ROOT}/deploy/windows/run-kiosk.vbs" "${OUT_DIR}/run-kiosk.vbs"
 cp "${ROOT}/deploy/windows/install-autostart.bat" "${OUT_DIR}/install-autostart.bat"
 cp "${ROOT}/deploy/windows/uninstall-autostart.bat" "${OUT_DIR}/uninstall-autostart.bat"
 cp "${ROOT}/deploy/windows/README.txt" "${OUT_DIR}/README.txt"
+cp "${ROOT}/deploy/windows/INSTALL-RU.txt" "${OUT_DIR}/INSTALL-RU.txt"
 
 (
   cd "${OUT_DIR}"
@@ -28,7 +29,8 @@ cp "${ROOT}/deploy/windows/README.txt" "${OUT_DIR}/README.txt"
     run-kiosk.vbs \
     install-autostart.bat \
     uninstall-autostart.bat \
-    README.txt
+    README.txt \
+    INSTALL-RU.txt
 ) || true
 
 echo "OK: ${OUT_BIN}"

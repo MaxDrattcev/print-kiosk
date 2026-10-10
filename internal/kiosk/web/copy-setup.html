@@ -33,7 +33,6 @@
     <section class="hero compact">
       <p class="print-mode-heading">Черно-белая печать</p>
       <h1>Настройки копирования</h1>
-      <p>Выберите количество копий</p>
     </section>
 
     <section class="settings-panel">
@@ -304,7 +303,7 @@
       KioskPayment.showWaiting();
       showError('');
 
-      const body = { ...settings(), method: 'terminal' };
+      const body = { ...settings(), method: KioskPayment.method() };
       try {
         const payRes = await fetch('/api/kiosk/copy/jobs/' + encodeURIComponent(jobId) + '/pay', {
           method: 'POST',
